@@ -5,8 +5,7 @@
     "license": "MIT",
     "require": {
         "php": ">=8.4",
-        "infocyph/foundation": "dev-main",
-        "vlucas/phpdotenv": "^5.6"
+        "infocyph/foundation": "dev-main"
     },
     "autoload": {
         "psr-4": {

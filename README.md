@@ -37,7 +37,7 @@ The application entry flow is:
 4. `bootstrap/providers.php`
 5. `routes/*.php`
 
-`bootstrap/app.php` loads `.env` and creates the Foundation application with the project base path.
+`bootstrap/app.php` creates the Foundation application with the project base path. Foundation loads `.env` and `.env.local` during config boot.
 
 ## Project structure
 
