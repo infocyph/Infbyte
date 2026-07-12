@@ -8,7 +8,7 @@
         "infocyph/foundation": "dev-main"
     },
     "require-dev": {
-        "infocyph/phpforge": "dev-main"
+        "infocyph/phpforge": "dev-main@dev"
     },
     "repositories": [
         {
