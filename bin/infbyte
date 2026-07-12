@@ -1,0 +1,439 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use Infocyph\Foundation\Application\Application;
+use Infocyph\Foundation\Config\ConfigRepository;
+use Infocyph\Foundation\Foundation;
+use Infocyph\Foundation\Routing\RoutePresetRegistrar;
+use Infocyph\Foundation\Routing\WebrickMiddlewareFactory;
+use Infocyph\Foundation\Support\ValueNormalizer;
+use Infocyph\Webrick\Constants\MatcherModeEnum;
+use Infocyph\Webrick\Router\Definition\Attribute\AttributeRouteLoader;
+use Infocyph\Webrick\Router\Definition\Registrar;
+use Infocyph\Webrick\Support\RouteCache;
+use Psr\Log\NullLogger;
+
+require dirname(__DIR__) . '/vendor/autoload.php';
+
+final readonly class ProjectRouteCacheRouter
+{
+    public function __construct(
+        private Registrar $registrar,
+        private RoutePresetRegistrar $presets,
+        private ConfigRepository $config,
+    ) {}
+
+    /**
+     * @param list<mixed> $arguments
+     */
+    public function __call(string $method, array $arguments): mixed
+    {
+        if (!is_callable([$this->registrar, $method])) {
+            throw new BadMethodCallException(sprintf(
+                'Method %s::%s does not exist.',
+                $this->registrar::class,
+                $method,
+            ));
+        }
+
+        return $this->registrar->{$method}(...$arguments);
+    }
+
+    /**
+     * @param list<string>|string|null $prefix
+     * @param list<string>|string|Closure|null $domain
+     */
+    public function apiAuth(
+        Closure $callback,
+        array|string|null $prefix = null,
+        array|string|Closure|null $domain = null,
+        ?string $namePrefix = null,
+    ): void {
+        $this->presets->apiAuth($this->registrar, $callback, $prefix, $domain, $namePrefix);
+    }
+
+    /**
+     * @param list<string>|string|null $prefix
+     * @param list<string>|string|Closure|null $domain
+     */
+    public function authMfa(
+        Closure $callback,
+        array|string|null $prefix = null,
+        array|string|Closure|null $domain = null,
+        ?string $namePrefix = null,
+    ): void {
+        $this->presets->authMfa($this->registrar, $callback, $prefix, $domain, $namePrefix);
+    }
+
+    /**
+     * @param list<string>|string|null $prefix
+     * @param list<string>|string|Closure|null $domain
+     */
+    public function authVerified(
+        Closure $callback,
+        array|string|null $prefix = null,
+        array|string|Closure|null $domain = null,
+        ?string $namePrefix = null,
+    ): void {
+        $this->presets->authVerified($this->registrar, $callback, $prefix, $domain, $namePrefix);
+    }
+
+    /**
+     * @param list<string>|string|null $prefix
+     * @param list<string>|string|Closure|null $domain
+     */
+    public function authWeb(
+        Closure $callback,
+        array|string|null $prefix = null,
+        array|string|Closure|null $domain = null,
+        ?string $namePrefix = null,
+    ): void {
+        $this->presets->authWeb($this->registrar, $callback, $prefix, $domain, $namePrefix);
+    }
+
+    public function config(?string $key = null, mixed $default = null): mixed
+    {
+        if ($key === null || $key === '') {
+            return $this->config->get('router', []);
+        }
+
+        return $this->config->get('router.' . $key, $default);
+    }
+
+    /**
+     * @param list<string>|string|null $prefix
+     * @param list<string>|string|Closure|null $domain
+     */
+    public function groupWithPreset(
+        string $preset,
+        Closure $callback,
+        array|string|null $prefix = null,
+        array|string|Closure|null $domain = null,
+        ?string $namePrefix = null,
+    ): void {
+        $this->presets->group($this->registrar, $preset, $callback, $prefix, $domain, $namePrefix);
+    }
+
+    public function router(): Registrar
+    {
+        return $this->registrar;
+    }
+}
+
+/**
+ * @param array<int, string> $argv
+ * @return array{cmd:string, opts:array<string, string|bool>}
+ */
+function parseArgv(array $argv): array
+{
+    array_shift($argv);
+    $cmd = $argv[0] ?? 'help';
+    $opts = [];
+
+    if ($argv !== []) {
+        array_shift($argv);
+    }
+
+    $expectValueFor = null;
+
+    foreach ($argv as $token) {
+        if ($expectValueFor !== null) {
+            $opts[$expectValueFor] = $token;
+            $expectValueFor = null;
+
+            continue;
+        }
+
+        if (!str_starts_with($token, '--')) {
+            continue;
+        }
+
+        $eq = strpos($token, '=');
+
+        if ($eq !== false) {
+            $key = substr($token, 2, $eq - 2);
+            $opts[$key] = substr($token, $eq + 1);
+
+            continue;
+        }
+
+        $key = substr($token, 2);
+        $expectValueFor = $key;
+        $opts[$key] = $opts[$key] ?? true;
+    }
+
+    return ['cmd' => $cmd, 'opts' => $opts];
+}
+
+function out(string $message): void
+{
+    fwrite(STDOUT, $message);
+}
+
+function err(string $message): void
+{
+    fwrite(STDERR, $message);
+}
+
+function isAbsolutePath(string $path): bool
+{
+    return preg_match('/^(?:[A-Z]:[\\\\\\/]|\\\\\\\\|\/)/i', $path) === 1;
+}
+
+function boolOption(array $options, string $key, bool $default): bool
+{
+    $value = $options[$key] ?? null;
+
+    if (is_bool($value)) {
+        return $value;
+    }
+
+    if (is_string($value) && $value !== '') {
+        return filter_var($value, FILTER_VALIDATE_BOOL);
+    }
+
+    return $default;
+}
+
+/**
+ * @return list<string>
+ */
+function csvList(string $value): array
+{
+    return array_values(array_filter(array_map(
+        static fn(string $item): string => trim($item),
+        explode(',', $value),
+    )));
+}
+
+function projectApp(bool $boot = false): Application
+{
+    $app = Foundation::create([
+        'base_path' => dirname(__DIR__),
+        'router' => [
+            'load_files' => false,
+        ],
+    ]);
+
+    return $boot ? $app->boot() : $app;
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function routerConfig(ConfigRepository $config): array
+{
+    return ValueNormalizer::associativeArray($config->get('router', []));
+}
+
+/**
+ * @return list<string>
+ */
+function routeFiles(ConfigRepository $config, array $options): array
+{
+    if (isset($options['routes']) && is_string($options['routes']) && $options['routes'] !== '') {
+        return csvList($options['routes']);
+    }
+
+    return ValueNormalizer::stringList(routerConfig($config)['files'] ?? ['web.php', 'api.php', 'auth.php']);
+}
+
+/**
+ * @param array<string, mixed> $options
+ * @return array<string, mixed>
+ */
+function normalizeSignedUrlOptions(array $options): array
+{
+    if ($options === []) {
+        return [];
+    }
+
+    $normalized = [];
+
+    foreach ($options as $key => $value) {
+        if (!is_string($key)) {
+            continue;
+        }
+
+        $normalized[match ($key) {
+            'default_ttl' => 'defaultTtl',
+            'expiry_param' => 'expiryParam',
+            'generation_key' => 'generationKey',
+            'ignored_query_params' => 'ignoredQueryParams',
+            'payload_mode' => 'payloadMode',
+            'signature_param' => 'signatureParam',
+            'verification_keys' => 'verificationKeys',
+            default => $key,
+        }] = $value;
+    }
+
+    return $normalized;
+}
+
+/**
+ * @param list<string> $files
+ */
+function loadProjectRoutes(Application $app, Registrar $registrar, array $files): void
+{
+    $config = $app->config();
+    $presets = $app->make(RoutePresetRegistrar::class);
+    $presets->register();
+    $router = new ProjectRouteCacheRouter($registrar, $presets, $config);
+
+    foreach ($files as $file) {
+        $path = match (true) {
+            isAbsolutePath($file) => $file,
+            str_contains($file, '/'), str_contains($file, '\\') => $app->basePath($file),
+            default => $app->paths()->routes($file),
+        };
+
+        if (!is_file($path)) {
+            continue;
+        }
+
+        require $path;
+    }
+
+    $attributes = ValueNormalizer::associativeArray($config->get('router.attributes', []));
+
+    if (!ValueNormalizer::bool($attributes['enabled'] ?? false, false)) {
+        return;
+    }
+
+    $classes = ValueNormalizer::stringList($attributes['classes'] ?? []);
+    if ($classes !== []) {
+        AttributeRouteLoader::register($registrar, $classes);
+    }
+
+    $directories = [];
+    foreach (ValueNormalizer::associativeArray($attributes['directories'] ?? []) as $namespace => $path) {
+        if (!is_string($path) || $path === '') {
+            continue;
+        }
+
+        $directories[$namespace] = $path;
+    }
+
+    if ($directories === []) {
+        $directories = [
+            'App\\Http\\Controllers\\' => $app->appPath('Http/Controllers'),
+        ];
+    }
+
+    $filter = ValueNormalizer::bool($attributes['controller_file_filter'] ?? true, true)
+        ? AttributeRouteLoader::controllerFileFilter()
+        : null;
+
+    AttributeRouteLoader::registerFromDirs($registrar, $directories, $filter);
+}
+
+$matcherValues = implode('|', MatcherModeEnum::values());
+$usage = <<<TXT
+Infbyte CLI
+
+USAGE:
+  infbyte route:cache [--matcher={$matcherValues}] [--cache=PATH] [--routes=web.php,api.php,auth.php] [--verbose=1]
+  infbyte route:clear [--matcher={$matcherValues}] [--cache=PATH] [--aggressive=1|0]
+
+NOTES:
+- Defaults come from config/router.php and .env.
+- Fused/generated matcher expects a cache file path.
+- Sharded matcher expects a cache directory path.
+TXT;
+
+$parsed = parseArgv($_SERVER['argv'] ?? []);
+$command = $parsed['cmd'];
+$options = $parsed['opts'];
+
+switch ($command) {
+    case 'route:cache':
+        $app = projectApp(true);
+        $config = $app->config();
+        $router = routerConfig($config);
+        $matcher = isset($options['matcher']) && is_string($options['matcher'])
+            ? strtolower($options['matcher'])
+            : ValueNormalizer::string($router['matcher'] ?? null, 'fused');
+
+        if (!in_array($matcher, MatcherModeEnum::values(), true)) {
+            err("✖ invalid matcher '{$matcher}'. allowed: " . implode(', ', MatcherModeEnum::values()) . PHP_EOL);
+            exit(2);
+        }
+
+        $cache = isset($options['cache']) && is_string($options['cache']) && $options['cache'] !== ''
+            ? $options['cache']
+            : ValueNormalizer::string($router['cache'] ?? null);
+
+        $verbose = boolOption($options, 'verbose', false);
+
+        if ($verbose) {
+            out('CMD: route:cache' . PHP_EOL);
+            out('OPTS: ' . json_encode($options, JSON_UNESCAPED_SLASHES) . PHP_EOL);
+        }
+
+        try {
+            $middleware = $app->make(WebrickMiddlewareFactory::class);
+            $sentinel = RouteCache::build([
+                'matcher' => $matcher,
+                'cache' => $cache,
+                'register' => static function (Registrar $registrar) use ($app, $config, $options): void {
+                    loadProjectRoutes($app, $registrar, routeFiles($config, $options));
+                },
+                'signKey' => ValueNormalizer::nullableString($config->get('router.signed_urls.key')),
+                'signedDefaultTtl' => ValueNormalizer::int($config->get('router.signed_urls.default_ttl'), 900),
+                'signedUrlConfig' => normalizeSignedUrlOptions(
+                    ValueNormalizer::associativeArray($config->get('router.signed_urls.options', [])),
+                ),
+                'urlBaseUri' => ValueNormalizer::string($config->get('router.url_base_uri'), ''),
+                'registrarOptions' => [
+                    'autoSlashRedirect' => (bool) $config->get('router.auto_slash_redirect', false),
+                    'exposeUrlServices' => (bool) $config->get('router.expose_url_services', false),
+                ],
+                'preGlobal' => $middleware->preGlobal(),
+                'postGlobal' => $middleware->postGlobal(),
+                'fallbackAliasesFromRegistrar' => true,
+                'logger' => new NullLogger(),
+            ]);
+        } catch (Throwable $e) {
+            err("✖ route:cache failed: {$e->getMessage()}" . PHP_EOL);
+            exit(2);
+        }
+
+        out("✔ Route cache ready at: {$sentinel}" . PHP_EOL);
+        exit(0);
+
+    case 'route:clear':
+        $app = projectApp();
+        $config = routerConfig($app->config());
+        $matcher = isset($options['matcher']) && is_string($options['matcher'])
+            ? strtolower($options['matcher'])
+            : ValueNormalizer::string($config['matcher'] ?? null, 'fused');
+
+        if (!in_array($matcher, MatcherModeEnum::values(), true)) {
+            err("✖ invalid matcher '{$matcher}'. allowed: " . implode(', ', MatcherModeEnum::values()) . PHP_EOL);
+            exit(4);
+        }
+
+        $cache = isset($options['cache']) && is_string($options['cache']) && $options['cache'] !== ''
+            ? $options['cache']
+            : ValueNormalizer::string($config['cache'] ?? null);
+
+        try {
+            $removed = RouteCache::clear([
+                'matcher' => $matcher,
+                'cache' => $cache,
+                'aggressive' => boolOption($options, 'aggressive', false),
+            ]);
+        } catch (Throwable $e) {
+            err("✖ route:clear failed: {$e->getMessage()}" . PHP_EOL);
+            exit(4);
+        }
+
+        out($removed ? "✔ Route cache cleared: {$cache}" . PHP_EOL : "ℹ Nothing to clear at: {$cache}" . PHP_EOL);
+        exit(0);
+
+    default:
+        out($usage . PHP_EOL);
+        exit(0);
+}

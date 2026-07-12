@@ -1,0 +1,13 @@
+deptrac:
+  paths:
+    - app
+  exclude_files:
+    - '#(^|[\\/])tests([\\/]|$)#'
+  layers:
+    - name: Project
+      collectors:
+        - type: directory
+          value: '^app[\\/].*'
+  ruleset:
+    Project:
+      - Project

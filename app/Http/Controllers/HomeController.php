@@ -7,7 +7,7 @@ namespace App\Http\Controllers;
 final class HomeController
 {
     /**
-     * @return array<string, string>
+     * @phpstan-return array{framework: string, status: string}
      */
     public function index(): array
     {

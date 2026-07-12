@@ -6,4 +6,4 @@ use App\Http\Controllers\HomeController;
 
 /** @var \Infocyph\Foundation\Routing\RouterManager $router */
 
-$router->get('/', [HomeController::class, 'index']);
+$router->router()->get('/', [HomeController::class, 'index']);
