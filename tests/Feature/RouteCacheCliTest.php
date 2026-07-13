@@ -32,6 +32,30 @@ it('builds and clears route cache through the infbyte cli wrapper', function ():
     expect(file_exists($cacheFile))->toBeFalse();
 });
 
+it('reports application readiness and auth schema status through the infbyte cli', function (): void {
+    $root = dirname(__DIR__, 2);
+
+    [$readinessExitCode, $readinessOutput] = runInfbyteCommand([
+        PHP_BINARY,
+        $root . '/infbyte',
+        'app:ready',
+        '--json=1',
+    ]);
+    [$schemaExitCode, $schemaOutput] = runInfbyteCommand([
+        PHP_BINARY,
+        $root . '/infbyte',
+        'auth:schema:status',
+        '--json=1',
+    ]);
+
+    expect($readinessExitCode)->toBe(0);
+    expect(json_decode($readinessOutput, true, flags: JSON_THROW_ON_ERROR))
+        ->toMatchArray(['production_ready' => true]);
+    expect($schemaExitCode)->toBe(0);
+    expect(json_decode($schemaOutput, true, flags: JSON_THROW_ON_ERROR))
+        ->toMatchArray(['installed' => true]);
+});
+
 /**
  * @param list<string> $arguments
  * @return array{0:int,1:string}

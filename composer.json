@@ -5,21 +5,12 @@
     "type": "project",
     "require": {
         "php": ">=8.4",
-        "infocyph/foundation": "dev-main"
+        "infocyph/foundation": "^0.1"
     },
     "require-dev": {
         "infocyph/phpforge": "dev-main@dev"
     },
-    "repositories": [
-        {
-            "type": "path",
-            "url": "../Foundation",
-            "options": {
-                "symlink": true
-            }
-        }
-    ],
-    "minimum-stability": "dev",
+    "minimum-stability": "stable",
     "prefer-stable": true,
     "autoload": {
         "psr-4": {
@@ -41,6 +32,9 @@
         "sort-packages": true
     },
     "scripts": {
+        "app:ready": "@php infbyte app:ready",
+        "auth:schema:install": "@php infbyte auth:schema:install",
+        "auth:schema:status": "@php infbyte auth:schema:status",
         "route:cache": "@php infbyte route:cache",
         "route:clear": "@php infbyte route:clear"
     }

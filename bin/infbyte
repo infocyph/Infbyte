@@ -198,6 +198,27 @@ function boolOption(array $options, string $key, bool $default): bool
 }
 
 /**
+ * @param array<string, mixed> $report
+ */
+function report(array $report, bool $json): void
+{
+    if ($json) {
+        out(json_encode($report, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR) . PHP_EOL);
+
+        return;
+    }
+
+    out(json_encode($report, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR) . PHP_EOL);
+}
+
+function connectionOption(array $options): ?string
+{
+    $connection = $options['connection'] ?? null;
+
+    return is_string($connection) && $connection !== '' ? $connection : null;
+}
+
+/**
  * @return list<string>
  */
 function csvList(string $value): array
@@ -334,10 +355,15 @@ $usage = <<<TXT
 Infbyte CLI
 
 USAGE:
+  infbyte app:ready [--json=1]
+  infbyte auth:schema:status [--connection=NAME] [--json=1]
+  infbyte auth:schema:install [--connection=NAME] [--json=1]
   infbyte route:cache [--matcher={$matcherValues}] [--cache=PATH] [--routes=web.php,api.php,auth.php] [--verbose=1]
   infbyte route:clear [--matcher={$matcherValues}] [--cache=PATH] [--aggressive=1|0]
 
 NOTES:
+- app:ready validates the complete Foundation production readiness report.
+- auth:schema:install creates missing Foundation authentication tables only.
 - Defaults come from config/router.php and .env.
 - Fused/generated matcher expects a cache file path.
 - Sharded matcher expects a cache directory path.
@@ -348,6 +374,36 @@ $command = $parsed['cmd'];
 $options = $parsed['opts'];
 
 switch ($command) {
+    case 'app:ready':
+        $report = projectApp(true)->readinessReport();
+        report($report, boolOption($options, 'json', false));
+        exit($report['production_ready'] === true ? 0 : 2);
+
+    case 'auth:schema:status':
+        try {
+            $schema = projectApp(true)->db()->authSchema()->readiness(connectionOption($options));
+        } catch (Throwable $e) {
+            err("✖ auth:schema:status failed: {$e->getMessage()}" . PHP_EOL);
+            exit(2);
+        }
+
+        report($schema, boolOption($options, 'json', false));
+        exit($schema['installed'] === true ? 0 : 2);
+
+    case 'auth:schema:install':
+        try {
+            $app = projectApp(true);
+            $installer = $app->db()->authSchema();
+            $installer->install(connectionOption($options));
+            $schema = $installer->readiness(connectionOption($options));
+        } catch (Throwable $e) {
+            err("✖ auth:schema:install failed: {$e->getMessage()}" . PHP_EOL);
+            exit(2);
+        }
+
+        report($schema, boolOption($options, 'json', false));
+        exit($schema['installed'] === true ? 0 : 2);
+
     case 'route:cache':
         $app = projectApp(true);
         $config = $app->config();

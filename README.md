@@ -16,7 +16,16 @@ composer create-project infocyph/infbyte my-app
 composer install
 ```
 
-Update `.env` for your environment, then either:
+Create your local environment file, then either:
+
+```bash
+cp .env.example .env
+```
+
+`.env` is intentionally ignored by Git. Keep secrets in the deployment
+environment or a secret manager; commit only `.env.example`.
+
+Configure the environment, then either:
 
 - keep the default SQLite setup and create `database/database.sqlite`
 - or switch `DB_CONNECTION` to `mysql` or `pgsql` and fill in the matching credentials
@@ -53,7 +62,41 @@ The application entry flow is:
 
 ## Foundation relationship
 
-Infbyte depends on `infocyph/foundation` through Composer. Foundation provides the runtime, routing integration, auth wiring, validation, cache integration, database integration, notifications, and path management. Infbyte provides the main project shape where that runtime lives.
+Infbyte depends on the stable `infocyph/foundation` `^0.1` release through
+Composer. Foundation provides the runtime, routing integration, auth wiring,
+validation, cache integration, database integration, notifications, and path
+management. Infbyte provides the main project shape where that runtime lives.
+
+## Operations
+
+The `infbyte` executable is the application command entrypoint:
+
+```bash
+php infbyte app:ready --json=1
+php infbyte auth:schema:status --json=1
+php infbyte auth:schema:install --json=1
+php infbyte route:cache
+```
+
+`app:ready` is deployment-safe: it reports Foundation configuration, auth,
+cache, database, notification, and writable-path readiness without outputting
+secrets. `auth:schema:install` is idempotent and creates only the Foundation
+authentication tables that are missing.
+
+Before production deployment, set a unique `AUTH_TOKEN_SECRET` of at least 32
+bytes, configure the selected production database/cache/notification drivers,
+run `auth:schema:install`, and require `app:ready` to succeed.
+
+## Release Process
+
+Run the local guard before tagging a project release:
+
+```bash
+composer ic:release:guard
+```
+
+See `SECURITY.md` for private vulnerability reporting and `CONTRIBUTING.md`
+for the project workflow.
 
 ## Notes
 

@@ -1,5 +1,5 @@
 /vendor/
-/.env.local
+.env
 /.phpunit.cache/
 /.psalm-cache/
 /database/*.sqlite
@@ -15,13 +15,11 @@
 !/storage/sessions/.gitkeep
 !/storage/uploads/.gitkeep
 !/bootstrap/cache/.gitkeep
-composer.lock
 vendor
 example
 .idea
 example.php
 test.php
-composer.lock
 git-story_media
 *~
 *.txt
