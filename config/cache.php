@@ -44,7 +44,7 @@ return [
         ],
         'sqlite' => [
             'driver' => 'sqlite',
-            'path' => env_string('CACHE_SQLITE_PATH', 'database/cachelayer.sqlite'),
+            'path' => env_string('CACHE_SQLITE_PATH', storage_path('cache/cachelayer.sqlite')),
             'table' => env_string('CACHE_SQLITE_TABLE', 'cachelayer_entries'),
             'lock' => [
                 'driver' => 'pdo',

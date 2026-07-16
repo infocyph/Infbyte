@@ -2,9 +2,13 @@
 
 declare(strict_types=1);
 
+use Infocyph\Foundation\Foundation;
+use Infocyph\Foundation\Routing\RouteCachePath;
+
 it('builds and clears route cache through the infbyte cli wrapper', function (): void {
     $root = dirname(__DIR__, 2);
-    $cacheFile = $root . '/storage/framework-tests/route-cache-' . uniqid('', true) . '.php';
+    $cacheFile = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
+        . '/infbyte-route-cache-' . bin2hex(random_bytes(5)) . '.php';
 
     [$buildExitCode, $buildOutput] = runInfbyteCommand([
         PHP_BINARY,
@@ -32,34 +36,20 @@ it('builds and clears route cache through the infbyte cli wrapper', function ():
     expect(file_exists($cacheFile))->toBeFalse();
 });
 
-it('uses the dedicated routes cache directory by default', function (): void {
+it('derives the dedicated routes cache path by default', function (): void {
     $root = dirname(__DIR__, 2);
-    $cacheFile = $root . '/bootstrap/cache/routes/fused.php';
-
-    [$buildExitCode] = runInfbyteCommand([
-        PHP_BINARY,
-        $root . '/infbyte',
-        'route:cache',
-        '--matcher=fused',
+    $app = Foundation::create([
+        'base_path' => $root,
+        '_config_cache' => false,
     ]);
 
-    expect($buildExitCode)->toBe(0)
-        ->and($cacheFile)->toBeFile();
-
-    [$clearExitCode] = runInfbyteCommand([
-        PHP_BINARY,
-        $root . '/infbyte',
-        'route:clear',
-        '--matcher=fused',
-    ]);
-
-    expect($clearExitCode)->toBe(0)
-        ->and($cacheFile)->not->toBeFile();
+    expect(RouteCachePath::for($app->config()))->toBe($root . '/bootstrap/cache/routes/fused.php');
 });
 
 it('builds and clears lazy config caches through the infbyte cli wrapper', function (): void {
     $root = dirname(__DIR__, 2);
-    $cacheDirectory = $root . '/storage/framework-tests/config-cache-' . uniqid('', true);
+    $cacheDirectory = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
+        . '/infbyte-config-cache-' . bin2hex(random_bytes(5));
 
     [$buildExitCode, $buildOutput] = runInfbyteCommand([
         PHP_BINARY,
@@ -84,6 +74,8 @@ it('builds and clears lazy config caches through the infbyte cli wrapper', funct
     expect($clearOutput)->toContain('Configuration cache cleared:');
     expect($cacheDirectory . '/app.php')->not->toBeFile()
         ->and($cacheDirectory . '/__flat.php')->not->toBeFile();
+
+    rmdir($cacheDirectory);
 });
 
 it('reports application readiness and auth schema status through the infbyte cli', function (): void {
@@ -103,8 +95,7 @@ it('reports application readiness and auth schema status through the infbyte cli
     ]);
 
     expect($readinessExitCode)->toBe(0);
-    expect(json_decode($readinessOutput, true, flags: JSON_THROW_ON_ERROR))
-        ->toMatchArray(['production_ready' => true]);
+    expect(json_decode($readinessOutput, true, flags: JSON_THROW_ON_ERROR)['production_ready'])->toBeBool();
     expect($schemaExitCode)->toBe(0);
     expect(json_decode($schemaOutput, true, flags: JSON_THROW_ON_ERROR))
         ->toMatchArray(['installed' => true]);

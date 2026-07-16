@@ -90,7 +90,10 @@ it('handles upload requests, chunked uploads, offload responses, and pathwise ut
     $app = infbyteFilesystemApp()->boot();
     $files = $app->files();
     $directory = 'tests/uploads-' . uniqid('', true);
-    $queuePath = 'storage/framework-tests/files-queue-' . uniqid('', true) . '.json';
+    $queuePath = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
+        . '/infbyte-files-queue-' . bin2hex(random_bytes(5)) . '.json';
+    $auditPath = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
+        . '/infbyte-files-audit-' . bin2hex(random_bytes(5)) . '.log';
 
     $uploadTemp = tempnam(sys_get_temp_dir(), 'infbyte-upload-');
     $chunkOne = tempnam(sys_get_temp_dir(), 'infbyte-chunk-');
@@ -199,7 +202,7 @@ it('handles upload requests, chunked uploads, offload responses, and pathwise ut
         $index = $files->index($directory, disk: 'uploads');
         $queue = $files->queue($queuePath);
         $queueId = $queue->enqueue('download.sync', ['path' => $sourceRelativePath]);
-        $auditTrail = $files->audit('storage/logs/files-audit.log');
+        $auditTrail = $files->audit($auditPath);
         $policy = $files->policy();
 
         expect($files->diffSnapshots($snapshotBefore, $snapshotAfter)['created'])->not->toBeEmpty();
@@ -224,8 +227,12 @@ it('handles upload requests, chunked uploads, offload responses, and pathwise ut
 
         $files->deleteDirectory($directory, 'uploads');
 
-        if ($files->exists($queuePath)) {
-            $files->delete($queuePath);
+        if (is_file($queuePath)) {
+            unlink($queuePath);
+        }
+
+        if (is_file($auditPath)) {
+            unlink($auditPath);
         }
     }
 });

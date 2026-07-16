@@ -3,16 +3,6 @@
 /.phpunit.cache/
 /.psalm-cache/
 /database/*.sqlite
-/storage/cache/*
-/storage/framework-tests/*
-/storage/logs/*
-/storage/sessions/*
-/storage/uploads/*
-!/storage/cache/.gitkeep
-!/storage/framework-tests/.gitkeep
-!/storage/logs/.gitkeep
-!/storage/sessions/.gitkeep
-!/storage/uploads/.gitkeep
 vendor
 example
 .idea

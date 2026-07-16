@@ -274,7 +274,43 @@ function csvList(string $value): array
 
 function projectApp(bool $boot = false): Application
 {
-    $app = Foundation::create(['base_path' => dirname(__DIR__)]);
+    $options = ['base_path' => dirname(__DIR__)];
+
+    if (getenv('INFBYTE_TESTING') === '1') {
+        $options['_config_cache'] = false;
+        $runtime = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . '/infbyte-cli-runtime-' . getmypid();
+
+        foreach (['app', 'app/public', 'cache', 'logs', 'sessions', 'uploads'] as $directory) {
+            $path = $runtime . DIRECTORY_SEPARATOR . $directory;
+
+            if (!is_dir($path) && !mkdir($path, 0775, true) && !is_dir($path)) {
+                throw new RuntimeException(sprintf('Unable to create test runtime directory "%s".', $path));
+            }
+        }
+
+        $options['paths'] = [
+            'storage' => $runtime,
+            'cache' => $runtime . '/cache',
+            'logs' => $runtime . '/logs',
+            'sessions' => $runtime . '/sessions',
+            'uploads' => $runtime . '/uploads',
+        ];
+        $options['filesystem'] = [
+            'disks' => [
+                'local' => ['root' => $runtime . '/app'],
+                'public' => ['root' => $runtime . '/app/public'],
+                'uploads' => ['root' => $runtime . '/uploads'],
+            ],
+        ];
+        $options['auth'] = [
+            'drivers' => [
+                // Tests must not persist auth lockout state in the application runtime.
+                'cache' => 'array',
+            ],
+        ];
+    }
+
+    $app = Foundation::create($options);
 
     return $boot ? $app->boot() : $app;
 }

@@ -10,10 +10,12 @@ use Infocyph\TalkingBytes\Email\Mailbox\Pop3Mailbox;
 
 it('exposes the broader TalkingBytes email stack through foundation notifications', function (): void {
     $root = dirname(__DIR__, 2);
-    $spoolDirectory = $root . '/storage/testing-mail/inbound';
-    $processingDirectory = $root . '/storage/testing-mail/processing';
-    $processedDirectory = $root . '/storage/testing-mail/processed';
-    $failedDirectory = $root . '/storage/testing-mail/failed';
+    $temporaryRoot = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
+        . '/infbyte-talkingbytes-' . bin2hex(random_bytes(5));
+    $spoolDirectory = $temporaryRoot . '/inbound';
+    $processingDirectory = $temporaryRoot . '/processing';
+    $processedDirectory = $temporaryRoot . '/processed';
+    $failedDirectory = $temporaryRoot . '/failed';
     $rawInbound = <<<MAIL
 From: Sender <sender@example.test>
 To: User <user@example.test>
@@ -44,6 +46,7 @@ MAIL;
 
     $app = Foundation::create([
         'base_path' => $root,
+        '_config_cache' => false,
         'notifications' => [
             'auth' => [
                 'transport' => 'fake',
@@ -52,13 +55,13 @@ MAIL;
                 'receivers' => [
                     'spool' => [
                         'default' => [
-                            'directory' => 'storage/testing-mail/inbound',
-                            'processingDirectory' => 'storage/testing-mail/processing',
+                            'directory' => $spoolDirectory,
+                            'processingDirectory' => $processingDirectory,
                             'extension' => 'eml',
                             'lockBeforeRead' => true,
                             'maxMessages' => 10,
-                            'moveAfterRead' => 'storage/testing-mail/processed',
-                            'failedDirectory' => 'storage/testing-mail/failed',
+                            'moveAfterRead' => $processedDirectory,
+                            'failedDirectory' => $failedDirectory,
                         ],
                     ],
                 ],
@@ -141,7 +144,7 @@ MAIL;
         expect(array_column($events, 0))->toContain('email.send.start', 'email.send.finish', 'email.receive.start', 'email.receive.finish', 'bounce.detected');
     } finally {
         $notifications->emailEvents(null);
-        talkingBytesRemoveDirectory($root . '/storage/testing-mail');
+        talkingBytesRemoveDirectory($temporaryRoot);
     }
 });
 
