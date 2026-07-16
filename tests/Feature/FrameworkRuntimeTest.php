@@ -71,10 +71,11 @@ it('serves the web and api entry routes', function (): void {
         $registered[$route->getMethod() . ' ' . $route->getPath()] = true;
     }
 
-    expect($registered)->toHaveKeys(['GET /', 'GET /api/health']);
+    expect($registered)->toHaveKeys(['GET /', 'GET /api/health', 'GET /json']);
 
     $home = $app->handle(Request::fake(headers: ['Host' => 'localhost'], uri: 'https://localhost/'));
     $health = $app->handle(Request::fake(headers: ['Host' => 'localhost'], uri: 'https://localhost/api/health'));
+    $json = $app->handle(Request::fake(headers: ['Host' => 'localhost'], uri: 'https://localhost/json'));
     $missing = $app->handle(Request::fake(headers: ['Host' => 'localhost'], uri: 'https://localhost/missing'));
 
     expect($home->getStatusCode())->toBe(200);
@@ -87,6 +88,9 @@ it('serves the web and api entry routes', function (): void {
     expect(json_decode((string) $health->getBody(), true))->toBe([
         'status' => 'ok',
     ]);
+
+    expect($json->getStatusCode())->toBe(200);
+    expect(json_decode((string) $json->getBody(), true))->toHaveKey('memory');
 
     expect($missing->getStatusCode())->toBe(404);
 });
