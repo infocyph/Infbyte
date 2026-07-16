@@ -73,9 +73,9 @@ it('serves the web and api entry routes', function (): void {
 
     expect($registered)->toHaveKeys(['GET /', 'GET /api/health']);
 
-    $home = $app->handle(Request::fake(headers: ['Host' => 'localhost'], uri: 'http://localhost/'));
-    $health = $app->handle(Request::fake(headers: ['Host' => 'localhost'], uri: 'http://localhost/api/health'));
-    $missing = $app->handle(Request::fake(headers: ['Host' => 'localhost'], uri: 'http://localhost/missing'));
+    $home = $app->handle(Request::fake(headers: ['Host' => 'localhost'], uri: 'https://localhost/'));
+    $health = $app->handle(Request::fake(headers: ['Host' => 'localhost'], uri: 'https://localhost/api/health'));
+    $missing = $app->handle(Request::fake(headers: ['Host' => 'localhost'], uri: 'https://localhost/missing'));
 
     expect($home->getStatusCode())->toBe(200);
     expect(json_decode((string) $home->getBody(), true))->toBe([

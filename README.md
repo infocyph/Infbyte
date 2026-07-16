@@ -80,6 +80,10 @@ php infbyte config:clear
 php infbyte route:cache
 ```
 
+`config:cache` warms ArrayKit's lazy project-config namespace cache at
+`bootstrap/cache/config/`, including its scalar lookup index. `config:clear`
+removes those generated entries.
+
 `app:ready` is deployment-safe: it reports Foundation configuration, auth,
 cache, database, notification, and writable-path readiness without outputting
 secrets. `auth:schema:install` is idempotent and creates only the Foundation

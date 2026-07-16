@@ -8,13 +8,11 @@
 /storage/logs/*
 /storage/sessions/*
 /storage/uploads/*
-/bootstrap/cache/*
 !/storage/cache/.gitkeep
 !/storage/framework-tests/.gitkeep
 !/storage/logs/.gitkeep
 !/storage/sessions/.gitkeep
 !/storage/uploads/.gitkeep
-!/bootstrap/cache/.gitkeep
 vendor
 example
 .idea
