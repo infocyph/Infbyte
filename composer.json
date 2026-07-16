@@ -5,7 +5,7 @@
     "type": "project",
     "require": {
         "php": ">=8.4",
-        "infocyph/foundation": "^0.1"
+        "infocyph/foundation": "^0.1.01"
     },
     "require-dev": {
         "infocyph/phpforge": "dev-main@dev"

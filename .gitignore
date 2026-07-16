@@ -32,3 +32,4 @@ patch.php
 .route-cache-*
 .codex
 .agents
+composer.lock

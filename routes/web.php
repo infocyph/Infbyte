@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\HomeController;
+use Infocyph\Webrick\Router\Facade\Router as Route;
 
-/** @var \Infocyph\Foundation\Routing\RouterManager $router */
-
-$router->router()->get('/', [HomeController::class, 'index']);
+Route::get('/', [HomeController::class, 'index']);
