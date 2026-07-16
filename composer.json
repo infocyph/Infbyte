@@ -35,6 +35,8 @@
         "app:ready": "@php infbyte app:ready",
         "auth:schema:install": "@php infbyte auth:schema:install",
         "auth:schema:status": "@php infbyte auth:schema:status",
+        "config:cache": "@php infbyte config:cache",
+        "config:clear": "@php infbyte config:clear",
         "route:cache": "@php infbyte route:cache",
         "route:clear": "@php infbyte route:clear"
     }

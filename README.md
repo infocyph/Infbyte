@@ -75,6 +75,8 @@ The `infbyte` executable is the application command entrypoint:
 php infbyte app:ready --json=1
 php infbyte auth:schema:status --json=1
 php infbyte auth:schema:install --json=1
+php infbyte config:cache
+php infbyte config:clear
 php infbyte route:cache
 ```
 

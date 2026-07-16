@@ -4,6 +4,7 @@
 declare(strict_types=1);
 
 use Infocyph\Foundation\Application\Application;
+use Infocyph\Foundation\Config\ConfigLoader;
 use Infocyph\Foundation\Config\ConfigRepository;
 use Infocyph\Foundation\Foundation;
 use Infocyph\Foundation\Routing\RoutePresetRegistrar;
@@ -218,6 +219,61 @@ function connectionOption(array $options): ?string
     return is_string($connection) && $connection !== '' ? $connection : null;
 }
 
+function configCachePath(array $options): string
+{
+    $path = $options['path'] ?? 'bootstrap/cache/config.php';
+    if (!is_string($path) || $path === '') {
+        $path = 'bootstrap/cache/config.php';
+    }
+
+    return isAbsolutePath($path)
+        ? $path
+        : dirname(__DIR__) . DIRECTORY_SEPARATOR . $path;
+}
+
+function clearConfigCache(string $path): bool
+{
+    return !file_exists($path) || unlink($path);
+}
+
+function writeConfigCache(string $path): void
+{
+    $directory = dirname($path);
+    if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
+        throw new RuntimeException(sprintf('Unable to create config cache directory "%s".', $directory));
+    }
+
+    $temporary = tempnam($directory, '.config-cache-');
+    if ($temporary === false) {
+        throw new RuntimeException(sprintf('Unable to create config cache file in "%s".', $directory));
+    }
+
+    try {
+        $config = (new ConfigLoader())->load([
+            'base_path' => dirname(__DIR__),
+            '_config_cache' => false,
+        ]);
+        $items = $config->all();
+        unset($items['_config_cache']);
+
+        if (!(new ConfigRepository($items))->exportCache($temporary)) {
+            throw new RuntimeException(sprintf('Unable to write config cache "%s".', $path));
+        }
+
+        if (!is_array(require $temporary)) {
+            throw new RuntimeException('Compiled config must return an array.');
+        }
+
+        if (!rename($temporary, $path)) {
+            throw new RuntimeException(sprintf('Unable to publish config cache "%s".', $path));
+        }
+    } finally {
+        if (is_file($temporary)) {
+            unlink($temporary);
+        }
+    }
+}
+
 /**
  * @return list<string>
  */
@@ -358,12 +414,16 @@ USAGE:
   infbyte app:ready [--json=1]
   infbyte auth:schema:status [--connection=NAME] [--json=1]
   infbyte auth:schema:install [--connection=NAME] [--json=1]
+  infbyte config:cache [--path=bootstrap/cache/config.php]
+  infbyte config:clear [--path=bootstrap/cache/config.php]
   infbyte route:cache [--matcher={$matcherValues}] [--cache=PATH] [--routes=web.php,api.php,auth.php] [--verbose=1]
   infbyte route:clear [--matcher={$matcherValues}] [--cache=PATH] [--aggressive=1|0]
 
 NOTES:
 - app:ready validates the complete Foundation production readiness report.
 - auth:schema:install creates missing Foundation authentication tables only.
+- config:cache compiles project configuration and freezes its environment values.
+- config:clear removes the compiled configuration.
 - Defaults come from config/router.php and .env.
 - Fused/generated matcher expects a cache file path.
 - Sharded matcher expects a cache directory path.
@@ -403,6 +463,32 @@ switch ($command) {
 
         report($schema, boolOption($options, 'json', false));
         exit($schema['installed'] === true ? 0 : 2);
+
+    case 'config:cache':
+        $path = configCachePath($options);
+
+        try {
+            writeConfigCache($path);
+        } catch (Throwable $e) {
+            err("✖ config:cache failed: {$e->getMessage()}" . PHP_EOL);
+            exit(2);
+        }
+
+        out("✔ Configuration cached: {$path}" . PHP_EOL);
+        exit(0);
+
+    case 'config:clear':
+        $path = configCachePath($options);
+
+        try {
+            $cleared = clearConfigCache($path);
+        } catch (Throwable $e) {
+            err("✖ config:clear failed: {$e->getMessage()}" . PHP_EOL);
+            exit(2);
+        }
+
+        out($cleared ? "✔ Configuration cache cleared: {$path}" . PHP_EOL : "ℹ Nothing to clear at: {$path}" . PHP_EOL);
+        exit(0);
 
     case 'route:cache':
         $app = projectApp(true);

@@ -32,6 +32,38 @@ it('builds and clears route cache through the infbyte cli wrapper', function ():
     expect(file_exists($cacheFile))->toBeFalse();
 });
 
+it('builds and clears compiled config through the infbyte cli wrapper', function (): void {
+    $root = dirname(__DIR__, 2);
+    $cacheFile = $root . '/storage/framework-tests/config-cache-' . uniqid('', true) . '.php';
+
+    [$buildExitCode, $buildOutput] = runInfbyteCommand([
+        PHP_BINARY,
+        $root . '/infbyte',
+        'config:cache',
+        '--path=' . $cacheFile,
+    ]);
+
+    expect($buildExitCode)->toBe(0);
+    expect($buildOutput)->toContain('Configuration cached:');
+    expect(is_file($cacheFile))->toBeTrue();
+
+    $cached = require $cacheFile;
+
+    expect($cached)->toBeArray()
+        ->and($cached)->toHaveKey('app');
+
+    [$clearExitCode, $clearOutput] = runInfbyteCommand([
+        PHP_BINARY,
+        $root . '/infbyte',
+        'config:clear',
+        '--path=' . $cacheFile,
+    ]);
+
+    expect($clearExitCode)->toBe(0);
+    expect($clearOutput)->toContain('Configuration cache cleared:');
+    expect(file_exists($cacheFile))->toBeFalse();
+});
+
 it('reports application readiness and auth schema status through the infbyte cli', function (): void {
     $root = dirname(__DIR__, 2);
 
