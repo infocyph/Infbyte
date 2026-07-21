@@ -7,6 +7,9 @@ return [
     'env' => env('APP_ENV', 'local'),
     'debug' => env('APP_DEBUG', true),
     'url' => env('APP_URL', 'http://localhost'),
+    'config_cache' => [
+        'type' => env('APP_CONFIG_CACHE_TYPE', 'sharded'),
+    ],
     'container' => [
         'alias' => env('APP_CONTAINER_ALIAS'),
         'environment' => env('APP_ENV', 'local'),

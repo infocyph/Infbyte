@@ -42,6 +42,9 @@ if (getenv('INFBYTE_TESTING') === '1') {
             'cache' => 'array',
         ],
     ];
+    $options['router'] = [
+        'cache' => false,
+    ];
 }
 
 return Foundation::create($options);

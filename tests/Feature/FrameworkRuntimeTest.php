@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Infocyph\Foundation\Application\Application;
+use Infocyph\Foundation\Auth\Contract\Notification\AuthNotifierInterface;
 use Infocyph\Foundation\Database\DatabaseConnectionResolver;
 use Infocyph\TalkingBytes\Email\Emailer;
 use Infocyph\Foundation\Routing\RouterManager;
@@ -105,7 +106,7 @@ it('exposes the auth validation schema and default notifier', function (): void 
         'password' => 'secret-secret',
     ])->fails())->toBeFalse();
     expect($validator->validate('auth.login', [])->fails())->toBeTrue();
-    expect($app->notifications()->authNotifier()::class)->toBe(expectedNotifierClass($app));
+    expect($app->make(AuthNotifierInterface::class)::class)->toBe(expectedNotifierClass($app));
 });
 
 it('round-trips cache data and opens the default database connection', function (): void {

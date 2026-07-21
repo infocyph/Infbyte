@@ -46,7 +46,7 @@ it('derives the dedicated routes cache path by default', function (): void {
     expect(RouteCachePath::for($app->config()))->toBe($root . '/bootstrap/cache/routes/fused.php');
 });
 
-it('builds and clears lazy config caches through the infbyte cli wrapper', function (): void {
+it('builds and clears the default sharded config cache through the infbyte cli wrapper', function (): void {
     $root = dirname(__DIR__, 2);
     $cacheDirectory = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
         . '/infbyte-config-cache-' . bin2hex(random_bytes(5));
@@ -59,9 +59,11 @@ it('builds and clears lazy config caches through the infbyte cli wrapper', funct
     ]);
 
     expect($buildExitCode)->toBe(0);
-    expect($buildOutput)->toContain('Configuration cached:');
-    expect($cacheDirectory . '/app.php')->toBeFile()
-        ->and($cacheDirectory . '/__flat.php')->toBeFile();
+    expect($buildOutput)->toContain('Configuration cached (sharded):');
+    expect($cacheDirectory . '/__manifest.php')->toBeFile()
+        ->and($cacheDirectory . '/app.php')->toBeFile()
+        ->and($cacheDirectory . '/__flat.php')->not->toBeFile()
+        ->and($cacheDirectory . '/__compiled.php')->not->toBeFile();
 
     [$clearExitCode, $clearOutput] = runInfbyteCommand([
         PHP_BINARY,
@@ -72,9 +74,40 @@ it('builds and clears lazy config caches through the infbyte cli wrapper', funct
 
     expect($clearExitCode)->toBe(0);
     expect($clearOutput)->toContain('Configuration cache cleared:');
-    expect($cacheDirectory . '/app.php')->not->toBeFile()
+    expect($cacheDirectory . '/__manifest.php')->not->toBeFile()
+        ->and($cacheDirectory . '/app.php')->not->toBeFile()
         ->and($cacheDirectory . '/__flat.php')->not->toBeFile();
 
+    rmdir($cacheDirectory);
+});
+
+it('can explicitly build a single config cache through the infbyte cli wrapper', function (): void {
+    $root = dirname(__DIR__, 2);
+    $cacheDirectory = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
+        . '/infbyte-single-config-cache-' . bin2hex(random_bytes(5));
+
+    [$exitCode, $output] = runInfbyteCommand([
+        PHP_BINARY,
+        $root . '/infbyte',
+        'config:cache',
+        '--type=single',
+        '--path=' . $cacheDirectory,
+    ]);
+
+    expect($exitCode)->toBe(0);
+    expect($output)->toContain('Configuration cached (single):');
+    expect($cacheDirectory . '/__manifest.php')->toBeFile()
+        ->and($cacheDirectory . '/app.php')->not->toBeFile()
+        ->and($cacheDirectory . '/__flat.php')->not->toBeFile();
+
+    [$clearExitCode] = runInfbyteCommand([
+        PHP_BINARY,
+        $root . '/infbyte',
+        'config:clear',
+        '--path=' . $cacheDirectory,
+    ]);
+
+    expect($clearExitCode)->toBe(0);
     rmdir($cacheDirectory);
 });
 
