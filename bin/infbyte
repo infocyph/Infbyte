@@ -334,7 +334,7 @@ function routeFiles(ConfigRepository $config, array $options): array
         return csvList($options['routes']);
     }
 
-    return ValueNormalizer::stringList(routerConfig($config)['files'] ?? ['web.php', 'api.php', 'auth.php']);
+    return ValueNormalizer::stringList(routerConfig($config)['files'] ?? ['api.php']);
 }
 
 /**
@@ -437,7 +437,7 @@ USAGE:
   infbyte auth:schema:install [--connection=NAME] [--json=1]
   infbyte config:cache [--path=bootstrap/cache/config] [--type=sharded|single]
   infbyte config:clear [--path=bootstrap/cache/config]
-  infbyte route:cache [--matcher={$matcherValues}] [--cache=PATH] [--routes=web.php,api.php,auth.php] [--verbose=1]
+  infbyte route:cache [--matcher={$matcherValues}] [--cache=PATH] [--routes=api.php] [--verbose=1]
   infbyte route:clear [--matcher={$matcherValues}] [--cache=PATH] [--aggressive=1|0]
 
 NOTES:

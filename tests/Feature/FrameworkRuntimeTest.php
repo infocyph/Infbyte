@@ -63,7 +63,7 @@ it('registers the core services', function (): void {
     expect($app->make(ValidationManager::class))->toBeInstanceOf(ValidationManager::class);
 });
 
-it('serves the web and api entry routes', function (): void {
+it('serves the health and JSON routes', function (): void {
     $app = infbyteApp()->boot();
     $router = $app->make(RouterManager::class);
     $registered = [];
@@ -72,28 +72,15 @@ it('serves the web and api entry routes', function (): void {
         $registered[$route->getMethod() . ' ' . $route->getPath()] = true;
     }
 
-    expect($registered)->toHaveKeys(['GET /', 'GET /api/health', 'GET /json']);
+    expect(array_keys($registered))->toBe(['GET /api/health', 'GET /json']);
 
-    $home = $app->handle(Request::fake(headers: ['Host' => 'localhost'], uri: 'https://localhost/'));
     $health = $app->handle(Request::fake(headers: ['Host' => 'localhost'], uri: 'https://localhost/api/health'));
     $json = $app->handle(Request::fake(headers: ['Host' => 'localhost'], uri: 'https://localhost/json'));
-    $missing = $app->handle(Request::fake(headers: ['Host' => 'localhost'], uri: 'https://localhost/missing'));
-
-    expect($home->getStatusCode())->toBe(200);
-    expect(json_decode((string) $home->getBody(), true))->toBe([
-        'framework' => 'Infbyte',
-        'status' => 'ready',
-    ]);
 
     expect($health->getStatusCode())->toBe(200);
-    expect(json_decode((string) $health->getBody(), true))->toBe([
-        'status' => 'ok',
-    ]);
-
+    expect(json_decode((string) $health->getBody(), true))->toBe(['status' => 'ok']);
     expect($json->getStatusCode())->toBe(200);
     expect(json_decode((string) $json->getBody(), true))->toHaveKey('memory');
-
-    expect($missing->getStatusCode())->toBe(404);
 });
 
 it('exposes the auth validation schema and default notifier', function (): void {

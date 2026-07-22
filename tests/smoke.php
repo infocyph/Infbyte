@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Infocyph\Foundation\Application\Application;
 use Infocyph\Foundation\Auth\AuthManager;
 use Infocyph\Foundation\Auth\AuthServices;
+use Infocyph\Foundation\Auth\Contract\Notification\AuthNotifierInterface;
 use Infocyph\Foundation\Auth\Http\AuthActions;
 use Infocyph\Foundation\Cache\CacheManager;
 use Infocyph\Foundation\Database\DatabaseConnectionResolver;
@@ -118,21 +119,20 @@ section('Routing And HTTP', function () use ($app): void {
         $registered[$route->getMethod() . ' ' . $route->getPath()] = true;
     }
 
-    expect(isset($registered['GET /']), 'The home route should be registered.');
     expect(isset($registered['GET /api/health']), 'The health route should be registered.');
-
-    $home = $app->handle(Request::fake(headers: ['Host' => 'localhost'], uri: 'http://localhost/'));
-    expectSame(200, $home->getStatusCode(), 'The home route should return 200.');
-
-    $homePayload = decodeJsonResponse((string) $home->getBody(), 'The home route should return JSON.');
-    expectSame('Infbyte', $homePayload['framework'] ?? null, 'The home route should expose the framework name.');
-    expectSame('ready', $homePayload['status'] ?? null, 'The home route should expose the ready status.');
+    expect(isset($registered['GET /json']), 'The JSON route should be registered.');
 
     $health = $app->handle(Request::fake(headers: ['Host' => 'localhost'], uri: 'http://localhost/api/health'));
     expectSame(200, $health->getStatusCode(), 'The health route should return 200.');
 
     $healthPayload = decodeJsonResponse((string) $health->getBody(), 'The health route should return JSON.');
     expectSame('ok', $healthPayload['status'] ?? null, 'The health route should expose the ok status.');
+
+    $json = $app->handle(Request::fake(headers: ['Host' => 'localhost'], uri: 'http://localhost/json'));
+    expectSame(200, $json->getStatusCode(), 'The JSON route should return 200.');
+
+    $jsonPayload = decodeJsonResponse((string) $json->getBody(), 'The JSON route should return JSON.');
+    expect(isset($jsonPayload['memory']), 'The JSON route should expose memory usage.');
 
     $missing = $app->handle(Request::fake(headers: ['Host' => 'localhost'], uri: 'http://localhost/missing'));
     expectSame(404, $missing->getStatusCode(), 'Unknown routes should return 404.');
@@ -152,7 +152,7 @@ section('Auth And Validation', function () use ($app): void {
     $invalid = $validator->validate('auth.login', []);
     expect($invalid->fails(), 'The auth.login schema should reject an empty payload.');
 
-    $notifier = $app->notifications()->authNotifier();
+    $notifier = $app->make(AuthNotifierInterface::class);
     expectSame(
         expectedNotifierClass($app),
         $notifier::class,

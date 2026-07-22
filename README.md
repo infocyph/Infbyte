@@ -58,12 +58,12 @@ The application entry flow is:
 - `storage/` runtime cache, logs, sessions, uploads
 - `database/` migrations, seeders, factories, local SQLite file
 - `resources/` views, emails, assets
-- `tests/` test suite
+- `tests/` repository test suite (excluded from created projects)
 
 ## Foundation relationship
 
-Infbyte depends on the stable `infocyph/foundation` `^0.1` release through
-Composer. Foundation provides the runtime, routing integration, auth wiring,
+Infbyte depends on `infocyph/foundation` through Composer. Foundation provides
+the runtime, routing integration, auth wiring,
 validation, cache integration, database integration, notifications, and path
 management. Infbyte provides the main project shape where that runtime lives.
 
@@ -80,9 +80,9 @@ php infbyte config:clear
 php infbyte route:cache
 ```
 
-`config:cache` warms ArrayKit's lazy project-config namespace cache at
-`bootstrap/cache/config/`, including its scalar lookup index. `config:clear`
-removes those generated entries.
+`config:cache` warms the project configuration at `bootstrap/cache/config/`.
+The default sharded layout keeps namespaces lazy; the optional single layout
+loads one compiled snapshot. `config:clear` removes either layout.
 
 `app:ready` is deployment-safe: it reports Foundation configuration, auth,
 cache, database, notification, and writable-path readiness without outputting
@@ -108,5 +108,6 @@ for the project workflow.
 
 - `bootstrap/providers.php` is the application provider list.
 - `config/*.php` is loaded automatically by Foundation.
-- `routes/web.php`, `routes/api.php`, and `routes/auth.php` are loaded automatically by Foundation.
+- `routes/api.php` defines the default `/api/health` and `/json` routes.
+- Foundation loads the route files listed in `config/router.php` automatically.
 - Storage directories are already present for cache, logs, sessions, and uploads.

@@ -3,13 +3,45 @@
 declare(strict_types=1);
 
 return [
+    /*
+    |--------------------------------------------------------------------------
+    | Route Sources And Matcher
+    |--------------------------------------------------------------------------
+    |
+    | "files" lists route files beneath the routes directory. "matcher" selects
+    | a Webrick matcher mode such as fused, sharded, or another supported mode.
+    | "auto_slash_redirect" redirects trailing-slash variants when enabled.
+    | File example: `api.php`; matcher: `fused|generated|sharded`; redirect:
+    | `true|false`.
+    |
+    */
     'files' => [
-        'web.php',
         'api.php',
-        'auth.php',
     ],
     'matcher' => env('ROUTER_MATCHER', 'fused'),
     'auto_slash_redirect' => false,
+
+    /*
+    |--------------------------------------------------------------------------
+    | URL Services And Signed URLs
+    |--------------------------------------------------------------------------
+    |
+    | "expose_url_services" registers URL generation services and
+    | "url_base_uri" supplies their default origin. Signed URLs use "key" for
+    | authentication, "default_ttl" in seconds, and "options" for additional
+    | signer-specific settings. Keep the signing key secret and environment
+    | specific. Exposure accepts `true|false`. A base URI may be
+    | `https://api.example.com`, the key should be a random 32-byte Base64 secret,
+    | and the TTL may be 900 seconds.
+    |
+    | Supported option keys: `generation_key`, `verification_keys`, `default_ttl`,
+    | `signature_param`, `expiry_param`, `algorithm`, `payload_mode`,
+    | `ignored_query_params`, and `leeway`. Payload mode accepts
+    | `relative|absolute`. Example signature and expiry parameters are `_sig` and
+    | `_exp`; an algorithm may be `sha3-256`; an ignored parameter may be
+    | `utm_source`; and leeway may be 30 seconds.
+    |
+    */
     'expose_url_services' => true,
     'url_base_uri' => env('APP_URL', 'http://localhost'),
     'signed_urls' => [
@@ -17,6 +49,21 @@ return [
         'default_ttl' => env('ROUTER_SIGNED_URL_DEFAULT_TTL', 900),
         'options' => [],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Attribute Route Discovery
+    |--------------------------------------------------------------------------
+    |
+    | "enabled" activates attribute discovery. "controller_file_filter" limits
+    | scanning to controller-like files. "directories" maps namespaces to scan
+    | roots, while "classes" explicitly lists additional attributed classes.
+    | Leave discovery disabled when deployment uses compiled route metadata.
+    | Boolean values accept `true|false`. For example, map the
+    | `App\\Http\\Controllers\\` namespace to `app/Http/Controllers`, and list
+    | `App\\Http\\Controllers\\HealthController` as an explicit class.
+    |
+    */
     'attributes' => [
         'enabled' => env('ROUTER_ATTRIBUTE_ROUTES', false),
         'controller_file_filter' => true,
@@ -25,6 +72,19 @@ return [
         ],
         'classes' => [],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | HTTP Middleware
+    |--------------------------------------------------------------------------
+    |
+    | Global "pre" middleware runs before the route handler and global "post"
+    | middleware processes the response. "aliases" maps short route names to
+    | registered middleware. "definitions" contains each middleware's options.
+    | Entries are registered middleware names such as `gateway_hardening` or
+    | class strings; alias examples are `throttle` and `signed`.
+    |
+    */
     'middleware' => [
         'globals' => [
             'pre' => [
@@ -133,6 +193,15 @@ return [
             /*
              * Defines which proxies and hosts may influence request origin and HTTPS decisions.
              * Configure this accurately whenever the application is deployed behind a load balancer.
+             *
+             * `trusted_proxy_cidrs` permits forwarded headers only from listed networks.
+             * "deny_ip_cidrs" rejects client networks and "trusted_hosts" constrains Host.
+             * "forwarded_header_mask" selects accepted forwarded fields. "enforce_https"
+             * redirects to "https_port". "strip_hop_by_hop" removes connection-local
+             * headers and "redirect_allowed_hosts" constrains redirect destinations.
+             * CIDR examples: `10.0.0.0/8`, `203.0.113.4/32`; host examples:
+             * `api.example.com`; header mask is null or an integer bitmask; HTTPS
+             * port example: `443`; boolean keys accept `true|false`.
              */
             'gateway_hardening' => [
                 'trusted_proxy_cidrs' => [],
@@ -147,6 +216,18 @@ return [
             /*
              * Controls observability headers and optional network-error/OpenTelemetry integration.
              * These settings make request correlation available without coupling controllers to telemetry.
+             *
+             * "add_x_response_time" and "add_server_timing" expose timing headers.
+             * Request/trace ID emit flags control their named headers and the corresponding
+             * "respect" flags preserve trusted incoming values. "emit_traceparent_header"
+             * emits W3C trace context. OpenTelemetry uses its enable flag, service name,
+             * and version. NEL group/endpoint enable browser reporting; TTL is seconds,
+             * with subdomain and successful-request collection controlled separately.
+             * Boolean keys accept `true|false`. Header examples: `X-Request-Id`,
+             * `Trace-Id`; service/version examples: `checkout-api`, `2.4.0`; NEL
+             * An NEL group may be `network-errors` and its endpoint may be
+             * `https://nel.example/report`. A TTL may be 86400 seconds. Null
+             * group/endpoint values disable NEL output.
              */
             'telemetry' => [
                 'add_x_response_time' => true,
@@ -170,6 +251,12 @@ return [
             /*
              * Watches the configured marker file so deployments can temporarily take the app offline.
              * Create the file during a deployment to fail fast with a retriable response.
+             *
+             * "enabled" activates checks, "file" identifies the marker, "retry_after"
+             * supplies the response delay in seconds, and "content_type" labels the body.
+             * Enabled accepts `true|false`. A marker file may be
+             * `storage/framework/down`, a retry delay may be 3600 seconds, and
+             * the content type may be `text/plain`.
              */
             'maintenance_mode' => [
                 'enabled' => true,
@@ -180,6 +267,13 @@ return [
             /*
              * Establishes an application-wide ceiling for HTTP request metadata and payload sizes.
              * Set a body limit before accepting untrusted uploads or webhook payloads.
+             *
+             * Header byte/count keys bound metadata. `max_body_bytes` bounds payload size.
+             * null leaves it unbounded. "body_limit_verbs" restricts enforcement by HTTP
+             * method. "violate_on_unknown_body" rejects bodies whose size is unavailable.
+             * Typical header ceilings are 8192 bytes and 100 fields, while a body
+             * ceiling may be 10485760 bytes. Verbs use HTTP names such as
+             * `POST|PUT|PATCH`; unknown-body behavior accepts `true|false`.
              */
             'request_limits' => [
                 'max_header_bytes' => 8192,
@@ -191,6 +285,14 @@ return [
             /*
              * Provides the default values used by the `throttle` route alias.
              * Use an atomic shared cache store for this in multi-worker production deployments.
+             *
+             * "max" requests are allowed per "window" seconds using "store". The retry
+             * header may be an HTTP date when "retry_as_date" is true. Standard RateLimit
+             * headers are controlled by "emit_standard_rate_limit". "scope" namespaces
+             * counters and "cost_attribute" names an optional per-request cost attribute.
+             * A typical limit is 120 requests per 60 seconds. The store may be
+             * `redis`, the scope may be `api`, and the cost attribute may be
+             * `rate_cost.thm`. Boolean keys accept `true|false`.
              */
             'throttle' => [
                 'max' => 120,
@@ -204,6 +306,15 @@ return [
             /*
              * Protects cookie confidentiality and integrity; keep disabled until a valid key is configured.
              * The key must be suitable for Webrick cookie encryption, not merely any application secret.
+             *
+             * "key" is primary and "keys" supports rotation. "cookie_prefix" selects
+             * protected cookies and "max_bytes" bounds plaintext. Oversized state may use
+             * "store" for "store_ttl" seconds. Decryption failures can drop cookies.
+             * "force_secure", "force_http_only", and "default_same_site" harden output.
+             * Enabled and policy switches accept `true|false`. Use a random 32-byte
+             * Base64 key; rotation may list a new key followed by an old key. A
+             * prefix may be `enc_`, limits may be 3800 bytes and 86400 seconds,
+             * and the store may be `redis`. SameSite accepts `Lax|Strict|None|null`.
              */
             'cookie_encryption' => [
                 'enabled' => env('ROUTER_COOKIE_ENCRYPTION', false),
@@ -221,6 +332,8 @@ return [
             /*
              * Enables or disables method-override normalization without changing route definitions.
              * Disable it only when clients must be restricted to their literal HTTP verbs.
+             * "enabled" is the sole switch for this middleware.
+             * Accepted values: `true|false`.
              */
             'normalize_method' => [
                 'enabled' => true,
@@ -228,6 +341,9 @@ return [
             /*
              * Parses selected request input sources early, making controller input access predictable.
              * Enable JSON or upload name handling only when the application needs those sources.
+             * "touch_form_bodies", "touch_json_bodies", and "touch_uploaded_names"
+             * independently enable normalization for those request input sources.
+             * Every key accepts `true|false`.
              */
             'input_sanitizer' => [
                 'touch_form_bodies' => true,
@@ -237,6 +353,10 @@ return [
             /*
              * Chooses a response media type, charset, and locale from client preference headers.
              * Keep the lists aligned with the representations your application can actually produce.
+             * "produces" lists supported media suffixes/types, "charsets" accepted encodings,
+             * and "locales" supported languages. "locale_fallback" is used when no locale matches.
+             * Examples: `['+json', 'application/json', 'text/html']`, `['utf-8']`,
+             * `['en', 'bn']`, and fallback `en`.
              */
             'negotiation' => [
                 'produces' => ['+json', 'application/json', 'text/html'],
@@ -247,6 +367,9 @@ return [
             /*
              * Adds ETag support and handles conditional requests to avoid sending unchanged content.
              * This is a low-risk bandwidth optimization for stable responses.
+             * "auto_etag_when_missing" hashes eligible responses, "include_query_in_etag"
+             * varies validators by query input, and "auto_etag_min_size" is the byte threshold.
+             * Boolean keys accept `true|false`; minimum-size example: `2048` bytes.
              */
             'cache_validators' => [
                 'auto_etag_when_missing' => true,
@@ -256,6 +379,15 @@ return [
             /*
              * Enables shared response caching only when explicitly requested by ROUTER_RESPONSE_CACHE.
              * Keep it off globally unless every included route is safe to cache for its configured Vary keys.
+             *
+             * "store" names the cache backend and "ttl_seconds" controls freshness.
+             * "include_query" varies keys by query string and "max_body_bytes" bounds entries.
+             * "default_vary" lists request headers in the cache key. Personalized responses,
+             * restrictive response Cache-Control, and Set-Cookie output are skipped by their
+             * respective safety flags.
+             * Enabled/safety switches accept `true|false`. A store may be `redis`,
+             * with a 15 second TTL and a 1048576 byte body ceiling. Typical Vary
+             * members are `Accept`, `Accept-Language`, and `Accept-Encoding`.
              */
             'response_cache' => [
                 'enabled' => env('ROUTER_RESPONSE_CACHE', false),
@@ -271,6 +403,17 @@ return [
             /*
              * Controls response compression trade-offs between bandwidth, CPU time, and memory use.
              * Tune codecs and buffer limits for your infrastructure rather than compressing every response blindly.
+             *
+             * "min_bytes" is the response threshold and "pref_order" ranks codecs.
+             * "etag_mode" and "etag_derive_salt" preserve validator correctness across
+             * encodings. Codec level/quality keys tune CPU versus size. "max_buffer_bytes"
+             * bounds buffering. Exclude/only type lists filter media types, and
+             * "force_add_vary" always declares Accept-Encoding variance.
+             * Codecs: `zstd|br|gzip|deflate`; ETag modes:
+             * `weak-on-encode|recompute-strong|derive-strong`. Examples: minimum
+             * `1400` bytes, gzip `0..9`, Brotli `0..11`, Zstandard `3`, salt
+             * `enc-v1`, buffer `8388608`, MIME pattern `application/pdf` or
+             * `image/*`; force-add-Vary accepts `true|false`.
              */
             'compression' => [
                 'min_bytes' => 1400,
@@ -288,6 +431,18 @@ return [
             /*
              * Defines cross-origin access plus browser security headers such as HSTS and CSP.
              * Replace wildcard origins before enabling credentialed browser requests in production.
+             *
+             * Origins, methods, allowed request headers, and exposed response headers define
+             * browser access. "max_age_seconds" caches preflight results. Credential and
+             * private-network flags grant those capabilities. HSTS has an enable flag and
+             * subdomain switch. "csp" sets Content-Security-Policy, "accept_ch" requests
+             * client hints, and "timing_allow_origins" controls cross-origin timing access.
+             * Example origins are `*` and `https://app.example.com`. Methods are
+             * comma-separated HTTP names; headers may include `Content-Type` and
+             * `Authorization`; and preflight age may be 3600 seconds. Boolean policy
+             * keys accept `true|false`. A CSP may use `default-src 'self'`, a client
+             * hint may be `Sec-CH-UA`, and a timing origin may be
+             * `https://metrics.example.com`.
              */
             'cors' => [
                 'origins' => ['*'],
@@ -306,6 +461,8 @@ return [
             /*
              * Ensures all response Vary contributions are emitted as one valid header.
              * This protects downstream caches when middleware varies output by request headers.
+             * "enabled" is the sole switch for Vary normalization.
+             * Accepted values: `true|false`.
              */
             'vary' => [
                 'enabled' => true,
@@ -313,6 +470,10 @@ return [
             /*
              * Audits response correctness during development; disabled by default outside debug mode.
              * Keep it off in production because linting is diagnostic work, not user-facing behavior.
+             * "enabled" activates the linter and "checks" selects whether configured checks run.
+             * Enabled accepts `true|false`. Checks accepts `true|false` or a bitmask:
+             * `1` content type, `2` no-body statuses, `4` compression Vary,
+             * `8` weak encoded ETag, `16` Content-Length; combine by addition.
              */
             'response_linter' => [
                 'enabled' => env('APP_DEBUG', false),
