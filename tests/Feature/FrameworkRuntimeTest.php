@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 use Infocyph\Foundation\Application\Application;
 use Infocyph\Foundation\Auth\Contract\Notification\AuthNotifierInterface;
+use Infocyph\Console\Command\CommandContract;
 use Infocyph\Foundation\Database\DatabaseConnectionResolver;
+use Infocyph\Foundation\Http\HttpKernel;
+use Infocyph\Foundation\Routing\RouteFileLoader;
 use Infocyph\TalkingBytes\Email\Emailer;
 use Infocyph\Foundation\Routing\RouterManager;
 use Infocyph\Foundation\Validation\ValidationManager;
@@ -40,13 +43,41 @@ function expectedNotifierClass(Application $app): string
 it('boots with the expected application shape', function (): void {
     $app = infbyteApp();
 
-    expect($app->environment())->toBe(expectedEnvironment());
+    expect($app->environment())->toBe(expectedEnvironment())
+        ->and($app->runningInWeb())->toBeTrue();
 
     $paths = $app->paths()->all();
 
     expect($paths)->toHaveKey('providers');
     expect(is_file($paths['providers']))->toBeTrue();
     expect(is_dir($paths['storage']))->toBeTrue();
+});
+
+it('keeps the console bootstrap outside the web boot graph', function (): void {
+    $app = require dirname(__DIR__, 2) . '/bootstrap/console.php';
+
+    expect($app)->toBeInstanceOf(Application::class)
+        ->and($app->runningInConsole())->toBeTrue()
+        ->and($app->container()->has(RouteFileLoader::class))->toBeFalse()
+        ->and($app->container()->has(HttpKernel::class))->toBeFalse();
+
+    $app->boot();
+
+    expect($app->container()->has(RouteFileLoader::class))->toBeFalse()
+        ->and($app->container()->has(HttpKernel::class))->toBeFalse()
+        ->and(fn() => $app->http())
+        ->toThrow(LogicException::class, 'HTTP kernel is unavailable');
+});
+
+it('defines console commands through an explicit command route map', function (): void {
+    $commands = require dirname(__DIR__, 2) . '/routes/console.php';
+
+    expect($commands)->toBeArray()
+        ->and($commands)->toBe([]);
+
+    foreach ($commands as $command) {
+        expect(is_string($command) && is_a($command, CommandContract::class, true))->toBeTrue();
+    }
 });
 
 it('registers the core services', function (): void {

@@ -15,4 +15,4 @@ if (count($config) !== count($options)) {
     throw new RuntimeException('Bootstrap options must use string keys.');
 }
 
-return Foundation::web($config);
+return Foundation::console($config);

@@ -38,7 +38,7 @@ it('builds and clears route cache through the infbyte cli wrapper', function ():
 
 it('derives the dedicated routes cache path by default', function (): void {
     $root = dirname(__DIR__, 2);
-    $app = Foundation::create([
+    $app = Foundation::web([
         'base_path' => $root,
         '_config_cache' => false,
     ]);

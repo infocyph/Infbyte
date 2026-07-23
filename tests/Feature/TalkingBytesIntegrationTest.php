@@ -44,7 +44,7 @@ MAIL;
 
     file_put_contents($spoolDirectory . '/message-001.eml', str_replace("\n", "\r\n", $rawInbound));
 
-    $app = Foundation::create([
+    $app = Foundation::web([
         'base_path' => $root,
         '_config_cache' => false,
         'notifications' => [

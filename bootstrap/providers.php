@@ -3,5 +3,9 @@
 declare(strict_types=1);
 
 return [
-    App\Providers\AppServiceProvider::class,
+    'common' => [],
+    'web' => [
+        App\Providers\AppServiceProvider::class,
+    ],
+    'console' => [],
 ];

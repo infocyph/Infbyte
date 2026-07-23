@@ -38,15 +38,47 @@ php -S localhost:8000 -t public
 
 ## Bootstrap
 
-The application entry flow is:
+The web entry flow is:
 
 1. `public/index.php`
 2. `bootstrap/app.php`
-3. Foundation application boot
-4. `bootstrap/providers.php`
-5. `routes/*.php`
+3. `bootstrap/options.php`
+4. `Foundation::web()`
+5. web providers from `bootstrap/providers.php`
+6. `routes/*.php`
 
-`bootstrap/app.php` creates the Foundation application with the project base path. Foundation loads `.env` and `.env.local` during config boot.
+The CLI entry flow is separate:
+
+1. `bin/infbyte`
+2. Console preflight for help, list, completion, and version
+3. `bootstrap/console.php` only when a real command needs the application
+4. `bootstrap/options.php`
+5. `Foundation::console()`
+6. command routing from `routes/console.php`
+7. only the providers required by that command
+
+`bootstrap/options.php` contains the options intentionally shared by both
+paths. The console runtime does not register the HTTP kernel or load normal web
+routes. Route-cache commands activate routing explicitly because route
+compilation is their requested work.
+
+Console commands are routed explicitly from a command name to a command class:
+
+```php
+<?php
+
+use App\Console\Commands\ImportUsersCommand;
+
+return [
+    'users:import' => ImportUsersCommand::class,
+];
+```
+
+Application command classes belong in `app/Console/Commands`. The command route
+key is authoritative, while the class owns its arguments, options, validation,
+authorization requirements, and execution. Foundation's `app:ready`,
+`auth:schema:*`, `config:*`, and `route:*` commands are system commands and are
+registered by Foundation; they do not belong in this application route file.
 
 ## Project structure
 
@@ -106,7 +138,10 @@ for the project workflow.
 
 ## Notes
 
-- `bootstrap/providers.php` is the application provider list.
+- `bootstrap/providers.php` has explicit `common`, `web`, and `console`
+  provider lists. Keep a provider out of `common` unless both paths need it.
+- `routes/console.php` maps CLI command names to command classes and is loaded
+  only by the CLI entrypoint.
 - `config/*.php` is loaded automatically by Foundation.
 - `routes/api.php` defines the default `/api/health` and `/json` routes.
 - Foundation loads the route files listed in `config/router.php` automatically.
