@@ -4,9 +4,11 @@ set -Eeuo pipefail
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 php_bin="${PHP_BIN:-php}"
-app_user="${APP_USER:-$(id -un)}"
-app_group="${APP_GROUP:-$(id -gn "$app_user")}"
+current_user="$(id -un)"
+current_uid="$(id -u)"
 warm_caches=true
+
+umask 0002
 
 if [[ "${1:-}" == "--no-cache" ]]; then
     warm_caches=false
@@ -17,10 +19,17 @@ fi
 
 cd "$root_dir"
 
+if [[ "$current_uid" -eq 0 ]]; then
+    printf 'Do not run deploy.sh as root; run it as the deployment user that owns the project.\n' >&2
+    printf 'Provision web-server access to storage separately with groups or ACLs when required.\n' >&2
+    exit 77
+fi
+
 runtime_directories=(
     "bootstrap/cache"
     "bootstrap/cache/config"
     "bootstrap/cache/routes"
+    "storage"
     "storage/app"
     "storage/cache"
     "storage/cache/auth"
@@ -34,23 +43,24 @@ runtime_directories=(
 )
 
 for directory in "${runtime_directories[@]}"; do
-    install -d -m 2775 "$directory"
+    mkdir -p "$directory"
 done
 
-# The setgid bit keeps newly-created files in the runtime group.
-for directory in "${runtime_directories[@]}"; do
-    find "$directory" -type d -exec chmod 2775 {} +
-    find "$directory" -type f -exec chmod 0664 {} +
-done
-
-if [[ "$(id -u)" -eq 0 ]]; then
-    chown -R "$app_user:$app_group" bootstrap/cache storage
-else
-    printf 'Permissions prepared for %s:%s. Run as root with APP_USER/APP_GROUP if PHP uses another user.\n' "$app_user" "$app_group"
+blocked_path="$(
+    find bootstrap/cache storage \
+        \( -type d -o -type f \) \
+        ! -writable \
+        -print \
+        -quit
+)"
+if [[ -n "$blocked_path" ]]; then
+    printf 'Runtime path is not writable by deployment user %s: %s\n' "$current_user" "$blocked_path" >&2
+    printf 'Restore project ownership once, then rerun deploy.sh without sudo.\n' >&2
+    exit 77
 fi
 
 if [[ "$warm_caches" == false ]]; then
-    printf 'Runtime permissions prepared. Cache warming skipped.\n'
+    printf 'Runtime directories are writable. Cache warming skipped.\n'
     exit 0
 fi
 
@@ -59,14 +69,9 @@ command -v "$php_bin" >/dev/null 2>&1 || {
     exit 127
 }
 
-"$php_bin" infbyte config:clear
-"$php_bin" infbyte route:clear
-"$php_bin" infbyte config:cache
-"$php_bin" infbyte route:cache
+php_path="$(command -v "$php_bin")"
 
-if [[ "$(id -u)" -eq 0 ]]; then
-    # CacheLayer may create private cache directories while warming.
-    chown -R "$app_user:$app_group" bootstrap/cache storage
-fi
+"$php_path" infbyte config:cache
+"$php_path" infbyte route:cache
 
-printf 'Deployment runtime permissions and application caches are ready.\n'
+printf 'Deployment directories and application caches are ready.\n'

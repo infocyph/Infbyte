@@ -87,82 +87,35 @@ return [
     */
     'middleware' => [
         'globals' => [
-            'pre' => [
-                /*
-                 * Trust proxy headers only from known networks and reject hostile requests early.
-                 * This must run before routing so every downstream component sees a safe request.
-                 */
-                'gateway_hardening',
-                /*
-                 * Add request IDs, timing, tracing, and optional OpenTelemetry/NEL response metadata.
-                 * It establishes observability context for the entire request lifecycle.
-                 */
-                'telemetry',
-                /*
-                 * Serve a controlled 503 response while the application is intentionally offline.
-                 * Keeping it early prevents controllers and external services from running during maintenance.
-                 */
-                'maintenance_mode',
-                /*
-                 * Reject oversized headers or bodies before they consume application resources.
-                 * This limits exposure to malformed or intentionally expensive requests.
-                 */
-                'request_limits',
-                /*
-                 * Select the best response representation from Accept, charset, and locale headers.
-                 * Controllers can then return content that matches the client contract.
-                 */
-                'negotiation',
-                /*
-                 * Cache only when ROUTER_RESPONSE_CACHE is enabled; personalized responses stay uncached.
-                 * It runs before the controller to serve a valid cached response without executing it.
-                 */
-                'response_cache',
-                /*
-                 * Generate validators and honour conditional requests to save response bandwidth.
-                 * This enables efficient 304 responses when a representation has not changed.
-                 */
-                'cache_validators',
-                /*
-                 * Encrypt configured cookies only when ROUTER_COOKIE_ENCRYPTION and a valid key are set.
-                 * Keeping it before input access makes decrypted cookie state available to the application.
-                 */
-                'cookie_encryption',
-                /*
-                 * Normalize HTTP method overrides before route matching.
-                 * This lets browser form submissions consistently target PUT, PATCH, and DELETE routes.
-                 */
-                'normalize_method',
-                /*
-                 * Safely parse form, JSON, and upload input before controllers consume it.
-                 * This gives request handlers predictable access to the configured input sources.
-                 */
-                'input_sanitizer',
-            ],
-            'post' => [
-                /*
-                 * Compress eligible response bodies after controllers have produced them.
-                 * This reduces bandwidth while preserving correct content negotiation headers.
-                 */
-                'compression',
-                /*
-                 * Apply browser-facing CORS and security policy headers.
-                 * It must see the final response to consistently secure success and error responses.
-                 */
-                'cors',
-                /*
-                 * Merge Vary requirements contributed by earlier middleware.
-                 * A single normalized header keeps shared caches from mixing response variants.
-                 */
-                'vary',
-                /*
-                 * In debug mode, surface malformed or unsafe HTTP responses during development.
-                 * It is intentionally last so it validates the completed HTTP response.
-                 */
-                'response_linter',
-            ],
+            /*
+             * Keep the default request path empty. Promote middleware aliases below
+             * into these lists only when every route requires the corresponding
+             * behavior. Route-level middleware avoids charging unrelated endpoints.
+             *
+             * Example pre stack:
+             * `['gateway', 'limits', 'maintenance', 'telemetry']`
+             * Example post stack:
+             * `['compress', 'cors', 'vary']`
+             */
+            'pre' => [],
+            'post' => [],
         ],
         'aliases' => [
+            /*
+             * Use `gateway` where trusted proxy, host, HTTPS, or network policy
+             * normalization is required.
+             */
+            'gateway' => 'gateway_hardening',
+            /*
+             * Use `telemetry` where request IDs, timing, tracing, or access
+             * observability is required.
+             */
+            'telemetry' => 'telemetry',
+            /*
+             * Use `maintenance` on surfaces governed by the configured
+             * maintenance marker.
+             */
+            'maintenance' => 'maintenance_mode',
             /*
              * Use `signed` on routes that require a valid, unexpired signed URL.
              * This is suitable for temporary downloads, previews, and invitation links.
@@ -179,6 +132,31 @@ return [
              */
             'limits' => 'request_limits',
             /*
+             * Use `negotiate` when a route selects media type, charset, or locale
+             * from request preference headers.
+             */
+            'negotiate' => 'negotiation',
+            /*
+             * Use `validators` when a route should generate ETags and honour
+             * conditional requests.
+             */
+            'validators' => 'cache_validators',
+            /*
+             * Use `encrypted-cookie` only on routes that read or write protected
+             * cookies.
+             */
+            'encrypted-cookie' => 'cookie_encryption',
+            /*
+             * Use `method-override` on browser form routes that accept overridden
+             * PUT, PATCH, or DELETE methods.
+             */
+            'method-override' => 'normalize_method',
+            /*
+             * Use `sanitize` on routes that require eager form, JSON, or upload
+             * normalization.
+             */
+            'sanitize' => 'input_sanitizer',
+            /*
              * Use `cors` to apply the configured cross-origin policy to selected routes.
              * Keep it route-scoped when only an API surface should be accessed cross-origin.
              */
@@ -188,6 +166,18 @@ return [
              * This is safer than global caching for public, stable endpoints.
              */
             'cache' => 'response_cache',
+            /*
+             * Use `compress` for responses large enough to justify encoding cost.
+             */
+            'compress' => 'compression',
+            /*
+             * Use `vary` where middleware contributes request-header variance.
+             */
+            'vary' => 'vary',
+            /*
+             * Use `lint-response` for development-only response diagnostics.
+             */
+            'lint-response' => 'response_linter',
         ],
         'definitions' => [
             /*
