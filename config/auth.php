@@ -9,20 +9,23 @@ return [
     |--------------------------------------------------------------------------
     |
     | Each key selects the implementation for one authentication capability.
-    | Storage: `memory|dblayer`. Cache: `array|cachelayer`. Passwords:
-    | `native|epicrypt`. Tokens: `simple|epicrypt`. MFA: `simple|otp`.
-    | Notifications: `collect|talkingbytes`. Passkeys:
-    | `disabled|memory|webauthn`. Production defaults select durable,
-    | security-oriented drivers while local defaults remain self-contained.
+    | IDs: `random|uid`. Storage: `memory|dblayer`. Cache:
+    | `array|cachelayer`. Passwords: `native|epicrypt`. Tokens:
+    | `simple|epicrypt`. MFA: `simple|otp`. Notifications:
+    | `collect|talkingbytes`. Passkeys: `disabled|memory|webauthn`.
+    |
+    | The self-contained defaults keep auth adapters optional. Production auth
+    | must install and explicitly select the durable modules it requires.
     |
     */
     'drivers' => [
-        'storage' => env('AUTH_STORAGE', env('APP_ENV', 'local') === 'production' ? 'dblayer' : 'memory'),
-        'cache' => env('AUTH_CACHE', env('APP_ENV', 'local') === 'production' ? 'cachelayer' : 'array'),
-        'passwords' => env('AUTH_PASSWORDS', env('APP_ENV', 'local') === 'production' ? 'epicrypt' : 'native'),
-        'tokens' => env('AUTH_TOKENS', env('APP_ENV', 'local') === 'production' ? 'epicrypt' : 'simple'),
-        'mfa' => env('AUTH_MFA', env('APP_ENV', 'local') === 'production' ? 'otp' : 'simple'),
-        'notifications' => env('AUTH_NOTIFICATIONS', env('APP_ENV', 'local') === 'production' ? 'talkingbytes' : 'collect'),
+        'ids' => env('AUTH_IDS', 'random'),
+        'storage' => env('AUTH_STORAGE', 'memory'),
+        'cache' => env('AUTH_CACHE', 'array'),
+        'passwords' => env('AUTH_PASSWORDS', 'native'),
+        'tokens' => env('AUTH_TOKENS', 'simple'),
+        'mfa' => env('AUTH_MFA', 'simple'),
+        'notifications' => env('AUTH_NOTIFICATIONS', 'collect'),
         'passkey' => env('AUTH_PASSKEY', 'disabled'),
     ],
 

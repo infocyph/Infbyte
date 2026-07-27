@@ -9,10 +9,15 @@ use Infocyph\Foundation\Console\FoundationConsole;
 require dirname(__DIR__) . '/vendor/autoload.php';
 
 $basePath = dirname(__DIR__);
-$commands = require $basePath . '/routes/console.php';
+$commandManifest = $basePath . '/bootstrap/cache/console/commands.php';
+$commands = [];
 
-if (!is_array($commands)) {
-    throw new RuntimeException('Console routes must return a command-to-class map.');
+if (!is_file($commandManifest)) {
+    $commands = require $basePath . '/routes/console.php';
+
+    if (!is_array($commands)) {
+        throw new RuntimeException('Console routes must return a command-to-class map.');
+    }
 }
 
 $console = FoundationConsole::create(
@@ -32,6 +37,7 @@ $console = FoundationConsole::create(
     name: 'infbyte',
     version: 'dev-main',
     commands: $commands,
+    commandManifest: $commandManifest,
 );
 
 exit($console->run());

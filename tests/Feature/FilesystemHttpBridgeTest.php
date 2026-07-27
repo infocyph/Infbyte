@@ -3,7 +3,14 @@
 declare(strict_types=1);
 
 use Infocyph\Foundation\Application\Application;
+use Infocyph\Pathwise\PathwiseFacade;
 use Infocyph\Webrick\Request\Request;
+
+beforeEach(function (): void {
+    if (!class_exists(PathwiseFacade::class)) {
+        $this->markTestSkipped('Install the filesystem module to run Pathwise integration tests.');
+    }
+});
 
 function infbyteFilesystemApp(): Application
 {

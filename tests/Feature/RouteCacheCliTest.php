@@ -111,7 +111,40 @@ it('can explicitly build a single config cache through the infbyte cli wrapper',
     rmdir($cacheDirectory);
 });
 
-it('reports application readiness and auth schema status through the infbyte cli', function (): void {
+it('builds and clears compiled command metadata through the infbyte cli wrapper', function (): void {
+    $root = dirname(__DIR__, 2);
+    $cacheDirectory = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
+        . '/infbyte-command-cache-' . bin2hex(random_bytes(5));
+    $manifest = $cacheDirectory . '/commands.php';
+
+    [$buildExitCode, $buildOutput] = runInfbyteCommand([
+        PHP_BINARY,
+        $root . '/infbyte',
+        'command:cache',
+        '--path=' . $manifest,
+    ]);
+
+    expect($buildExitCode)->toBe(0);
+    expect($buildOutput)->toContain('Command manifest ready at:');
+    expect($manifest)->toBeFile();
+    expect($manifest . '.d')->toBeDirectory();
+
+    [$clearExitCode, $clearOutput] = runInfbyteCommand([
+        PHP_BINARY,
+        $root . '/infbyte',
+        'command:clear',
+        '--path=' . $manifest,
+    ]);
+
+    expect($clearExitCode)->toBe(0);
+    expect($clearOutput)->toContain('Command manifest cleared:');
+    expect($manifest)->not->toBeFile();
+    expect($manifest . '.d')->not->toBeDirectory();
+
+    rmdir($cacheDirectory);
+});
+
+it('reports readiness and optional module state through the infbyte cli', function (): void {
     $root = dirname(__DIR__, 2);
 
     [$readinessExitCode, $readinessOutput] = runInfbyteCommand([
@@ -120,18 +153,41 @@ it('reports application readiness and auth schema status through the infbyte cli
         'app:ready',
         '--json=1',
     ]);
-    [$schemaExitCode, $schemaOutput] = runInfbyteCommand([
+    [$modulesExitCode, $modulesOutput] = runInfbyteCommand([
+        PHP_BINARY,
+        $root . '/infbyte',
+        'module:list',
+        '--json=true',
+    ]);
+
+    expect($readinessExitCode)->toBe(2);
+    expect(json_decode($readinessOutput, true, flags: JSON_THROW_ON_ERROR)['production_ready'])->toBeFalse();
+    expect($modulesExitCode)->toBe(0);
+
+    $modules = array_column(
+        json_decode($modulesOutput, true, flags: JSON_THROW_ON_ERROR)['modules'],
+        null,
+        'name',
+    );
+
+    expect($modules['db']['installed'])->toBeFalse()
+        ->and($modules['cache']['installed'])->toBeFalse()
+        ->and($modules['filesystem']['installed'])->toBeFalse();
+});
+
+it('explains how to install a service owned by an absent optional module', function (): void {
+    $root = dirname(__DIR__, 2);
+
+    [$exitCode, $output] = runInfbyteCommand([
         PHP_BINARY,
         $root . '/infbyte',
         'auth:schema:status',
         '--json=1',
     ]);
 
-    expect($readinessExitCode)->toBe(0);
-    expect(json_decode($readinessOutput, true, flags: JSON_THROW_ON_ERROR)['production_ready'])->toBeBool();
-    expect($schemaExitCode)->toBe(0);
-    expect(json_decode($schemaOutput, true, flags: JSON_THROW_ON_ERROR))
-        ->toMatchArray(['installed' => true]);
+    expect($exitCode)->toBe(2)
+        ->and($output)->toContain('requires infocyph/dblayer')
+        ->and($output)->toContain('php infbyte module:install db');
 });
 
 /**

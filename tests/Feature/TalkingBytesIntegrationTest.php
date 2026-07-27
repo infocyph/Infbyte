@@ -8,6 +8,12 @@ use Infocyph\TalkingBytes\Email\Enum\BounceType;
 use Infocyph\TalkingBytes\Email\Mailbox\Mailbox;
 use Infocyph\TalkingBytes\Email\Mailbox\Pop3Mailbox;
 
+beforeEach(function (): void {
+    if (!class_exists(EmailMessage::class)) {
+        $this->markTestSkipped('Install the communication module to run TalkingBytes integration tests.');
+    }
+});
+
 it('exposes the broader TalkingBytes email stack through foundation notifications', function (): void {
     $root = dirname(__DIR__, 2);
     $temporaryRoot = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)

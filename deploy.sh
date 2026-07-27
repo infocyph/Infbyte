@@ -28,6 +28,7 @@ fi
 runtime_directories=(
     "bootstrap/cache"
     "bootstrap/cache/config"
+    "bootstrap/cache/console"
     "bootstrap/cache/routes"
     "storage"
     "storage/app"
@@ -71,7 +72,6 @@ command -v "$php_bin" >/dev/null 2>&1 || {
 
 php_path="$(command -v "$php_bin")"
 
-"$php_path" infbyte config:cache
-"$php_path" infbyte route:cache
+"$php_path" infbyte optimize
 
 printf 'Deployment directories and application caches are ready.\n'

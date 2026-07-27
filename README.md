@@ -50,12 +50,13 @@ The web entry flow is:
 The CLI entry flow is separate:
 
 1. `bin/infbyte`
-2. Console preflight for help, list, completion, and version
-3. `bootstrap/console.php` only when a real command needs the application
-4. `bootstrap/options.php`
-5. `Foundation::console()`
-6. command routing from `routes/console.php`
-7. only the providers required by that command
+2. the compiled command manifest, when present
+3. Console preflight for help, list, completion, and version
+4. `bootstrap/console.php` only when a real command needs the application
+5. `bootstrap/options.php`
+6. `Foundation::console()`
+7. command routing from `routes/console.php` when no manifest is cached
+8. only the providers required by that command
 
 `bootstrap/options.php` contains the options intentionally shared by both
 paths. The console runtime does not register the HTTP kernel or load normal web
@@ -77,8 +78,9 @@ return [
 Application command classes belong in `app/Console/Commands`. The command route
 key is authoritative, while the class owns its arguments, options, validation,
 authorization requirements, and execution. Foundation's `app:ready`,
-`auth:schema:*`, `config:*`, and `route:*` commands are system commands and are
-registered by Foundation; they do not belong in this application route file.
+`app:ready`, `auth:schema:*`, `command:*`, `config:*`, `module:*`, `optimize*`,
+and `route:*` commands are system commands registered by Foundation; they do
+not belong in this application route file.
 
 ## Project structure
 
@@ -107,19 +109,38 @@ The `infbyte` executable is the application command entrypoint:
 php infbyte app:ready --json=1
 php infbyte auth:schema:status --json=1
 php infbyte auth:schema:install --json=1
+php infbyte module:list
+php infbyte module:install db
 php infbyte config:cache
 php infbyte config:clear
+php infbyte command:cache
+php infbyte command:clear
 php infbyte route:cache
+php infbyte optimize
+php infbyte optimize:clear
 ```
 
 `config:cache` warms the project configuration at `bootstrap/cache/config/`.
 The default sharded layout keeps namespaces lazy; the optional single layout
 loads one compiled snapshot. `config:clear` removes either layout.
 
+`command:cache` compiles system and project command definitions beneath
+`bootstrap/cache/console/`. Normal command dispatch then reads only the selected
+descriptor and does not load `routes/console.php`. `optimize` warms command,
+configuration, and route caches together; cache compilation is intentionally
+allowed to do more work so requests and command dispatch do less.
+
+Foundation modules are opt-in. Use `module:list` to inspect availability and
+`module:install cache|communication|crypto|db|filesystem|otp|passkeys|validation`
+to add only the capabilities the application needs. Installing a module makes
+it a direct project dependency; absent modules are not registered or loaded on
+the request path.
+
 `app:ready` is deployment-safe: it reports Foundation configuration, auth,
 cache, database, notification, and writable-path readiness without outputting
 secrets. `auth:schema:install` is idempotent and creates only the Foundation
-authentication tables that are missing.
+authentication tables that are missing; install the `db` module before using
+the auth schema commands.
 
 Before production deployment, set a unique `AUTH_TOKEN_SECRET` of at least 32
 bytes, configure the selected production database/cache/notification drivers,
@@ -141,7 +162,7 @@ for the project workflow.
 - `bootstrap/providers.php` has explicit `common`, `web`, and `console`
   provider lists. Keep a provider out of `common` unless both paths need it.
 - `routes/console.php` maps CLI command names to command classes and is loaded
-  only by the CLI entrypoint.
+  only by the CLI entrypoint when the compiled command manifest is absent.
 - `config/*.php` is loaded automatically by Foundation.
 - `routes/api.php` defines the default `/api/health` and `/json` routes.
 - Foundation loads the route files listed in `config/router.php` automatically.

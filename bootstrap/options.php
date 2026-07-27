@@ -9,6 +9,7 @@ $options = [
 
 if (getenv('INFBYTE_TESTING') === '1') {
     $options['_config_cache'] = false;
+    $options['env'] = 'testing';
     $runtime = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . '/infbyte-runtime-' . getmypid();
 
     foreach (['app', 'app/public', 'cache', 'logs', 'sessions', 'uploads'] as $directory) {
