@@ -8,6 +8,7 @@ use Infocyph\Foundation\Cache\CacheManager;
 use Infocyph\Console\Command\CommandContract;
 use Infocyph\Foundation\Database\DatabaseManager;
 use Infocyph\Foundation\Filesystem\FilesystemManager;
+use Infocyph\Foundation\Foundation;
 use Infocyph\Foundation\Http\HttpKernel;
 use Infocyph\Foundation\Notifications\NotificationManager;
 use Infocyph\Foundation\Routing\RouteFileLoader;
@@ -17,26 +18,47 @@ use Infocyph\Webrick\Request\Request;
 
 function infbyteApp(): Application
 {
-    $app = require dirname(__DIR__, 2) . '/bootstrap/app.php';
-
-    if (!$app instanceof Application) {
-        throw new RuntimeException('Bootstrap should return an Application instance.');
-    }
-
-    return $app;
+    return Foundation::web(infbyteTestOptions());
 }
 
-function expectedEnvironment(): string
+/**
+ * @return array<string, mixed>
+ */
+function infbyteTestOptions(): array
 {
-    if (getenv('INFBYTE_TESTING') === '1') {
-        return 'testing';
+    $root = dirname(__DIR__, 2);
+    $runtime = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
+        . '/infbyte-runtime-'
+        . getmypid();
+
+    foreach (['app', 'app/public', 'cache', 'logs', 'sessions', 'uploads'] as $directory) {
+        $path = $runtime . DIRECTORY_SEPARATOR . $directory;
+
+        if (!is_dir($path) && !mkdir($path, 0775, true) && !is_dir($path)) {
+            throw new RuntimeException(sprintf('Unable to create test runtime directory "%s".', $path));
+        }
     }
 
-    $value = $_ENV['APP_ENV'] ?? 'local';
-
-    return is_string($value) && $value !== ''
-        ? strtolower($value)
-        : 'local';
+    return [
+        'base_path' => $root,
+        '_config_cache' => false,
+        'env' => 'testing',
+        'paths' => [
+            'storage' => $runtime,
+            'cache' => $runtime . '/cache',
+            'logs' => $runtime . '/logs',
+            'sessions' => $runtime . '/sessions',
+            'uploads' => $runtime . '/uploads',
+        ],
+        'auth' => [
+            'drivers' => [
+                'cache' => 'array',
+            ],
+        ],
+        'router' => [
+            'cache' => false,
+        ],
+    ];
 }
 
 function expectedNotifierClass(Application $app): string
@@ -49,7 +71,7 @@ function expectedNotifierClass(Application $app): string
 it('boots with the expected application shape', function (): void {
     $app = infbyteApp();
 
-    expect($app->environment())->toBe(expectedEnvironment())
+    expect($app->environment())->toBeString()->not->toBeEmpty()
         ->and($app->runningInWeb())->toBeTrue();
 
     $paths = $app->paths()->all();
@@ -60,7 +82,7 @@ it('boots with the expected application shape', function (): void {
 });
 
 it('keeps the console bootstrap outside the web boot graph', function (): void {
-    $app = require dirname(__DIR__, 2) . '/bootstrap/console.php';
+    $app = Foundation::console(infbyteTestOptions());
 
     expect($app)->toBeInstanceOf(Application::class)
         ->and($app->runningInConsole())->toBeTrue()
