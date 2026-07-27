@@ -127,7 +127,8 @@ it('builds and clears compiled command metadata through the infbyte cli wrapper'
     expect($buildExitCode)->toBe(0);
     expect($buildOutput)->toContain('Command manifest ready at:');
     expect($manifest)->toBeFile();
-    expect($manifest . '.d')->toBeDirectory();
+    expect(glob($cacheDirectory . '/commands-*.php') ?: [])->not->toBeEmpty();
+    expect($manifest . '.d')->not->toBeDirectory();
 
     [$clearExitCode, $clearOutput] = runInfbyteCommand([
         PHP_BINARY,
@@ -139,6 +140,7 @@ it('builds and clears compiled command metadata through the infbyte cli wrapper'
     expect($clearExitCode)->toBe(0);
     expect($clearOutput)->toContain('Command manifest cleared:');
     expect($manifest)->not->toBeFile();
+    expect(glob($cacheDirectory . '/commands-*.php') ?: [])->toBeEmpty();
     expect($manifest . '.d')->not->toBeDirectory();
 
     rmdir($cacheDirectory);

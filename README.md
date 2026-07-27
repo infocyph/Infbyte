@@ -78,11 +78,14 @@ Compile application metadata before serving production traffic:
 
 ```bash
 php infbyte optimize
+php infbyte optimize:clear
 ```
 
 This builds the sharded configuration cache, selected route matcher cache, and
-compiled command manifest. Cache compilation may do more work so web requests
-and command dispatch do less.
+compiled command manifest. Command descriptors remain lazy and are stored
+directly in `bootstrap/cache/console/` beside the manifest. `optimize:clear`
+removes all three cache types. Cache compilation may do more work so web
+requests and command dispatch do less.
 
 ## Optional modules
 
