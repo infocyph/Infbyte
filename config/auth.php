@@ -9,9 +9,9 @@ return [
     |--------------------------------------------------------------------------
     |
     | Each key selects the implementation for one authentication capability.
-    | IDs: `random|uid`. Storage: `memory|dblayer`. Cache:
-    | `array|cachelayer`. Passwords: `native|epicrypt`. Tokens:
-    | `simple|epicrypt`. MFA: `simple|otp`. Notifications:
+    | IDs: `random|uid`. Storage: `memory|database`. Cache:
+    | `array|cache`. Passwords: `native|security`. Tokens:
+    | `simple|security`. MFA: `simple|otp`. Notifications:
     | `collect|talkingbytes`. Passkeys: `disabled|memory|webauthn`.
     |
     | The self-contained defaults keep auth adapters optional. Production auth
@@ -34,41 +34,14 @@ return [
     | Token Signing Secret
     |--------------------------------------------------------------------------
     |
-    | This secret protects authentication tokens. Replace the placeholder with
-    | a unique high-entropy production secret and never commit the real value.
-    | Example format: a randomly generated 32-or-more-byte Base64 string.
+    | This secret protects authentication tokens. It has no config-file
+    | default. Local runtime may supply its development-only fallback, while
+    | production rejects missing or short values. Set AUTH_TOKEN_SECRET to a
+    | unique high-entropy secret of at least 32 bytes and never commit it.
+    | Example format: a randomly generated 64-character hexadecimal string.
     |
     */
-    'token_secret' => env(
-        'AUTH_TOKEN_SECRET',
-        env('APP_ENV', 'local') === 'production'
-            ? 'replace-with-a-production-token-secret'
-            : 'foundation-dev-secret',
-    ),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Persistent Auth Adapters
-    |--------------------------------------------------------------------------
-    |
-    | "cachelayer.store" names the cache store used for auth state and
-    | lockouts. "dblayer.connection" names the database connection used by
-    | persistent accounts, sessions, grants, and audit records. Store names are
-    | keys from cache.stores, for example `auth`; connection examples are
-    | `sqlite`, `mysql`, and `pgsql` from database.connections.
-    |
-    */
-    'cachelayer' => [
-        'store' => env(
-            'AUTH_CACHE_STORE',
-            env('APP_ENV', 'local') === 'production'
-                ? 'auth'
-                : env('CACHE_STORE', 'local'),
-        ),
-    ],
-    'dblayer' => [
-        'connection' => env('AUTH_DB_CONNECTION', env('DB_CONNECTION', env('DB_DRIVER', 'sqlite'))),
-    ],
+    'token_secret' => env('AUTH_TOKEN_SECRET'),
 
     /*
     |--------------------------------------------------------------------------

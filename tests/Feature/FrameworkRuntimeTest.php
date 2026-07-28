@@ -6,6 +6,7 @@ use Infocyph\Foundation\Application\Application;
 use Infocyph\Foundation\Auth\Contract\Notification\AuthNotifierInterface;
 use Infocyph\Foundation\Cache\CacheManager;
 use Infocyph\Console\Command\CommandContract;
+use Infocyph\Foundation\Console\FoundationConsole;
 use Infocyph\Foundation\Database\DatabaseManager;
 use Infocyph\Foundation\Filesystem\FilesystemManager;
 use Infocyph\Foundation\Foundation;
@@ -106,6 +107,21 @@ it('defines console commands through an explicit command route map', function ()
     foreach ($commands as $command) {
         expect(is_string($command) && is_a($command, CommandContract::class, true))->toBeTrue();
     }
+});
+
+it('keeps Foundation system commands out of application Composer scripts', function (): void {
+    $composer = json_decode(
+        file_get_contents(dirname(__DIR__, 2) . '/composer.json'),
+        true,
+        flags: JSON_THROW_ON_ERROR,
+    );
+    $scripts = $composer['scripts'] ?? [];
+
+    expect($scripts)->toBeArray()
+        ->and(array_intersect(
+            array_keys($scripts),
+            array_keys(FoundationConsole::commands([])),
+        ))->toBe([]);
 });
 
 it('registers the core services', function (): void {

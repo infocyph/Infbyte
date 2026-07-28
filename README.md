@@ -37,7 +37,9 @@ CLI requests follow:
 2. the compiled command manifest, when available
 3. `bootstrap/console.php` only when the selected command needs the application
 4. console providers from `bootstrap/providers.php`
-5. project command mappings from `routes/console.php`
+5. project command mappings from `routes/console.php` when no manifest exists
+6. `routes/schedule.php` only for `schedule:*` or optimization commands
+7. `routes/workers.php` only for `worker:*` commands
 
 The CLI path does not register the HTTP kernel or load application web routes.
 The web path does not load Console classes, command routes, or the console
@@ -71,8 +73,53 @@ return [
 ```
 
 Foundation supplies system commands including `app:ready`, `auth:schema:*`,
-`command:*`, `config:*`, `module:*`, `optimize*`, and `route:*`. They do not
-belong in the project command map.
+`command:*`, `config:*`, `create:*`, `module:*`, `optimize*`, `route:*`,
+`schedule:*`, and `worker:*`. They do not belong in the project command map.
+Invoke them through `php infbyte`; the skeleton does not duplicate
+Foundation-owned commands as Composer scripts. Composer does not inherit
+scripts from dependencies, and application-specific Composer scripts remain
+free to use unrelated names.
+`php infbyte list` places every Foundation-owned command under `System`.
+Application commands are grouped by the first namespace segment in their route
+name, such as `reports` for `reports:daily`.
+
+Create application artifacts only when the project needs them:
+
+```bash
+php infbyte create:controller Admin/User
+php infbyte create:command Reports/Daily
+php infbyte create:service Billing
+php infbyte create:job SendReceipt
+php infbyte create:middleware EnsureTenant
+php infbyte create:policy Invoice
+php infbyte create:provider Billing
+php infbyte create:repository User
+php infbyte create:repository Reporting/Person --table=reporting.people
+php infbyte create:worker Queue
+php infbyte create:event UserRegistered
+php infbyte create:listener SendWelcomeEmail
+php infbyte create:enum OrderStatus
+php infbyte create:exception BillingFailed
+php infbyte create:interface BillingGateway
+php infbyte create:trait FormatsMoney
+php infbyte create:class Services/ReportBuilder
+php infbyte create:test Http/UserAccess
+```
+
+Existing files are preserved unless `--force` is supplied. Commands, providers,
+and workers remain explicitly registered in `routes/console.php`,
+`bootstrap/providers.php`, and `routes/workers.php`; generation does not make
+them part of either runtime automatically. Repositories use DBLayer rather than
+an ORM model and therefore require `php infbyte module:install db`; `--table`
+overrides the derived plural snake_case table. Generated jobs and listeners are
+plain invokable classes so the application can connect them to its chosen queue
+or event mechanism without Foundation loading either mechanism automatically.
+
+Define scheduled commands in `routes/schedule.php`. Define dynamic worker names
+in `routes/workers.php` as a map to classes implementing
+`Infocyph\Foundation\Console\WorkerProvider`. Schedule and worker execution use
+CacheLayer locks; install the cache module to select file, Redis, Valkey,
+Memcached, or PDO-backed coordination.
 
 Compile application metadata before serving production traffic:
 
