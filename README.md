@@ -73,15 +73,18 @@ return [
 ```
 
 Foundation supplies system commands including `app:ready`, `auth:schema:*`,
-`command:*`, `config:*`, `create:*`, `module:*`, `optimize*`, `route:*`,
-`schedule:*`, and `worker:*`. They do not belong in the project command map.
+`command:*`, `config:*`, `create:*`, `db:*`, `migrate*`, `module:*`,
+`optimize*`, `route:*`, `schedule:*`, `session:*`, and `worker:*`. Omnibus
+commands such as `queue:consume` are registered through Console's lazy
+messaging capability. None of these commands belong in the project command map.
 Invoke them through `php infbyte`; the skeleton does not duplicate
 Foundation-owned commands as Composer scripts. Composer does not inherit
 scripts from dependencies, and application-specific Composer scripts remain
 free to use unrelated names.
-`php infbyte list` places every Foundation-owned command under `System`.
-Application commands are grouped by the first namespace segment in their route
-name, such as `reports` for `reports:daily`.
+`php infbyte list` places Foundation's framework commands under `System`,
+package capability commands under their capability group, and application
+commands under the first namespace segment in their route name, such as
+`reports` for `reports:daily`.
 
 Create application artifacts only when the project needs them:
 
@@ -134,25 +137,111 @@ directly in `bootstrap/cache/console/` beside the manifest. `optimize:clear`
 removes all three cache types. Cache compilation may do more work so web
 requests and command dispatch do less.
 
-## Optional modules
+## Modules and published configuration
 
-A new Infbyte project contains no database, cache, communication, filesystem,
-cryptography, OTP, passkey, or validation package. Inspect and install only the
-capabilities the application uses:
+A new Infbyte project does not install database, cache, communication,
+filesystem, cryptography, OTP, passkey, or validation packages. Foundation's
+logging, Omnibus messaging, JsonDispatch resources, and browser-session
+integrations are already code-available, but their application configuration
+is not published. Their optional service graphs remain lazy and are resolved
+only by the route, command, or application service that selects them.
+
+Inspect modules and install or publish only the capabilities the application
+uses:
 
 ```bash
 php infbyte module:list
 php infbyte module:install db
 php infbyte module:install cache
+php infbyte module:install messaging
+php infbyte module:install resources
+php infbyte module:install session
 ```
 
 Available module names are `cache`, `communication`, `crypto`, `db`,
-`filesystem`, `otp`, `passkeys`, and `validation`. Installation adds the package
-as a direct Composer dependency and publishes its configuration from
-Foundation. Existing project configuration is never overwritten.
+`filesystem`, `logging`, `messaging`, `otp`, `passkeys`, `resources`,
+`session`, and `validation`.
+
+For an optional package, installation adds that package as a direct Composer
+dependency and publishes its Foundation integration config. For a built-in
+module, the same command publishes only its config. Published files include
+complete key documentation and inactive examples. Existing project
+configuration is never overwritten, and no install workflow activates a
+provider, route, middleware, listener, queue, database connection, or session
+globally.
 
 Commands owned by an absent module fail with an installation instruction. For
 example, install `db` before using `auth:schema:*`.
+
+### Database and migrations
+
+Install DBLayer before generating repositories or running schema commands:
+
+```bash
+php infbyte module:install db
+php infbyte create:repository Billing/Invoice --table=billing.invoices
+php infbyte migrate:status
+php infbyte migrate
+```
+
+Connection examples for MySQL/MariaDB, PostgreSQL, and SQLite are published to
+`config/database.php`. Migration and seeder manifests remain explicit and are
+never discovered during web requests.
+
+### Events, queues, and schedules
+
+Publish the Omnibus integration only when the application uses messaging:
+
+```bash
+php infbyte module:install messaging
+php infbyte create:event OrderPaid
+php infbyte create:listener SendReceipt
+php infbyte create:job GenerateInvoice
+```
+
+Register message routes, handlers, listeners, and scheduled-message factories
+in the published `config/messaging.php`. Register command schedules in
+`routes/schedule.php` and supervised workers in `routes/workers.php`. The
+ordinary web path does not load those route files or construct transports,
+receivers, consumers, or worker services.
+
+### JSON resources
+
+```bash
+php infbyte module:install resources
+```
+
+This publishes `config/responses.php` with the JsonDispatch media type,
+application version, and restricted-transport error-tunnelling policy.
+Resource transformation remains opt-in at the controller or response boundary;
+the starter `/json` route stays a minimal benchmark route.
+
+### Browser sessions
+
+```bash
+php infbyte module:install session
+```
+
+This publishes `config/session.php`. Session and CSRF services are resolved only
+on routes that select their middleware. Cache- and database-backed stores still
+require their corresponding modules; stateless API routes incur no browser-
+session startup.
+
+## Application testing
+
+Foundation provides the native Webrick HTTP test client through the application
+test kit:
+
+```php
+$response = $app->testing()->http()
+    ->get('/api/health')
+    ->assertStatus(200)
+    ->assertJson(['status' => 'ok']);
+```
+
+The Infbyte repository's own release tests are excluded from the
+Composer-created project, as required by `.gitattributes`. A created
+application can add its own suite with `php infbyte create:test`.
 
 ## Deployment
 
@@ -173,6 +262,21 @@ Before production traffic:
 - run any required schema installation or migrations;
 - require `php infbyte app:ready` to succeed.
 
-Repository-only tests and development workflow files are excluded from
-Composer-created projects. A created project can add its own test suite without
-inheriting Infbyte’s package-release exclusions.
+Repository-only tests are excluded from Composer-created projects. A created
+project can add its own test suite without inheriting Infbyte's repository
+release tests.
+
+## Framework and package guides
+
+Infbyte documents application setup and operations. Domain behavior remains in
+the repository that owns it:
+
+- [Foundation framework guide](https://github.com/infocyph/Foundation/tree/main/docs)
+- [Console guide](https://github.com/infocyph/Console/tree/main/docs)
+- [Omnibus messaging guide](https://github.com/infocyph/Omnibus/tree/main/docs)
+- [Webrick HTTP guide](https://docs.infocyph.com/projects/webrick/en/latest/)
+- [JsonDispatch specification](https://docs.infocyph.com/projects/json-dispatch/)
+
+Use each installed package's README and docs for driver-specific configuration,
+delivery guarantees, schema behavior, security policy, and production
+operations.

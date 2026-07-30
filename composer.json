@@ -1,6 +1,6 @@
 {
     "name": "infocyph/infbyte",
-    "description": "A secure PHP framework powered by Infocyph Foundation.",
+    "description": "The minimal application skeleton for Infocyph Foundation.",
     "license": "MIT",
     "type": "project",
     "require": {

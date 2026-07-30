@@ -6,13 +6,13 @@ namespace App\Http\Controllers;
 
 final readonly class SystemController
 {
-    /** @return array{status:string} */
+    /** @phpstan-return array{status:string} */
     public static function health(): array
     {
         return ['status' => 'ok'];
     }
 
-    /** @return array{memory:int} */
+    /** @phpstan-return array{memory:int} */
     public static function json(): array
     {
         return ['memory' => memory_get_usage(true)];

@@ -15,7 +15,6 @@ use Infocyph\Foundation\Notifications\NotificationManager;
 use Infocyph\Foundation\Routing\RouteFileLoader;
 use Infocyph\Foundation\Routing\RouterManager;
 use Infocyph\Foundation\Validation\ValidationManager;
-use Infocyph\Webrick\Request\Request;
 
 function infbyteApp(): Application
 {
@@ -150,13 +149,19 @@ it('serves the health and JSON routes', function (): void {
 
     expect(array_keys($registered))->toBe(['GET /api/health', 'GET /json']);
 
-    $health = $app->handle(Request::fake(headers: ['Host' => 'localhost'], uri: 'https://localhost/api/health'));
-    $json = $app->handle(Request::fake(headers: ['Host' => 'localhost'], uri: 'https://localhost/json'));
+    $http = $app->testing()->http();
+    $health = $http->get('/api/health')
+        ->assertStatus(200)
+        ->assertHeader('Content-Type')
+        ->assertJson(['status' => 'ok']);
+    $json = $http->get('/json')
+        ->assertStatus(200)
+        ->assertHeader('Content-Type')
+        ->json();
 
-    expect($health->getStatusCode())->toBe(200);
-    expect(json_decode((string) $health->getBody(), true))->toBe(['status' => 'ok']);
-    expect($json->getStatusCode())->toBe(200);
-    expect(json_decode((string) $json->getBody(), true))->toHaveKey('memory');
+    expect($health->json())->toBe(['status' => 'ok'])
+        ->and($json)->toHaveKey('memory')
+        ->and($json['memory'])->toBeInt();
 });
 
 it('uses the self-contained auth notifier without optional modules', function (): void {

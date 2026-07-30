@@ -174,7 +174,11 @@ it('reports readiness and optional module state through the infbyte cli', functi
 
     expect($modules['db']['installed'])->toBeFalse()
         ->and($modules['cache']['installed'])->toBeFalse()
-        ->and($modules['filesystem']['installed'])->toBeFalse();
+        ->and($modules['filesystem']['installed'])->toBeFalse()
+        ->and($modules['logging']['installed'])->toBeTrue()
+        ->and($modules['messaging']['installed'])->toBeTrue()
+        ->and($modules['resources']['installed'])->toBeTrue()
+        ->and($modules['session']['installed'])->toBeTrue();
 });
 
 it('explains how to install a service owned by an absent optional module', function (): void {
