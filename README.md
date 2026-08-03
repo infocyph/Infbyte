@@ -11,9 +11,12 @@ starter code.
 ```bash
 composer create-project infocyph/infbyte my-app
 cd my-app
-cp .env.example .env
 php -S localhost:8000 -t public
 ```
+
+Composer creates `.env` from `.env.example` and generates a random
+authentication token secret without replacing an existing environment file.
+Infbyte 1.x supports PHP 8.4 and newer; its CI verifies PHP 8.4 and 8.5.
 
 The starter application exposes:
 
@@ -84,7 +87,16 @@ free to use unrelated names.
 `php infbyte list` places Foundation's framework commands under `System`,
 package capability commands under their capability group, and application
 commands under the first namespace segment in their route name, such as
-`reports` for `reports:daily`.
+`reports` for `reports:daily`. `php infbyte --version` reports the installed
+Foundation runtime version because Composer-created root projects do not retain
+the skeleton package version. The displayed CLI application name comes from
+`APP_NAME` in `.env` (with process environment values taking precedence) and
+falls back to `infbyte` when it is missing or empty.
+
+Start the local development server with `php infbyte serve`. It serves the
+configured public directory at `http://127.0.0.1:8000`; use `--host` and
+`--port` to select another bind address. PHP's built-in server is for local
+development only, not production deployment.
 
 Create application artifacts only when the project needs them:
 
@@ -131,11 +143,13 @@ php infbyte optimize
 php infbyte optimize:clear
 ```
 
-This builds the sharded configuration cache, selected route matcher cache, and
-compiled command manifest. Command descriptors remain lazy and are stored
-directly in `bootstrap/cache/console/` beside the manifest. `optimize:clear`
-removes all three cache types. Cache compilation may do more work so web
-requests and command dispatch do less.
+This builds the sharded configuration cache, selected route matcher cache,
+compiled command metadata, schedule manifest, and installed-module manifest.
+Command descriptors remain lazy and are stored directly in
+`bootstrap/cache/console/` beside the command manifest. `optimize:clear`
+removes every generated application cache, including every route matcher
+layout. Cache compilation may do more work so web requests and command
+dispatch do less.
 
 ## Modules and published configuration
 

@@ -2,8 +2,37 @@
 
 declare(strict_types=1);
 
+use Composer\InstalledVersions;
 use Infocyph\Foundation\Foundation;
 use Infocyph\Foundation\Routing\RouteCachePath;
+
+it('uses the environment application name and reports the Foundation runtime version', function (): void {
+    $root = dirname(__DIR__, 2);
+    [$exitCode, $output] = runInfbyteCommand([
+        PHP_BINARY,
+        $root . '/infbyte',
+        '--version',
+    ], ['APP_NAME' => 'Acme Console']);
+
+    expect($exitCode)->toBe(0)
+        ->and($output)->toBe(
+            'Acme Console ' . (InstalledVersions::getPrettyVersion('infocyph/foundation') ?? 'dev-main'),
+        );
+});
+
+it('falls back to infbyte when the environment application name is empty', function (): void {
+    $root = dirname(__DIR__, 2);
+    [$exitCode, $output] = runInfbyteCommand([
+        PHP_BINARY,
+        $root . '/infbyte',
+        '--version',
+    ], ['APP_NAME' => '']);
+
+    expect($exitCode)->toBe(0)
+        ->and($output)->toBe(
+            'infbyte ' . (InstalledVersions::getPrettyVersion('infocyph/foundation') ?? 'dev-main'),
+        );
+});
 
 it('builds and clears route cache through the infbyte cli wrapper', function (): void {
     $root = dirname(__DIR__, 2);
@@ -198,11 +227,21 @@ it('explains how to install a service owned by an absent optional module', funct
 
 /**
  * @param list<string> $arguments
+ * @param array<string, string> $environment
  * @return array{0:int,1:string}
  */
-function runInfbyteCommand(array $arguments): array
+function runInfbyteCommand(array $arguments, array $environment = []): array
 {
-    $command = implode(' ', array_map(
+    $command = '';
+    foreach ($environment as $key => $value) {
+        if (preg_match('/^[A-Z_][A-Z0-9_]*$/D', $key) !== 1) {
+            throw new InvalidArgumentException(sprintf('Invalid environment variable name: %s', $key));
+        }
+
+        $command .= $key . '=' . escapeshellarg($value) . ' ';
+    }
+
+    $command .= implode(' ', array_map(
         static fn(string $argument): string => escapeshellarg($argument),
         $arguments,
     )) . ' 2>&1';

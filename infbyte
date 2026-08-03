@@ -3,14 +3,22 @@
 
 declare(strict_types=1);
 
+use Composer\InstalledVersions;
 use Infocyph\Foundation\Application\Application;
 use Infocyph\Foundation\Console\FoundationConsole;
+use Infocyph\Foundation\Config\EnvironmentLoader;
 
 require __DIR__ . '/vendor/autoload.php';
 
 $basePath = __DIR__;
 $commandManifest = $basePath . '/bootstrap/cache/console/commands.php';
 $commands = [];
+
+new EnvironmentLoader()->load($basePath);
+$applicationName = trim(env_string('APP_NAME', 'infbyte'));
+if ($applicationName === '') {
+    $applicationName = 'infbyte';
+}
 
 if (!is_file($commandManifest)) {
     $commands = require $basePath . '/routes/console.php';
@@ -34,8 +42,8 @@ $console = FoundationConsole::create(
 
         return $application;
     },
-    name: 'infbyte',
-    version: 'dev-main',
+    name: $applicationName,
+    version: InstalledVersions::getPrettyVersion('infocyph/foundation') ?? 'dev-main',
     commands: $commands,
     commandManifest: $commandManifest,
 );
