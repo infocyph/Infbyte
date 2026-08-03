@@ -5,13 +5,11 @@
     "type": "project",
     "require": {
         "php": ">=8.4",
-        "infocyph/foundation": "dev-main@dev"
+        "infocyph/foundation": "^1.2"
     },
     "require-dev": {
         "infocyph/phpforge": "dev-main@dev"
     },
-    "minimum-stability": "dev",
-    "prefer-stable": true,
     "autoload": {
         "psr-4": {
             "App\\": "app/"
@@ -30,5 +28,8 @@
         },
         "optimize-autoloader": true,
         "sort-packages": true
+    },
+    "scripts": {
+        "post-create-project-cmd": "@php bootstrap/install.php"
     }
 }
