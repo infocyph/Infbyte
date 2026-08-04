@@ -5,7 +5,7 @@
     "type": "project",
     "require": {
         "php": ">=8.4",
-        "infocyph/foundation": "^1.2"
+        "infocyph/foundation": "^1.2.1"
     },
     "require-dev": {
         "infocyph/phpforge": "dev-main@dev"
@@ -30,6 +30,6 @@
         "sort-packages": true
     },
     "scripts": {
-        "post-create-project-cmd": "@php bootstrap/install.php"
+        "post-create-project-cmd": "@php infbyte app:install"
     }
 }
