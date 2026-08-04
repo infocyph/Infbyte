@@ -78,7 +78,7 @@ it('builds a clean create-project archive and provisions its environment', funct
         }
 
         expect($project . '/composer.json')->toBeFile()
-            ->and($project . '/bootstrap/install.php')->toBeFile()
+            ->and($project . '/bootstrap/install.php')->not->toBeFile()
             ->and($project . '/bootstrap/cache/config/.gitignore')->toBeFile()
             ->and($project . '/bootstrap/cache/console/.gitignore')->toBeFile()
             ->and($project . '/bootstrap/cache/routes/.gitignore')->toBeFile()
@@ -108,7 +108,13 @@ it('builds a clean create-project archive and provisions its environment', funct
             ->and($exportedComposer['require']['infocyph/foundation'] ?? null)
             ->toBe($sourceComposer['require']['infocyph/foundation'] ?? null)
             ->and($exportedComposer['scripts']['post-create-project-cmd'] ?? null)
-            ->toBe('@php bootstrap/install.php');
+            ->toBe('@php infbyte app:install');
+
+        mkdir($project . '/vendor', 0775, true);
+        file_put_contents(
+            $project . '/vendor/autoload.php',
+            '<?php return require ' . var_export($root . '/vendor/autoload.php', true) . ';',
+        );
 
         $installOutput = [];
         $installExitCode = 0;

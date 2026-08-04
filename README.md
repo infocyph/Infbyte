@@ -22,9 +22,9 @@ different address or port when needed:
 php infbyte serve --host=0.0.0.0 --port=8080
 ```
 
-The built-in server is intended for local development only. Composer creates
-`.env` from `.env.example` and generates a unique authentication secret without
-overwriting an existing environment file.
+The built-in server is intended for local development only. Composer invokes
+Foundation's `app:install` command to create `.env` from `.env.example` and
+generate a unique authentication secret without replacing an existing one.
 
 The starter application exposes:
 
@@ -42,7 +42,7 @@ include:
 | Local development | `serve`, `create:*` |
 | Optional capabilities | `module:list`, `module:install`, `module:remove` |
 | Database work | `db:show`, `db:table`, `db:seed`, `migrate*` |
-| Runtime maintenance | `cache:clear`, `storage:link`, `secret:generate` |
+| Runtime maintenance | `app:install`, `cache:clear`, `storage:link`, `secret:generate` |
 | Background work | `schedule:*`, `worker:*`, `queue:consume` |
 | Deployment | `optimize`, `optimize:clear`, `app:ready` |
 
