@@ -18,12 +18,15 @@ it('ships only core application configuration before module installation', funct
     ]);
 });
 
-it('excludes repository tests without exporting the exclusion policy', function (): void {
+it('exports example tests while excluding repository verification tests', function (): void {
     $attributes = file_get_contents(dirname(__DIR__, 2) . '/.gitattributes');
 
     expect($attributes)->toBeString()
         ->and($attributes)->toContain('/.gitattributes export-ignore')
-        ->and($attributes)->toContain('/tests export-ignore');
+        ->and($attributes)->not->toContain("/tests export-ignore\n")
+        ->and($attributes)->toContain('/tests/Feature/FrameworkRuntimeTest.php export-ignore')
+        ->and($attributes)->toContain('/tests/Feature/RouteCacheCliTest.php export-ignore')
+        ->and($attributes)->toContain('/tests/Feature/SkeletonDistributionTest.php export-ignore');
 });
 
 it('builds a clean create-project archive and provisions its environment', function (): void {
@@ -85,10 +88,19 @@ it('builds a clean create-project archive and provisions its environment', funct
             ->and($project . '/storage/uploads/.gitignore')->toBeFile()
             ->and($project . '/.env.example')->toBeFile()
             ->and($project . '/.gitattributes')->not->toBeFile()
+            ->and($project . '/.github')->not->toBeDirectory()
             ->and($project . '/captainhook.json')->not->toBeFile()
             ->and($project . '/composer.lock')->not->toBeFile()
+            ->and($project . '/CODE_OF_CONDUCT.md')->not->toBeFile()
+            ->and($project . '/CONTRIBUTING.md')->not->toBeFile()
             ->and($project . '/plan.md')->not->toBeFile()
-            ->and($project . '/tests')->not->toBeDirectory()
+            ->and($project . '/SECURITY.md')->not->toBeFile()
+            ->and($project . '/tests/Pest.php')->toBeFile()
+            ->and($project . '/tests/Feature/ExampleTest.php')->toBeFile()
+            ->and($project . '/tests/Unit/ExampleTest.php')->toBeFile()
+            ->and($project . '/tests/Feature/FrameworkRuntimeTest.php')->not->toBeFile()
+            ->and($project . '/tests/Feature/RouteCacheCliTest.php')->not->toBeFile()
+            ->and($project . '/tests/Feature/SkeletonDistributionTest.php')->not->toBeFile()
             ->and($project . '/vendor')->not->toBeDirectory()
             ->and($project . '/bootstrap/cache/config/__manifest.php')->not->toBeFile()
             ->and($project . '/database')->not->toBeDirectory()
