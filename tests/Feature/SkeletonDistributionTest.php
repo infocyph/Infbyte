@@ -140,6 +140,33 @@ it('builds a clean create-project archive and provisions its environment', funct
 
         expect($installExitCode)->toBe(0)
             ->and(hash_file('sha256', $project . '/.env'))->toBe($before);
+
+        $deployOutput = [];
+        $deployExitCode = 0;
+        exec(sprintf(
+            'cd %s && bash ./deploy.sh 2>&1',
+            escapeshellarg($project),
+        ), $deployOutput, $deployExitCode);
+
+        expect($deployExitCode)->toBe(0, implode("\n", $deployOutput))
+            ->and($project . '/bootstrap/cache/config/__manifest.php')->toBeFile()
+            ->and($project . '/bootstrap/cache/routes/fused.php')->toBeFile()
+            ->and($project . '/bootstrap/cache/console/commands.php')->toBeFile()
+            ->and($project . '/bootstrap/cache/modules.php')->toBeFile();
+
+        $clearOutput = [];
+        $clearExitCode = 0;
+        exec(sprintf(
+            'cd %s && %s infbyte optimize:clear 2>&1',
+            escapeshellarg($project),
+            escapeshellarg(PHP_BINARY),
+        ), $clearOutput, $clearExitCode);
+
+        expect($clearExitCode)->toBe(0, implode("\n", $clearOutput))
+            ->and($project . '/bootstrap/cache/config/__manifest.php')->not->toBeFile()
+            ->and($project . '/bootstrap/cache/routes/fused.php')->not->toBeFile()
+            ->and($project . '/bootstrap/cache/console/commands.php')->not->toBeFile()
+            ->and($project . '/bootstrap/cache/modules.php')->not->toBeFile();
     } finally {
         removeInfbyteDistributionFixture($fixture);
     }

@@ -3,8 +3,15 @@
 declare(strict_types=1);
 
 use Composer\InstalledVersions;
+use App\Http\Controllers\SystemController;
+use Infocyph\Foundation\Auth\AuthManager;
+use Infocyph\Foundation\Database\DatabaseManager;
 use Infocyph\Foundation\Foundation;
+use Infocyph\Foundation\Messaging\MessagingManager;
 use Infocyph\Foundation\Routing\RouteCachePath;
+use Infocyph\Foundation\Session\SessionManager;
+use Infocyph\Webrick\Request\Request;
+use Infocyph\Webrick\Router\Matching\FusedMatcher;
 
 it('uses the environment application name and reports the Foundation runtime version', function (): void {
     $root = dirname(__DIR__, 2);
@@ -51,6 +58,62 @@ it('builds and clears route cache through the infbyte cli wrapper', function ():
     expect($buildOutput)->toContain('Route cache ready at:');
     expect(is_file($cacheFile))->toBeTrue();
     expect(filesize($cacheFile))->toBeGreaterThan(0);
+
+    $matcher = FusedMatcher::make()->enableCache($cacheFile);
+    [$cachedRoute] = $matcher->match('GET', 'localhost', '/json');
+    $cachedHandler = $cachedRoute->getHandler();
+    $webrickVersion = InstalledVersions::getVersion('infocyph/webrick') ?? '0.0.0';
+    $usesNativeHandler = version_compare($webrickVersion, '3.3.0', '>=');
+    if ($usesNativeHandler) {
+        expect($cachedHandler)->toBe([SystemController::class, 'json'])
+            ->and(class_exists(\Opis\Closure\Serializer::class, false))->toBeFalse();
+    } else {
+        expect($cachedHandler)->toBeInstanceOf(Closure::class);
+    }
+
+    $runtime = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
+        . '/infbyte-cached-runtime-' . bin2hex(random_bytes(5));
+    $runtimeCache = $runtime . '/bootstrap/cache/routes/fused.php';
+    mkdir(dirname($runtimeCache), 0775, true);
+    mkdir($runtime . '/routes', 0775, true);
+    copy($cacheFile, $runtimeCache);
+    file_put_contents(
+        $runtime . '/routes/missing.php',
+        "<?php\n\nthrow new RuntimeException('Cached dispatch loaded route source.');\n",
+    );
+
+    try {
+        $app = Foundation::web([
+            'base_path' => $runtime,
+            '_config_cache' => false,
+            'router' => [
+                'cache' => true,
+                'files' => ['missing.php'],
+                'matcher' => 'fused',
+            ],
+        ]);
+        $repository = $app->container()->getRepository();
+        $response = $app->handle(Request::fake(method: 'GET', uri: 'http://localhost/json'));
+
+        expect($response->getStatusCode())->toBe(200)
+            ->and((string) $response->getBody())->toContain('memory')
+            ->and($repository->hasResolvedSingleton(AuthManager::class))->toBeFalse()
+            ->and($repository->hasResolvedSingleton(SessionManager::class))->toBeFalse()
+            ->and($repository->hasResolvedSingleton(DatabaseManager::class))->toBeFalse()
+            ->and($repository->hasResolvedSingleton(MessagingManager::class))->toBeFalse()
+            ->and(get_included_files())->not->toContain($runtime . '/routes/missing.php');
+    } finally {
+        if (isset($app)) {
+            $app->container()->unset();
+        }
+        unlink($runtimeCache);
+        rmdir(dirname($runtimeCache));
+        rmdir(dirname(dirname($runtimeCache)));
+        rmdir(dirname(dirname(dirname($runtimeCache))));
+        unlink($runtime . '/routes/missing.php');
+        rmdir($runtime . '/routes');
+        rmdir($runtime);
+    }
 
     [$clearExitCode, $clearOutput] = runInfbyteCommand([
         PHP_BINARY,

@@ -44,11 +44,15 @@ return [
     | controls environment-aware definitions. "lazy_loading" defers supported
     | services, while "request_scope" isolates request-lived entries.
     |
-    | "compiled" may point to compiled container metadata. Debug tracing is
-    | disabled by default; "level" selects the trace detail when enabled.
+    | "compiled" selects the application-owned resolver artifact. Activation
+    | remains off unless a measured deployment explicitly selects "always".
+    | Debug tracing is disabled by default; "level" selects its detail.
     |
     | Alias/environment examples: `http` and `production`. Boolean switches use
-    | `true|false`. Compiled path example: `bootstrap/cache/container.php`.
+    | `true|false`. The compiled artifact defaults to
+    | `bootstrap/cache/container.php`; APP_CONTAINER_COMPILED may select another
+    | application-owned relative or absolute path.
+    | Compiled activation values: `off|always`.
     | Trace levels: `off|node|info|warn|warning|error|verbose`.
     |
     */
@@ -57,7 +61,8 @@ return [
         'environment' => env('APP_ENV', 'local'),
         'lazy_loading' => env('APP_CONTAINER_LAZY_LOADING', false),
         'request_scope' => env('APP_CONTAINER_REQUEST_SCOPE', true),
-        'compiled' => env('APP_CONTAINER_COMPILED'),
+        'compiled' => env('APP_CONTAINER_COMPILED', 'bootstrap/cache/container.php'),
+        'compiled_activation' => env('APP_CONTAINER_COMPILED_ACTIVATION', 'off'),
         'debug_tracing' => [
             'enabled' => env('APP_CONTAINER_DEBUG_TRACING', false),
             'level' => env('APP_CONTAINER_DEBUG_TRACE_LEVEL', 'node'),

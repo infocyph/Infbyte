@@ -144,10 +144,12 @@ it('serves the health and JSON routes', function (): void {
     $registered = [];
 
     foreach ($router->routes() as $route) {
-        $registered[$route->getMethod() . ' ' . $route->getPath()] = true;
+        $registered[$route->getMethod() . ' ' . $route->getPath()] = $route->getHandler();
     }
 
     expect(array_keys($registered))->toBe(['GET /api/health', 'GET /json']);
+    expect($registered['GET /api/health'])->toBeInstanceOf(Closure::class)
+        ->and($registered['GET /json'])->toBeInstanceOf(Closure::class);
 
     $http = $app->testing()->http();
     $health = $http->get('/api/health')

@@ -63,6 +63,11 @@ Existing files are preserved unless `--force` is supplied. Register application
 commands explicitly in `routes/console.php`, schedules in `routes/schedule.php`,
 and supervised workers in `routes/workers.php`.
 
+For an intentionally static controller action, use a first-class callable such
+as `Route::get('/reports', ReportsController::show(...))`; route caching converts
+that safe form to a plain descriptor. Captured closures and instance handlers
+remain supported through the general cached-handler path.
+
 ## Optional modules
 
 A new project installs only the core runtime. Add or publish capabilities as the
@@ -118,7 +123,20 @@ php infbyte app:ready
 ```
 
 `optimize` compiles configuration, route, command, schedule, and module metadata
-so requests do less work. `optimize:clear` removes generated caches.
+plus the eligible HTTP container graph so requests do less work. It publishes a
+final optimize manifest only after the complete set is ready. `optimize:clear`
+removes every generated artifact and leaves uncached execution available.
+
+`APP_CONFIG_CACHE_TYPE=single` loads one snapshot; `sharded` loads configuration
+namespaces on demand. Neither is universally faster: measure the application's
+minimal, authenticated, and database-backed routes before selecting one.
+Compiled-container activation remains `off` by default because small requests
+may not amortize its boot cost; use `always` only for a measured deployment,
+commonly a persistent worker with OPcache.
+
+Webrick automatically selects the response emitter. A known deployment may set
+`WEBRICK_EMITTER` to `fpm`, `frankenphp`, `lsapi`, `unit`, `swoole`,
+`roadrunner`, or `workerman`; leave it unset when runtime detection is desired.
 
 The included deployment helper validates writable runtime paths and builds the
 same caches:
