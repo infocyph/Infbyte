@@ -9,8 +9,11 @@
 /.route-cache-*
 /.vscode/
 /.windsurf/
+/bootstrap/cache/container.php
 /bootstrap/cache/modules.php
+/bootstrap/cache/optimize.php
 /database/*.sqlite
 /vendor/
 *~
 composer.lock
+plan.md
