@@ -12,9 +12,15 @@ return [
     | only replaceable authentication capabilities. The dependency-light
     | defaults work without optional modules.
     |
-    | Run `php infbyte module:install auth` to install the extended auth bundle
-    | used by AUTH_MFA=otp and AUTH_PASSKEY=webauthn. The two capabilities stay
-    | independently selectable even though they share one purpose-level module.
+    | Optional choices map to purpose-level modules:
+    |   storage=database             -> module:install database
+    |   cache=cache                  -> module:install cache
+    |   passwords/tokens=security    -> module:install security
+    |   mfa=otp or passkey=webauthn  -> module:install auth
+    |   notifications=talkingbytes   -> module:install communication
+    |
+    | OTP and WebAuthn remain independently selectable even though they share
+    | the same extended-auth module and installation bundle.
     |
     */
     'drivers' => [
