@@ -8,10 +8,13 @@ return [
     | Authentication Drivers
     |--------------------------------------------------------------------------
     |
-    | Foundation 2.0 owns identity generation through UID, so authentication no
-    | longer exposes an ID driver. These switches select only replaceable auth
-    | capabilities. The Infbyte defaults stay dependency-light; production may
-    | opt into the durable specialist modules it requires.
+    | Foundation owns identity generation through UID. These switches select
+    | only replaceable authentication capabilities. The dependency-light
+    | defaults work without optional modules.
+    |
+    | Run `php infbyte module:install auth` to install the extended auth bundle
+    | used by AUTH_MFA=otp and AUTH_PASSKEY=webauthn. The two capabilities stay
+    | independently selectable even though they share one purpose-level module.
     |
     */
     'drivers' => [
@@ -39,6 +42,11 @@ return [
     |--------------------------------------------------------------------------
     | One-Time Passwords
     |--------------------------------------------------------------------------
+    |
+    | OTP-backed MFA is provided by the auth module. Enable it with AUTH_MFA=otp
+    | after installing the module. Replay-safe production use also requires the
+    | configured shared cache/coordination capability.
+    |
     */
     'otp' => [
         'issuer' => env_string('AUTH_OTP_ISSUER', env_string('APP_NAME', 'Infbyte')),
@@ -66,6 +74,10 @@ return [
     |--------------------------------------------------------------------------
     | WebAuthn / Passkeys
     |--------------------------------------------------------------------------
+    |
+    | WebAuthn is provided by the auth module. Enable it with
+    | AUTH_PASSKEY=webauthn after installing that module.
+    |
     */
     'webauthn' => [
         'rp_id' => env('WEBAUTHN_RP_ID'),
