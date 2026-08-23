@@ -2,10 +2,19 @@
 
 Infbyte is the minimal application skeleton for
 [Infocyph Foundation](https://github.com/infocyph/Foundation). Foundation owns
-the reusable framework runtime; Infbyte provides the application bootstrap,
-configuration, routes, storage layout, and starter code.
+the reusable framework/runtime layer; Infbyte provides opinionated application
+bootstrap, starter configuration, routes, writable layout, and application code.
 
-Infbyte 1.x requires PHP 8.4 or newer.
+Infbyte requires PHP 8.4+.
+
+During Foundation 2.0 development this branch targets:
+
+```json
+"infocyph/foundation": "dev-feature/foundation-2.0 as 2.0.x-dev"
+```
+
+The release constraint will move to the stable Foundation 2.0 line for the final
+application release.
 
 ## Quick start
 
@@ -15,146 +24,271 @@ cd my-app
 php infbyte serve
 ```
 
-The development server listens on `http://127.0.0.1:8000` by default. Select a
-different address or port when needed:
+The built-in server defaults to `127.0.0.1:8000` and is for local development
+only:
 
 ```bash
 php infbyte serve --host=0.0.0.0 --port=8080
 ```
 
-The built-in server is intended for local development only. Composer invokes
-Foundation's `app:install` command to create `.env` from `.env.example` and
-generate a unique authentication secret without replacing an existing one.
+Composer invokes Foundation's `app:install` post-create command. The application
+root executable remains `infbyte`; there is no separate Artisan/Console runtime.
 
-The starter application exposes:
+## Foundation runtime boundary
 
-- `GET /api/health`
-- `GET /json`
+Infbyte does not implement a framework layer above Foundation.
 
-## Console
+The Web bootstrap is deliberately small:
 
-Run `php infbyte list` to see every available command. Frequently used commands
-include:
+```php
+use Infocyph\Foundation\Foundation;
+
+return Foundation::web([
+    'base_path' => dirname(__DIR__),
+]);
+```
+
+Foundation's `CommandDispatcher` selects CLI, Worker, and Scheduler runtimes for
+the root `infbyte` executable when commands require them.
+
+The four Foundation runtimes are:
+
+- Web
+- CLI
+- Worker
+- Scheduler
+
+Optional package providers remain lazy until configuration/code selects their
+capability.
+
+## CLI
+
+List the current command surface with:
+
+```bash
+php infbyte list
+```
+
+Common families include:
 
 | Purpose | Commands |
 | --- | --- |
-| Inspect the application | `about`, `env:show`, `config:show`, `route:list` |
+| Inspect | `about`, `env:show`, `config:show`, `config:validate`, `route:list` |
 | Local development | `serve`, `create:*` |
-| Optional capabilities | `module:list`, `module:install`, `module:remove` |
-| Database work | `db:show`, `db:table`, `db:seed`, `migrate*` |
-| Runtime maintenance | `app:install`, `cache:clear`, `storage:link`, `secret:generate` |
-| Background work | `schedule:*`, `worker:*`, `queue:consume` |
-| Deployment | `optimize`, `optimize:clear`, `app:ready` |
+| Modules | `module:list`, `module:show`, `module:install`, `module:remove`, `module:config:publish`, `module:schema:*` |
+| Database | `db:*`, `migrate*` |
+| Operations | `execution:*`, `maintenance:*`, `runtime:reload`, `log:tail` |
+| Background work | `schedule:*`, `worker:*`, `queue:*`, `messaging:list` |
+| Storage/session/auth | `storage:*`, `session:prune`, `auth:prune` |
+| Environment protection | `env:encrypt`, `env:decrypt` |
+| Deployment | `optimize`, `optimize:clear`, `optimize:report`, `app:ready` |
 
-Some commands become usable only after their corresponding optional module is
-installed. Missing capabilities report the exact installation command.
+Global controls include `--json`, `-q|--quiet`, `--silent`, `-v|-vv|-vvv`,
+`--profile`, `--env`, and `-n|--no-interaction`.
 
-Create application artifacts without adding unused runtime services:
+Application commands are registered explicitly in `routes/console.php`,
+schedules in `routes/schedule.php`, and non-message maintenance workers in
+`routes/workers.php`.
+
+## Application generators
+
+Foundation generators create application starting points without silently
+editing registration/configuration:
 
 ```bash
 php infbyte create:controller Admin/User
 php infbyte create:command Reports/Daily
+php infbyte create:request StoreUser
+php infbyte create:rule ValidVatNumber
+php infbyte create:resource User
+php infbyte create:job GenerateReport
+php infbyte create:handler GenerateReport
+php infbyte create:job-middleware AuditJob
+php infbyte create:mail Welcome
+php infbyte create:notification PasswordChanged
+php infbyte create:notification-channel Sms
 php infbyte create:repository User
-php infbyte create:worker Queue
-php infbyte create:test Http/UserAccess
+php infbyte create:migration CreateUsers
+php infbyte create:seeder Production
+php infbyte create:worker Metrics
 ```
 
-Existing files are preserved unless `--force` is supplied. Register application
-commands explicitly in `routes/console.php`, schedules in `routes/schedule.php`,
-and supervised workers in `routes/workers.php`.
+Existing files are preserved unless `--force` is supplied.
 
-For an intentionally static controller action, use a first-class callable such
-as `Route::get('/reports', ReportsController::show(...))`; route caching converts
-that safe form to a plain descriptor. Captured closures and instance handlers
-remain supported through the general cached-handler path.
+## Purpose-first optional modules
 
-## Optional modules
-
-A new project installs only the core runtime. Add or publish capabilities as the
-application needs them:
+A new application keeps only the Foundation core runtime. Add capabilities as
+they are needed:
 
 ```bash
 php infbyte module:list
-php infbyte module:install db
+php infbyte module:install database
 php infbyte module:install cache
+php infbyte module:install communication
 php infbyte module:install messaging
-php infbyte module:install session
+php infbyte module:config:publish operations
 ```
 
-Available modules include database, cache, communication, cryptography,
-filesystem, logging, messaging, OTP, passkeys, JSON resources, sessions, and
-validation. Installation publishes documented configuration without activating
-global middleware, providers, connections, workers, or sessions. Optional
-services remain lazy until selected by application code, a route, or a command.
+Canonical modules are:
+
+- `auth`
+- `cache`
+- `communication`
+- `database`
+- `filesystem`
+- `logging` (built in)
+- `messaging`
+- `operations` (built in)
+- `resources` (built in)
+- `security`
+- `session` (built in)
+- `validation`
+
+Aliases such as `db`, `crypto`, `otp`, `passkeys`, and `queue` remain accepted,
+but the application documentation uses purpose names. OTP and WebAuthn are
+implementations inside the `auth` module rather than standalone public modules.
+
+Installing a module does not add global middleware, open connections, or start
+workers. Optional config is published only when requested/needed and remains
+outside the lean checked-in skeleton by default.
+
+## Module schema lifecycle
+
+Capability-owned schemas use one command family:
+
+```bash
+php infbyte module:schema:status auth
+php infbyte module:schema:install auth
+php infbyte module:schema:status cache
+php infbyte module:schema:install session
+php infbyte module:schema:sync
+```
+
+The `database` module owns DB/migration infrastructure; it does not own arbitrary
+application tables. Removing a module never drops schemas/application data.
 
 ## Application structure
 
-- `app/` contains application controllers, commands, and generated code.
-- `bootstrap/` contains the isolated web and console composition roots.
-- `config/` contains application-owned configuration.
-- `routes/` contains HTTP, command, schedule, and worker mappings.
-- `public/` contains the web entry point.
-- `storage/` contains writable runtime data.
-- `tests/Feature/` and `tests/Unit/` contain starter Pest examples.
+The starter intentionally stays small:
 
-Web requests boot only the HTTP path. CLI requests boot only the command
-capabilities they require; the ordinary web path does not load console command,
-schedule, or worker definitions.
-
-## Testing
-
-The generated project includes one feature test and one unit test:
-
-```bash
-composer ic:tests
+```text
+app/
+bootstrap/
+  app.php
+  providers.php
+  cache/
+config/
+  app.php
+  auth.php
+  router.php
+public/
+routes/
+  web.php
+  api.php
+  auth.php
+  console.php
+  schedule.php
+  workers.php
+storage/
+tests/
+composer.json
+infbyte
 ```
 
-Foundation provides a native Webrick HTTP test client, as demonstrated by
-`tests/Feature/ExampleTest.php`. Infbyte's repository-only release tests are
-excluded from Composer-created projects.
+Only application-default config is checked in. Cache/database/filesystem/
+messaging/operations/security/session/validation/communication config belongs
+to optional module publication rather than being bulk-copied into every new
+project.
+
+## Database
+
+```bash
+php infbyte module:install database
+php infbyte migrate
+php infbyte migrate --pretend
+php infbyte migrate:status
+php infbyte db:monitor --section=status
+```
+
+Application migrations are registered explicitly under
+`database.migrations.classes`; Foundation does not scan migration directories.
+
+## Messaging and workers
+
+Omnibus-backed messaging is optional:
+
+```bash
+php infbyte module:install messaging
+php infbyte worker:list
+php infbyte worker:run reports
+php infbyte worker:status reports
+php infbyte queue:failed
+```
+
+Foundation does not expose a parallel messaging manager. Application services
+resolve native Omnibus `MessageBus`, `EventDispatcher`, and related APIs through
+DI.
+
+`routes/workers.php` is only for application maintenance workers; queue worker
+loops remain Omnibus-owned.
+
+## Runtime operations
+
+Useful production/runtime commands include:
+
+```bash
+php infbyte config:validate --production
+php infbyte maintenance:status
+php infbyte runtime:reload
+php infbyte worker:restart
+php infbyte schedule:interrupt
+php infbyte storage:status
+php infbyte log:tail --follow
+```
+
+Runtime generation commands request graceful shutdown. Foundation does not
+replace Supervisor/systemd/Docker/Kubernetes process supervision.
 
 ## Production
 
-Compile application metadata before serving production traffic:
+Build deployment-owned optimized artifacts before serving production traffic:
 
 ```bash
 php infbyte optimize
+php infbyte optimize:report
 php infbyte app:ready
 ```
 
-`optimize` compiles configuration, route, command, schedule, and module metadata
-plus the eligible HTTP container graph so requests do less work. It publishes a
-final optimize manifest only after the complete set is ready. `optimize:clear`
-removes every generated artifact and leaves uncached execution available.
-
-`APP_CONFIG_CACHE_TYPE=single` loads one snapshot; `sharded` loads configuration
-namespaces on demand. Neither is universally faster: measure the application's
-minimal, authenticated, and database-backed routes before selecting one.
-Compiled-container activation remains `off` by default because small requests
-may not amortize its boot cost; use `always` only for a measured deployment,
-commonly a persistent worker with OPcache.
-
-Webrick automatically selects the response emitter. A known deployment may set
-`WEBRICK_EMITTER` to `fpm`, `frankenphp`, `lsapi`, `unit`, `swoole`,
-`roadrunner`, or `workerman`; leave it unset when runtime detection is desired.
-
-The included deployment helper validates writable runtime paths and builds the
-same caches:
+Clear generated artifacts with:
 
 ```bash
-./deploy.sh
+php infbyte optimize:clear
 ```
 
-Before deployment, set `APP_ENV=production`, disable debug output, configure
-installed modules, apply required migrations, and require `app:ready` to pass.
+Compiled config/route/command/schedule/container artifacts belong to deployment
+and are ignored by the skeleton repository.
+
+Before deployment:
+
+- set production environment/debug policy;
+- configure only the modules the application actually uses;
+- run application migrations;
+- provision applicable module schemas;
+- require `config:validate --production` / `app:ready` to pass;
+- use a production web server and external process manager.
+
+## Testing and release checks
+
+The current skeleton Composer file does not invent generic test/release script
+aliases. Run the tools/scripts actually installed by the application/release
+candidate. Foundation's full Composer/PHPForge/static/PHPUnit/integration and
+performance matrix is performed in its dedicated release-verification phase.
 
 ## Documentation
 
-- [Foundation](https://github.com/infocyph/Foundation/tree/main/docs)
-- [Console](https://github.com/infocyph/Console/tree/main/docs)
-- [Omnibus](https://github.com/infocyph/Omnibus/tree/main/docs)
-- [Webrick](https://docs.infocyph.com/projects/webrick/en/latest/)
-- [JsonDispatch](https://docs.infocyph.com/projects/json-dispatch/)
+- [Foundation documentation](https://github.com/infocyph/Foundation/tree/feature/foundation-2.0/docs)
+- [Omnibus](https://github.com/infocyph/Omnibus)
+- [Webrick](https://github.com/infocyph/Webrick)
 
-Detailed framework and package documentation will expand separately; this
-README intentionally remains a concise application quick start.
+Infbyte keeps framework details in Foundation documentation rather than copying
+them into the application skeleton.
