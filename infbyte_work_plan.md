@@ -7,320 +7,232 @@
 
 ## Current checkpoint
 
-- Date: 2026-08-23
-- Infbyte source: `56cb73e18eab07f34242a929eccbc9e6572d9971`
-- Foundation source: `17a3a19cf27ba2d2c39b5722be3cc1d37f8a6eb5`
+- Date: 2026-08-24
+- Infbyte source checkpoint: `56cb73e18eab07f34242a929eccbc9e6572d9971`
+- Foundation source checkpoint: `493c39a7a06bac0455397556254f0f8e7e25f973`
 - Infbyte branch base: `main` at `47fb985f266c977504c3dca6bd13e85c9a1b73dc`
-- Phase: pre-documentation application-contract cleanup.
-- Latest completed cleanup: Omnibus 2.3 + Foundation Job/JobMiddleware messaging integration.
-- Full tests/release gates remain deferred.
+- Current phase: **Foundation + Infbyte documentation reconciliation and public-name/config freeze**.
+- Application-contract/API cleanup: complete in Foundation.
+- Full PHPUnit/static/PHPForge/runtime/release matrix: not run yet.
 
 ## Ownership
 
-Foundation owns reusable runtime composition, CLI/runtime machinery, purpose-module policy, module schema orchestration, configuration machinery, optimized artifacts, operational runtime controls, application-level messaging contracts, and integrations.
+Foundation owns reusable runtime composition, DI/provider activation policy, CLI/runtime machinery, purpose modules, module schema orchestration, configuration/optimization, operational runtime controls, application contracts and specialist integrations.
 
-Infbyte owns project bootstrap, application config, routes/code, deployment conventions, and skeleton developer experience.
+Infbyte owns the opinionated application skeleton: project bootstrap, app-specific config, routes/application code, deployment conventions and final developer experience.
 
-Specialist libraries retain their own storage/communication/crypto/messaging/database engines and public schema grammar. Foundation orchestrates those APIs rather than copying their implementations.
+Specialist packages retain their storage/database/cache/communication/crypto/messaging/validation engines. Neither Foundation nor Infbyte copies those implementations.
 
-## Completed migration baseline
+## Fixed Infbyte structure
 
 - root `infbyte` delegates to Foundation `CommandDispatcher`;
-- retired Console bootstrap/runtime removed;
-- Web bootstrap delegates to `Foundation::web()`;
+- web bootstrap delegates to one `Foundation::web()` application;
+- runtime selection for CLI/Worker/Scheduler is Foundation-owned;
 - provider groups are `common|web|cli|worker|scheduler`;
-- old IDs-driver and request-scope config removed;
-- checked-in config stays lean: `app`, `auth`, `router`;
-- route files use Foundation's scoped registrar contract;
+- checked-in config remains deliberately lean: `app.php`, `auth.php`, `router.php`;
+- optional module config is published on demand, not copied into the skeleton;
+- route files use the loader-provided scoped Webrick registrar;
+- `routes/console.php` and `routes/workers.php` remain application registration surfaces;
 - generated optimized artifacts are not committed;
-- deployment uses `php infbyte optimize`.
+- deployment optimization uses `php infbyte optimize`.
 
-## Purpose-first module model
+## Current Foundation package baseline
 
-Public modules represent application capabilities, not Composer packages.
+Core:
+
+- PHP `^8.4`
+- `infocyph/arraykit ^5.1.1`
+- `infocyph/intermix ^9.2`
+- `infocyph/uid ^5.0`
+- `infocyph/webrick ^4.0.2`
+
+Optional capability packages:
+
+- `infocyph/cachelayer ^3.2.0`
+- `infocyph/dblayer ^4.1`
+- `infocyph/epicrypt ^2.1`
+- `infocyph/omnibus ^2.4`
+- `infocyph/otp ^6.0`
+- `infocyph/pathwise ^3.1`
+- `infocyph/reqshield ^3.0.1`
+- `infocyph/talkingbytes ^2.0`
+- `web-auth/webauthn-lib ^5.3.5`
+- `infocyph/phpforge dev-main@dev`
+
+## Purpose-first modules
 
 | Module | Purpose |
 |---|---|
-| `auth` | optional OTP/MFA and WebAuthn/passkeys |
-| `cache` | cache, shared state, coordination |
-| `communication` | HTTP, email, webhook, gRPC |
-| `database` | persistence, schema, migrations |
-| `filesystem` | storage, files, uploads, archives |
+| `auth` | OTP/MFA + WebAuthn/passkeys |
+| `cache` | cache/shared state/coordination |
+| `communication` | HTTP/email/webhook/gRPC |
+| `database` | DB/persistence/schema/migrations |
+| `filesystem` | storage/files/uploads/downloads/archives |
 | `logging` | built-in logging |
-| `messaging` | Omnibus 2.3 events, messages, handler middleware, queues, workers, workflows |
-| `operations` | built-in maintenance, execution history, runtime control and process visibility |
+| `messaging` | Omnibus 2.4 messages/events/queues/middleware/workers |
+| `operations` | built-in maintenance/history/runtime control/process visibility |
 | `resources` | built-in response resources |
-| `security` | cryptography, password/token, keys |
-| `session` | built-in sessions, CSRF, flash |
-| `validation` | request/config/schema/database validation |
+| `security` | cryptography/password/token/key services |
+| `session` | built-in sessions/CSRF/flash/locking |
+| `validation` | ReqShield-backed request/config/schema/database validation |
 
-Naming rules:
+Canonical aliases remain purpose-oriented: `db|dblayer -> database`, `crypto|epicrypt -> security`, `otp|mfa|passkey|passkeys|webauthn -> auth`, `ops|runtime -> operations`.
 
-- `database` is canonical; `db` remains an alias;
-- `security` is canonical; `crypto` remains an alias;
-- OTP and passkeys are no longer separate modules;
-- `otp|mfa|passkey|passkeys|webauthn` resolve to `auth`;
-- `ops|runtime` resolve to `operations`;
-- `module:install auth` installs both OTP and WebAuthn dependencies;
-- runtime configuration still enables OTP and WebAuthn independently.
+No standalone OTP/passkey public module exists.
 
-Foundation reports `built-in|installed|partial|available` module status and includes owned schema metadata in `module:list`.
+## Module config + schema lifecycle inherited by Infbyte
 
-## Module config + schema lifecycle
+Commands:
 
-A module installation is operationally complete for database-backed capabilities rather than stopping at Composer/config publication.
+- `module:list`
+- `module:show <module>`
+- `module:install <module>`
+- `module:remove <module>`
+- `module:config:publish <module> [--force]`
+- `module:schema:status <module> [--connection=...]`
+- `module:schema:install <module> [--connection=...]`
+- `module:schema:sync [--connection=...]`
 
-Current database schema ownership:
+Schema owners:
 
-| Module | Schema behavior |
-|---|---|
-| `auth` | Foundation auth schema covering accounts, sessions/tokens, MFA factors/revisions, passkeys and authorization |
-| `cache` | CacheLayer native PDO/SQLite cache-entry schema and active PDO invalidation schema |
-| `session` | Foundation database-session schema |
+- auth -> Foundation auth schema;
+- cache -> CacheLayer native PDO/SQLite/invalidation schemas;
+- session -> Foundation database-session schema.
 
-Other modules currently own no application tables. The `database` module provides DB/migration infrastructure rather than another application schema.
+Schema status is read-only; explicit installation owns creation. `module:remove` never drops schema/data.
 
-CacheLayer node/tiered SQLite internals continue to self-initialize inside CacheLayer; Infbyte/Foundation do not copy private CacheLayer SQL.
+Forced config publication is transactional, refuses symbolic-link replacement and reports incomplete rollback rather than silently leaving partial files.
 
-### Commands
+## Application contracts now available to Infbyte apps
 
-- `php infbyte module:list`
-- `php infbyte module:show <module>`
-- `php infbyte module:install <module>`
-- `php infbyte module:remove <module>`
-- `php infbyte module:config:publish <module> [--force]`
-- `php infbyte module:schema:status <module>`
-- `php infbyte module:schema:install <module>`
-- `php infbyte module:schema:sync`
+### Validation
 
-Schema commands accept `--connection` where applicable.
+- Foundation `FormRequest` composes Webrick request input into ReqShield;
+- custom rules implement ReqShield `Contracts\Rule` directly;
+- generators: `create:request`, `create:rule`.
 
-Old `auth:schema:*` and `session:schema:*` command families remain removed in favor of the single module schema lifecycle.
+### Notifications/mail
 
-### `module:install` lifecycle
+Foundation core routing is built in:
 
-After package/config changes Foundation:
+- `Notification`;
+- `NotificationRecipient`;
+- `NotificationChannel`;
+- `NotificationDispatcher`/registry.
 
-1. invalidates compiled runtime container state;
-2. launches schema synchronization in a fresh PHP process so the updated Composer autoloader is used;
-3. provisions only schemas required by current application configuration;
-4. reports schema state and fails when an active required schema cannot be provisioned.
+Custom notification channels do not require TalkingBytes.
 
-This makes install order safe: a later `module:install database` can synchronize already-configured database auth/session/cache requirements.
+Mail remains optional communication infrastructure:
 
-`module:remove` never drops schemas or user/application data.
+- Foundation `MailMessage`/`Mailer` adapt TalkingBytes email;
+- `create:mail` and the default mail-based `create:notification` require communication;
+- `create:notification-channel` is package-neutral.
 
-`app:ready` also verifies applicable module schemas, so package installation alone no longer counts as persistence readiness.
+### Messaging/jobs
 
-## Auth config alignment
+- `Job` data-message marker;
+- `JobContext`;
+- `JobMiddleware`;
+- Omnibus-backed handler pipeline;
+- generators: `create:job`, `create:handler`, `create:job-middleware`.
 
-`config/auth.php` documents purpose-module requirements and schema behavior:
+### Resources
 
-- database-backed auth storage -> `module:install database` plus Foundation auth schema;
-- cache-backed auth state -> `module:install cache`;
-- enhanced password/token drivers -> `module:install security`;
-- OTP or WebAuthn -> `module:install auth`;
-- external communication notifications -> `module:install communication`;
-- schema state may be checked/prepared with `module:schema:status auth` / `module:schema:install auth`.
+- built-in `JsonResource`;
+- `create:resource` uses the current `resolve(): mixed` contract.
 
-Package installation, config publication, schema readiness, and runtime activation remain distinct states.
+## Application object rule
 
-## Foundation CLI expansion inherited by Infbyte
+Foundation `Application` is no longer a broad service facade. It retains runtime/bootstrap state, config/container/provider/service resolution, execution scope, paths and canonical HTTP handling.
 
-No second Infbyte command layer was added. Because the root launcher already delegates to Foundation `CommandDispatcher`, the expanded Foundation catalog is automatically the Infbyte CLI surface.
+App code should inject/resolve concrete services rather than calling convenience proxies for auth/session/router/responses/testing or specialist managers.
 
-### Database/cache
+## Runtime/operations behavior inherited by Infbyte
 
-New/expanded commands include:
+### Omnibus 2.4 workers
 
-- `db:monitor`;
-- `db:wipe`;
-- `migrate --pretend`;
-- `migrate:rollback --batch=N`;
-- `cache:forget`.
+- single messaging workers use Omnibus native `WorkerLifecycle` for heartbeat/reload/stop handling;
+- this path no longer requires `pcntl`;
+- Unix `WorkerPool` retains the watchdog because the upstream pool itself is pcntl/posix based;
+- provider-only workers remain messaging-lazy.
 
-Foundation delegates database monitoring/migration/schema primitives to DBLayer and cache primitives to CacheLayer.
+### Scheduler ownership
 
-### Messaging/queues
+- overlap/single-server locks refresh throughout child execution;
+- lost lease terminates/fails the child instead of continuing without ownership;
+- schedule history uses stable schedule identity, not only command text;
+- `schedule:test` reports real failure status.
 
-New/expanded commands include:
+### Runtime control
 
-- `messaging:list`;
-- `queue:failed`;
-- `queue:failed:show`;
-- `queue:retry`;
-- `queue:forget`;
-- `queue:flush`;
-- `queue:prune-failed`;
-- `queue:monitor`.
+- generation-map mutations are atomic for file and CacheLayer-backed state;
+- cache-backed runtime control requires suitable shared visibility and coordination;
+- process registry visibility is `host|shared`, default `host`;
+- `worker:status` exposes the registry view;
+- process registry remains observability metadata, not a daemon supervisor.
 
-Failure/transport/worker mechanics remain Omnibus-owned.
+### Other operations
 
-### Scheduling/storage/auth/logging
+- supervised child commands do not duplicate `--profile` output;
+- `log:tail --follow` handles truncation/rotation;
+- production OTP validation uses production topology assumptions;
+- `AuthPruner` covers disposable expired/consumed/revoked auth state;
+- environment encryption remains Epicrypt-backed with external key material only.
 
-New/expanded commands include:
+## Readiness behavior
 
-- `schedule:test`;
-- `schedule:interrupt`;
-- richer `schedule:list` execution state;
-- `storage:status`;
-- `storage:unlink`;
-- `auth:prune`;
-- `log:tail [--follow]`.
+`app:ready` now accounts for capability-specific dependencies, including:
 
-### Generators
+- CacheLayer for session locks;
+- CacheLayer for migration locks;
+- CacheLayer for cache-backed maintenance/runtime-control state;
+- DBLayer for explicit validation DB connections;
+- exact active package(s) inside the multi-package auth module;
+- applicable auth/cache/session schema readiness.
 
-The Foundation generator surface now includes:
+Infbyte does not add a second readiness layer.
 
-- `create:config`;
-- `create:resource`;
-- `create:job`;
-- `create:handler`;
-- `create:job-middleware`.
+## CLI inheritance
 
-Jobs are generated as data messages implementing Foundation `Job`; handlers remain separate explicit callables. Request/rule/mail/notification generators remain absent until those Foundation application contracts are reviewed.
+Because `infbyte` directly delegates to Foundation, the skeleton automatically receives the current capability-oriented command catalog and generator surface. No duplicate Infbyte command classes are introduced.
 
-## Omnibus 2.3 + Foundation job execution
-
-Foundation's messaging module now requires `infocyph/omnibus ^2.3` and uses Omnibus' public handler middleware pipeline rather than duplicating execution middleware.
-
-Application-facing Foundation contracts are:
-
-- `Infocyph\Foundation\Messaging\Job`;
-- `JobContext` with queue/attempt/sync-vs-async metadata;
-- `JobMiddleware` with a no-argument continuation.
-
-Foundation bridges these through one Omnibus `HandlerMiddleware` adapter. The same Omnibus `HandlerInvoker` is shared by synchronous `SyncTransport` and queued Consumer execution, so middleware semantics do not diverge by transport.
-
-Published messaging configuration provides:
-
-```text
-messaging.handler_middleware
-messaging.job_middleware
-```
-
-`handler_middleware` is the low-level Omnibus surface for all messages. `job_middleware` is the Foundation application surface and applies only to `Job` messages. Ordinary synchronous event listeners remain outside the message-handler middleware pipeline.
-
-Infbyte does not check in `config/messaging.php`; it remains module-published. Therefore no Infbyte source/config change is required for this feature.
-
-## Operations module/runtime
-
-Foundation provides built-in `operations` configuration for:
-
-```text
-operations.history.*
-operations.maintenance.*
-operations.runtime_control.*
-operations.runtime_registry.*
-```
-
-The skeleton does **not** check in `config/operations.php` by default. Foundation defaults make the built-in module usable dependency-free, while applications that need tuning can publish it with:
-
-```bash
-php infbyte module:config:publish operations
-```
-
-### Execution history
-
-- `execution:list`;
-- `execution:show`;
-- `execution:clear`.
-
-History is opt-in because it writes operational metadata.
-
-### Maintenance
-
-- `maintenance:enable`;
-- `maintenance:disable`;
-- `maintenance:status`.
-
-The default state driver is file-backed. Cache-backed shared state is available for multi-node deployment. Foundation's HTTP kernel enforces maintenance with HTTP 503 and optional `Retry-After`.
-
-### Persistent runtime control
-
-- `runtime:reload`;
-- `worker:restart [name]`;
-- `worker:status [name]`;
-- `schedule:interrupt`.
-
-Foundation uses generation markers and heartbeat-visible worker/scheduler process records. It requests graceful shutdown; Supervisor/systemd/Docker/Kubernetes or another process manager remains responsible for replacement processes.
-
-Messaging remains lazily activated only when a configured messaging worker is actually selected.
-
-## Environment protection
-
-Infbyte inherits:
-
-- `env:encrypt`;
-- `env:decrypt`.
-
-Foundation delegates encryption/decryption to Epicrypt. Key material is supplied through an external environment variable (default `ENV_ENCRYPTION_KEY`) or `--key-file`.
-
-`ENV_ENCRYPTION_KEY` is deliberately **not** added to `.env.example`: storing the key in the environment file being protected would defeat the protection boundary.
-
-Forced replacement is staged and restores the previous target when publication/finalization fails.
-
-## Global CLI controls
-
-The root `infbyte` launcher automatically exposes Foundation's global command controls:
-
-- `-q|--quiet`;
-- `--silent`;
-- `-v|-vv|-vvv`;
-- `--profile`;
-- `-n|--no-interaction`;
-- `--json`;
-- `--env=...`;
-- help/version/completion.
-
-`--profile` writes diagnostics to STDERR so command/JSON stdout remains clean. `--silent` suppresses all output and interactive prompting.
+Global controls include `--quiet`, `--silent`, `-v|-vv|-vvv`, `--profile`, `--json`, `--env`, `--no-interaction`, help/version/completion.
 
 ## Deliberate Infbyte non-changes
 
-Infbyte source checkpoint remains `56cb73e18eab07f34242a929eccbc9e6572d9971` because no application-side workaround or duplicate command/config layer is needed.
+The Infbyte **source** checkpoint remains `56cb73e18eab07f34242a929eccbc9e6572d9971` throughout these Foundation cleanup batches.
 
-In particular:
+That is intentional:
 
+- no optional `operations.php`, `messaging.php`, `notifications.php`, validation or other module config is copied into the base skeleton;
 - `.env.example` remains lean;
-- optional module environment variables are not listed before their config is published;
-- encryption key material is not placed in `.env.example`;
-- `config/operations.php` and `config/messaging.php` are not copied into the default skeleton;
-- no queue/database/cache/security implementation is duplicated in Infbyte.
+- no environment-encryption key is stored in `.env`/`.env.example`;
+- no queue/cache/database/communication/validation/schema implementation is duplicated;
+- no workaround is added in Infbyte for a Foundation defect.
 
-This is intentional architecture, not missing implementation.
+## Verification status
 
-## Source-audit status
-
-Foundation completed the Omnibus 2.3/job-integration source/config audit at source checkpoint `17a3a19cf27ba2d2c39b5722be3cc1d37f8a6eb5`.
-
-The audit confirmed shared sync/async `HandlerInvoker` composition, Omnibus 2.3 capability probing, middleware/default/config-validator alignment, job middleware isolation from Omnibus Envelope details, generator gating, lazy messaging activation and pooled-worker declarative-config safety.
-
-No PHPUnit/static-analysis/PHPForge/release matrix was run as part of this cleanup batch.
+Current work is a source/config/API audit only. The full Foundation 2.0 + Infbyte verification matrix remains intentionally deferred until documentation/public names are frozen.
 
 ## Immediate next work
 
-Continue Foundation application-contract cleanup for validation/request and notification/mail before documentation freeze. Infbyte should change only if those contracts require actual application-skeleton defaults or structure.
-
-After application-contract cleanup:
-
-1. reconcile Foundation + Infbyte documentation;
-2. freeze public command/module/config names;
-3. run the deferred test/release matrix;
-4. perform final Foundation 2.0 + Infbyte compatibility/release review.
+1. reconcile Foundation README/docs with source checkpoint `493c39a7a06bac0455397556254f0f8e7e25f973`;
+2. reconcile Infbyte README/examples with that public surface;
+3. remove stale Omnibus 2.3 / CacheLayer 3.1 / old generator / old Application-facade references;
+4. freeze public command/module/config/class names;
+5. run the deferred PHPUnit/static/PHPForge/module/runtime/fork/performance verification matrix;
+6. fix verification defects and prepare Foundation 2.0 + Infbyte release alignment.
 
 ## Do not regress
 
 - no package-per-module public model;
-- no standalone OTP/passkeys modules;
-- no duplicated specialized schema command families;
+- no standalone OTP/passkey module;
+- no duplicate specialist schema command families;
 - no schema/data deletion during module removal;
-- no copied specialist-package SQL;
-- no fake generator-only abstractions;
-- no second queue/retry/worker engine above Omnibus;
-- no Omnibus Envelope/HandlerContext leakage into Foundation JobMiddleware;
+- no copied specialist SQL/queue/retry/cache/database/communication engine;
+- no broad Application/service facade in Infbyte;
 - no retired Console runtime hierarchy;
-- no generic ID-driver/request-scope compatibility;
-- no broad manager/facade proxies in Infbyte;
-- no copied optional-module config by default;
+- no static global application state;
+- no optional config copied into the skeleton by default;
 - no environment-protection key in `.env`/`.env.example`;
 - no generated optimized artifacts committed.
