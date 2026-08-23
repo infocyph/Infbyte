@@ -4,8 +4,8 @@
     "license": "MIT",
     "type": "project",
     "require": {
-        "php": ">=8.4",
-        "infocyph/foundation": "^1.3"
+        "php": "^8.4",
+        "infocyph/foundation": "dev-feature/foundation-2.0 as 2.0.x-dev"
     },
     "require-dev": {
         "infocyph/phpforge": "dev-main@dev"
