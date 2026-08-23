@@ -14,10 +14,10 @@ return [
     | and "url" is the application's canonical external base URL.
     |
     */
-    'name' => env('APP_NAME', 'Infbyte'),
-    'env' => env('APP_ENV', 'local'),
+    'name' => env_string('APP_NAME', 'Infbyte'),
+    'env' => env_string('APP_ENV', 'local'),
     'debug' => env_bool('APP_DEBUG', true),
-    'url' => env('APP_URL', 'http://localhost'),
+    'url' => env_string('APP_URL', 'http://localhost'),
 
     /*
     |--------------------------------------------------------------------------
@@ -30,7 +30,7 @@ return [
     |
     */
     'config_cache' => [
-        'type' => env('APP_CONFIG_CACHE_TYPE', 'sharded'),
+        'type' => env_string('APP_CONFIG_CACHE_TYPE', 'sharded'),
     ],
 
     /*
@@ -45,13 +45,13 @@ return [
     */
     'container' => [
         'alias' => env('APP_CONTAINER_ALIAS'),
-        'environment' => env('APP_ENV', 'local'),
+        'environment' => env_string('APP_ENV', 'local'),
         'lazy_loading' => env_bool('APP_CONTAINER_LAZY_LOADING', true),
-        'compiled' => env('APP_CONTAINER_COMPILED', 'bootstrap/cache/container.php'),
-        'compiled_activation' => env('APP_CONTAINER_COMPILED_ACTIVATION', 'off'),
+        'compiled' => env_string('APP_CONTAINER_COMPILED', 'bootstrap/cache/container.php'),
+        'compiled_activation' => env_string('APP_CONTAINER_COMPILED_ACTIVATION', 'off'),
         'debug_tracing' => [
             'enabled' => env_bool('APP_CONTAINER_DEBUG_TRACING', false),
-            'level' => env('APP_CONTAINER_DEBUG_TRACE_LEVEL', 'node'),
+            'level' => env_string('APP_CONTAINER_DEBUG_TRACE_LEVEL', 'node'),
         ],
     ],
 ];
