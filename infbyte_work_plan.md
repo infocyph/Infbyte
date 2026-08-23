@@ -9,15 +9,15 @@
 
 - Date: 2026-08-23
 - Infbyte source: `56cb73e18eab07f34242a929eccbc9e6572d9971`
-- Foundation source: `3d8b2350094fbf8b031290b17a4085643234b563`
+- Foundation source: `17a3a19cf27ba2d2c39b5722be3cc1d37f8a6eb5`
 - Infbyte branch base: `main` at `47fb985f266c977504c3dca6bd13e85c9a1b73dc`
-- Phase: pre-documentation cleanup is complete for modules, schemas, CLI, and operational runtime surfaces.
-- Latest completed cleanup: Foundation capability-driven CLI + operations runtime integration.
+- Phase: pre-documentation application-contract cleanup.
+- Latest completed cleanup: Omnibus 2.3 + Foundation Job/JobMiddleware messaging integration.
 - Full tests/release gates remain deferred.
 
 ## Ownership
 
-Foundation owns reusable runtime composition, CLI/runtime machinery, purpose-module policy, module schema orchestration, configuration machinery, optimized artifacts, operational runtime controls, and integrations.
+Foundation owns reusable runtime composition, CLI/runtime machinery, purpose-module policy, module schema orchestration, configuration machinery, optimized artifacts, operational runtime controls, application-level messaging contracts, and integrations.
 
 Infbyte owns project bootstrap, application config, routes/code, deployment conventions, and skeleton developer experience.
 
@@ -47,7 +47,7 @@ Public modules represent application capabilities, not Composer packages.
 | `database` | persistence, schema, migrations |
 | `filesystem` | storage, files, uploads, archives |
 | `logging` | built-in logging |
-| `messaging` | events, queues, workers, workflows |
+| `messaging` | Omnibus 2.3 events, messages, handler middleware, queues, workers, workflows |
 | `operations` | built-in maintenance, execution history, runtime control and process visibility |
 | `resources` | built-in response resources |
 | `security` | cryptography, password/token, keys |
@@ -173,13 +173,39 @@ New/expanded commands include:
 The Foundation generator surface now includes:
 
 - `create:config`;
-- `create:resource`.
+- `create:resource`;
+- `create:job`;
+- `create:handler`;
+- `create:job-middleware`.
 
-No fake application abstractions were introduced merely to reproduce Laravel command names. Request/rule/mail/notification generators remain absent until corresponding framework contracts exist.
+Jobs are generated as data messages implementing Foundation `Job`; handlers remain separate explicit callables. Request/rule/mail/notification generators remain absent until those Foundation application contracts are reviewed.
+
+## Omnibus 2.3 + Foundation job execution
+
+Foundation's messaging module now requires `infocyph/omnibus ^2.3` and uses Omnibus' public handler middleware pipeline rather than duplicating execution middleware.
+
+Application-facing Foundation contracts are:
+
+- `Infocyph\Foundation\Messaging\Job`;
+- `JobContext` with queue/attempt/sync-vs-async metadata;
+- `JobMiddleware` with a no-argument continuation.
+
+Foundation bridges these through one Omnibus `HandlerMiddleware` adapter. The same Omnibus `HandlerInvoker` is shared by synchronous `SyncTransport` and queued Consumer execution, so middleware semantics do not diverge by transport.
+
+Published messaging configuration provides:
+
+```text
+messaging.handler_middleware
+messaging.job_middleware
+```
+
+`handler_middleware` is the low-level Omnibus surface for all messages. `job_middleware` is the Foundation application surface and applies only to `Job` messages. Ordinary synchronous event listeners remain outside the message-handler middleware pipeline.
+
+Infbyte does not check in `config/messaging.php`; it remains module-published. Therefore no Infbyte source/config change is required for this feature.
 
 ## Operations module/runtime
 
-Foundation now provides built-in `operations` configuration for:
+Foundation provides built-in `operations` configuration for:
 
 ```text
 operations.history.*
@@ -236,7 +262,7 @@ Forced replacement is staged and restores the previous target when publication/f
 
 ## Global CLI controls
 
-The root `infbyte` launcher now automatically exposes Foundation's global command controls:
+The root `infbyte` launcher automatically exposes Foundation's global command controls:
 
 - `-q|--quiet`;
 - `--silent`;
@@ -249,37 +275,38 @@ The root `infbyte` launcher now automatically exposes Foundation's global comman
 
 `--profile` writes diagnostics to STDERR so command/JSON stdout remains clean. `--silent` suppresses all output and interactive prompting.
 
-## Deliberate Infbyte non-changes in this batch
+## Deliberate Infbyte non-changes
 
 Infbyte source checkpoint remains `56cb73e18eab07f34242a929eccbc9e6572d9971` because no application-side workaround or duplicate command/config layer is needed.
 
 In particular:
 
 - `.env.example` remains lean;
-- optional operations environment variables are not listed before `operations.php` is published;
+- optional module environment variables are not listed before their config is published;
 - encryption key material is not placed in `.env.example`;
-- `config/operations.php` is not copied into the default skeleton;
+- `config/operations.php` and `config/messaging.php` are not copied into the default skeleton;
 - no queue/database/cache/security implementation is duplicated in Infbyte.
 
 This is intentional architecture, not missing implementation.
 
 ## Source-audit status
 
-Foundation completed a source/config consistency audit of the expanded CLI/operations batch at source checkpoint `3d8b2350094fbf8b031290b17a4085643234b563`.
+Foundation completed the Omnibus 2.3/job-integration source/config audit at source checkpoint `17a3a19cf27ba2d2c39b5722be3cc1d37f8a6eb5`.
 
-The audit confirmed command-to-handler wiring, purpose-module/config consistency, lazy worker capability activation, storage unlink safety, maintenance enforcement, runtime-control key alignment, and staged environment protection.
+The audit confirmed shared sync/async `HandlerInvoker` composition, Omnibus 2.3 capability probing, middleware/default/config-validator alignment, job middleware isolation from Omnibus Envelope details, generator gating, lazy messaging activation and pooled-worker declarative-config safety.
 
 No PHPUnit/static-analysis/PHPForge/release matrix was run as part of this cleanup batch.
 
 ## Immediate next work
 
-The joint module/schema/CLI/operations cleanup pass is ready for **Foundation + Infbyte documentation reconciliation**, unless another public-surface cleanup topic is intentionally opened first.
+Continue Foundation application-contract cleanup for validation/request and notification/mail before documentation freeze. Infbyte should change only if those contracts require actual application-skeleton defaults or structure.
 
-After documentation reconciliation:
+After application-contract cleanup:
 
-1. freeze public command/module/config names;
-2. run the deferred test/release matrix;
-3. perform final Foundation 2.0 + Infbyte compatibility/release review.
+1. reconcile Foundation + Infbyte documentation;
+2. freeze public command/module/config names;
+3. run the deferred test/release matrix;
+4. perform final Foundation 2.0 + Infbyte compatibility/release review.
 
 ## Do not regress
 
@@ -289,6 +316,8 @@ After documentation reconciliation:
 - no schema/data deletion during module removal;
 - no copied specialist-package SQL;
 - no fake generator-only abstractions;
+- no second queue/retry/worker engine above Omnibus;
+- no Omnibus Envelope/HandlerContext leakage into Foundation JobMiddleware;
 - no retired Console runtime hierarchy;
 - no generic ID-driver/request-scope compatibility;
 - no broad manager/facade proxies in Infbyte;
