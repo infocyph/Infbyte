@@ -3,49 +3,17 @@
 
 declare(strict_types=1);
 
-use Composer\InstalledVersions;
-use Infocyph\Foundation\Application\Application;
-use Infocyph\Foundation\Console\FoundationConsole;
-use Infocyph\Foundation\Config\EnvironmentLoader;
+use Infocyph\Foundation\Command\CommandDispatcher;
 
-require __DIR__ . '/vendor/autoload.php';
-
-$basePath = __DIR__;
-$commandManifest = $basePath . '/bootstrap/cache/console/commands.php';
-$commands = [];
-
-new EnvironmentLoader()->load($basePath);
-$applicationName = trim(env_string('APP_NAME', 'infbyte'));
-if ($applicationName === '') {
-    $applicationName = 'infbyte';
+$autoload = __DIR__ . '/vendor/autoload.php';
+if (!is_file($autoload)) {
+    fwrite(STDERR, "Unable to locate vendor/autoload.php; run composer install first.\n");
+    exit(1);
 }
 
-if (!is_file($commandManifest)) {
-    $commands = require $basePath . '/routes/console.php';
+require $autoload;
 
-    if (!is_array($commands)) {
-        throw new RuntimeException('Console routes must return a command-to-class map.');
-    }
-}
-
-$console = FoundationConsole::create(
-    applicationFactory: static function (?string $profile) use ($basePath): Application {
-        $application = require $basePath . '/bootstrap/console.php';
-
-        if ($profile !== null && $application->environment() !== $profile) {
-            throw new RuntimeException(sprintf(
-                'Console profile "%s" does not match the application environment "%s".',
-                $profile,
-                $application->environment() ?? '',
-            ));
-        }
-
-        return $application;
-    },
-    name: $applicationName,
-    version: InstalledVersions::getPrettyVersion('infocyph/foundation') ?? 'dev-main',
-    commands: $commands,
-    commandManifest: $commandManifest,
-);
-
-exit($console->run());
+exit(CommandDispatcher::project(
+    ['base_path' => __DIR__],
+    displayName: 'Infbyte',
+)->run($argv));
