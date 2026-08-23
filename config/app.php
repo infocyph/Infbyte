@@ -8,16 +8,15 @@ return [
     | Application Identity
     |--------------------------------------------------------------------------
     |
-    | "name" labels the application in diagnostics and integrations. "env"
-    | selects environment-sensitive defaults, "debug" enables development
-    | diagnostics, and "url" is the canonical base URL used to build links.
-    | Names and environments are free-form strings, for example `Acme API` and
-    | `staging`; debug accepts `true|false`; URL example: `https://api.acme.test`.
+    | Infbyte owns application-facing defaults while Foundation owns the runtime
+    | implementation. "name" labels diagnostics and integrations, "env" selects
+    | environment-sensitive policy, "debug" enables development diagnostics,
+    | and "url" is the application's canonical external base URL.
     |
     */
     'name' => env('APP_NAME', 'Infbyte'),
     'env' => env('APP_ENV', 'local'),
-    'debug' => env('APP_DEBUG', true),
+    'debug' => env_bool('APP_DEBUG', true),
     'url' => env('APP_URL', 'http://localhost'),
 
     /*
@@ -25,10 +24,9 @@ return [
     | Configuration Cache
     |--------------------------------------------------------------------------
     |
-    | "type" accepts "sharded" or "single". Sharded caches load namespaces
-    | on demand; single caches load one compiled snapshot. Build either form
-    | during deployment with `php infbyte config:cache`. Allowed values:
-    | `sharded|single`.
+    | Sharded config remains the normal application default so namespaces stay
+    | lazy. Build the selected artifact explicitly during deployment.
+    | Allowed values: sharded|single.
     |
     */
     'config_cache' => [
@@ -37,34 +35,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Dependency Injection Container
+    | InterMix Container
     |--------------------------------------------------------------------------
     |
-    | "alias" optionally names a configured container profile. "environment"
-    | controls environment-aware definitions. "lazy_loading" defers supported
-    | services, while "request_scope" isolates request-lived entries.
-    |
-    | "compiled" selects the application-owned resolver artifact. Activation
-    | remains off unless a measured deployment explicitly selects "always".
-    | Debug tracing is disabled by default; "level" selects its detail.
-    |
-    | Alias/environment examples: `http` and `production`. Boolean switches use
-    | `true|false`. The compiled artifact defaults to
-    | `bootstrap/cache/container.php`; APP_CONTAINER_COMPILED may select another
-    | application-owned relative or absolute path.
-    | Compiled activation values: `off|always`.
-    | Trace levels: `off|node|info|warn|warning|error|verbose`.
+    | Foundation 2.0 is lazy by default and owns execution scopes directly.
+    | There is no application request_scope switch. Compiled container activation
+    | remains opt-in until a deployment deliberately builds and enables it.
     |
     */
     'container' => [
         'alias' => env('APP_CONTAINER_ALIAS'),
         'environment' => env('APP_ENV', 'local'),
-        'lazy_loading' => env('APP_CONTAINER_LAZY_LOADING', false),
-        'request_scope' => env('APP_CONTAINER_REQUEST_SCOPE', true),
+        'lazy_loading' => env_bool('APP_CONTAINER_LAZY_LOADING', true),
         'compiled' => env('APP_CONTAINER_COMPILED', 'bootstrap/cache/container.php'),
         'compiled_activation' => env('APP_CONTAINER_COMPILED_ACTIVATION', 'off'),
         'debug_tracing' => [
-            'enabled' => env('APP_CONTAINER_DEBUG_TRACING', false),
+            'enabled' => env_bool('APP_CONTAINER_DEBUG_TRACING', false),
             'level' => env('APP_CONTAINER_DEBUG_TRACE_LEVEL', 'node'),
         ],
     ],
