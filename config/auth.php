@@ -15,13 +15,13 @@ return [
     |
     */
     'drivers' => [
-        'storage' => env('AUTH_STORAGE', 'memory'),
-        'cache' => env('AUTH_CACHE', 'array'),
-        'passwords' => env('AUTH_PASSWORDS', 'native'),
-        'tokens' => env('AUTH_TOKENS', 'simple'),
-        'mfa' => env('AUTH_MFA', 'simple'),
-        'notifications' => env('AUTH_NOTIFICATIONS', 'collect'),
-        'passkey' => env('AUTH_PASSKEY', 'disabled'),
+        'storage' => env_string('AUTH_STORAGE', 'memory'),
+        'cache' => env_string('AUTH_CACHE', 'array'),
+        'passwords' => env_string('AUTH_PASSWORDS', 'native'),
+        'tokens' => env_string('AUTH_TOKENS', 'simple'),
+        'mfa' => env_string('AUTH_MFA', 'simple'),
+        'notifications' => env_string('AUTH_NOTIFICATIONS', 'collect'),
+        'passkey' => env_string('AUTH_PASSKEY', 'disabled'),
     ],
 
     /*
@@ -41,12 +41,12 @@ return [
     |--------------------------------------------------------------------------
     */
     'otp' => [
-        'issuer' => env('AUTH_OTP_ISSUER', env('APP_NAME', 'Infbyte')),
+        'issuer' => env_string('AUTH_OTP_ISSUER', env_string('APP_NAME', 'Infbyte')),
         'hotp' => [
             'look_ahead' => env_int('AUTH_OTP_HOTP_LOOK_AHEAD', 5),
         ],
         'totp' => [
-            'algorithm' => env('AUTH_OTP_ALGORITHM', 'sha1'),
+            'algorithm' => env_string('AUTH_OTP_ALGORITHM', 'sha1'),
             'digits' => env_int('AUTH_OTP_DIGITS', 6),
             'period' => env_int('AUTH_OTP_PERIOD', 30),
             'secret_bytes' => env_int('AUTH_OTP_SECRET_BYTES', 20),
@@ -69,11 +69,11 @@ return [
     */
     'webauthn' => [
         'rp_id' => env('WEBAUTHN_RP_ID'),
-        'rp_name' => env('WEBAUTHN_RP_NAME', env('APP_NAME', 'Infbyte')),
+        'rp_name' => env_string('WEBAUTHN_RP_NAME', env_string('APP_NAME', 'Infbyte')),
         'origin' => env('WEBAUTHN_ORIGIN'),
-        'attestation' => env('WEBAUTHN_ATTESTATION', 'none'),
-        'user_verification' => env('WEBAUTHN_USER_VERIFICATION', 'preferred'),
-        'resident_key' => env('WEBAUTHN_RESIDENT_KEY', 'preferred'),
+        'attestation' => env_string('WEBAUTHN_ATTESTATION', 'none'),
+        'user_verification' => env_string('WEBAUTHN_USER_VERIFICATION', 'preferred'),
+        'resident_key' => env_string('WEBAUTHN_RESIDENT_KEY', 'preferred'),
         'algorithms' => ['ES256', 'RS256'],
         'transports' => ['internal', 'hybrid', 'usb', 'nfc', 'ble'],
     ],
