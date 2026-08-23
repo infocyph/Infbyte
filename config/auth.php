@@ -19,6 +19,11 @@ return [
     |   mfa=otp or passkey=webauthn  -> module:install auth
     |   notifications=talkingbytes   -> module:install communication
     |
+    | Module installation also synchronizes database schemas required by the
+    | active configuration. Database-backed authentication uses the auth schema;
+    | inspect or provision it explicitly with `module:schema:status auth` and
+    | `module:schema:install auth` when preparing persistence ahead of activation.
+    |
     | OTP and WebAuthn remain independently selectable even though they share
     | the same extended-auth module and installation bundle.
     |
