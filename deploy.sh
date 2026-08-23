@@ -28,7 +28,6 @@ fi
 runtime_directories=(
     "bootstrap/cache"
     "bootstrap/cache/config"
-    "bootstrap/cache/console"
     "bootstrap/cache/routes"
     "storage"
     "storage/app"
@@ -74,4 +73,4 @@ php_path="$(command -v "$php_bin")"
 
 "$php_path" infbyte optimize
 
-printf 'Deployment directories and application caches are ready.\n'
+printf 'Deployment directories and Foundation 2.0 runtime artifacts are ready.\n'
