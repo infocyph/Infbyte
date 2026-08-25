@@ -9,19 +9,63 @@ on:
     branches: [ "main", "master", "develop", "development" ]
 
 jobs:
-  phpforge:
-    uses: infocyph/phpforge/.github/workflows/security-standards.yml@main
-    permissions:
-      security-events: write
-      actions: read
-      contents: read
-    with:
-      php_versions: '["8.4","8.5"]'
-      dependency_versions: '["prefer-lowest","prefer-stable"]'
-      php_extensions: "pcntl"
-      phpstan_memory_limit: "1G"
-      run_analysis: true
-      run_svg_report: true
-      fail_on_skipped_tests: true
-      run_clean_install: true
-      artifact_retention_days: 61
+  integration-qa:
+    name: "Foundation 2 integration - PHP ${{ matrix.php-version }} - ${{ matrix.dependency-version }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version: ["8.4", "8.5"]
+        dependency-version: ["prefer-lowest", "prefer-stable"]
+    env:
+      XDEBUG_MODE: off
+      IC_PHPSTAN_MEMORY_LIMIT: "1G"
+      IC_PEST_FAIL_ON_SKIPPED: "true"
+      IC_TEST_TASK_TIMEOUT: "300"
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          tools: composer:v2
+          extensions: pcntl
+          coverage: none
+
+      - name: Validate and resolve integration dependencies
+        shell: bash
+        run: |
+          composer validate --strict
+          composer update --no-interaction --prefer-dist --no-progress --${{ matrix.dependency-version }}
+
+      - name: Run PHPForge quality suite
+        shell: bash
+        run: |
+          if [ "${{ matrix.dependency-version }}" = "prefer-lowest" ]; then
+            composer ic:ci --prefer-lowest
+          else
+            composer ic:ci
+          fi
+
+  clean-install:
+    name: "Foundation 2 integration - clean install"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.5"
+          tools: composer:v2
+          extensions: pcntl
+          coverage: none
+
+      - name: Validate production install
+        shell: bash
+        run: |
+          composer validate --strict
+          composer update --no-dev --no-interaction --prefer-dist --no-progress --classmap-authoritative
+          composer check-platform-reqs --no-dev
+          php -r 'require "vendor/autoload.php";'
