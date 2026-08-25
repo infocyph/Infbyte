@@ -183,9 +183,7 @@ config/
   router.php
 public/
 routes/
-  web.php
   api.php
-  auth.php
   console.php
   schedule.php
   workers.php
