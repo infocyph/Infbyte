@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use Infocyph\Console\Scheduling\Schedule;
+use Infocyph\Foundation\Scheduling\Schedule;
 
 return static function (Schedule $schedule): void {
     /**

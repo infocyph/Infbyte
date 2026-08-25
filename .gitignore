@@ -5,13 +5,13 @@
 !/.env.example
 /.idea/
 /.phpunit.cache/
+/.phpforge-report/
 /.psalm-cache/
 /.route-cache-*
 /.vscode/
 /.windsurf/
-/bootstrap/cache/container.php
-/bootstrap/cache/modules.php
-/bootstrap/cache/optimize.php
+/bootstrap/cache/*
+!/bootstrap/cache/.gitignore
 /database/*.sqlite
 /vendor/
 *~

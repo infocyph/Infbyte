@@ -3,7 +3,8 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\SystemController;
-use Infocyph\Webrick\Router\Facade\Router as Route;
+use Infocyph\Webrick\Router\Definition\Registrar;
 
-Route::get('/api/health', SystemController::health(...));
-Route::get('/json', SystemController::json(...), 'json');
+/** @var Registrar $router */
+$router->get('/api/health', SystemController::health(...));
+$router->get('/json', SystemController::json(...), 'json');
