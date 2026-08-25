@@ -3,27 +3,15 @@
 declare(strict_types=1);
 
 use Infocyph\Foundation\Application\Application;
-use Infocyph\Foundation\Auth\Contract\Notification\AuthNotifierInterface;
-use Infocyph\Foundation\Cache\CacheManager;
-use Infocyph\Console\Command\CommandContract;
-use Infocyph\Foundation\Console\FoundationConsole;
-use Infocyph\Foundation\Database\DatabaseManager;
-use Infocyph\Foundation\Filesystem\FilesystemManager;
+use Infocyph\Foundation\Application\RuntimeMode;
+use Infocyph\Foundation\Config\ConfigRepository;
+use Infocyph\Foundation\Filesystem\PathManager;
 use Infocyph\Foundation\Foundation;
 use Infocyph\Foundation\Http\HttpKernel;
-use Infocyph\Foundation\Notifications\NotificationManager;
-use Infocyph\Foundation\Routing\RouteFileLoader;
-use Infocyph\Foundation\Routing\RouterManager;
-use Infocyph\Foundation\Validation\ValidationManager;
+use Infocyph\Foundation\Runtime\ExecutionScope;
+use Infocyph\Webrick\Request\Request;
 
-function infbyteApp(): Application
-{
-    return Foundation::web(infbyteTestOptions());
-}
-
-/**
- * @return array<string, mixed>
- */
+/** @return array<string, mixed> */
 function infbyteTestOptions(): array
 {
     $root = dirname(__DIR__, 2);
@@ -31,7 +19,7 @@ function infbyteTestOptions(): array
         . '/infbyte-runtime-'
         . getmypid();
 
-    foreach (['app', 'app/public', 'cache', 'logs', 'sessions', 'uploads'] as $directory) {
+    foreach (['cache', 'logs', 'sessions', 'uploads'] as $directory) {
         $path = $runtime . DIRECTORY_SEPARATOR . $directory;
 
         if (!is_dir($path) && !mkdir($path, 0775, true) && !is_dir($path)) {
@@ -42,7 +30,9 @@ function infbyteTestOptions(): array
     return [
         'base_path' => $root,
         '_config_cache' => false,
-        'env' => 'testing',
+        'app' => [
+            'env' => 'testing',
+        ],
         'paths' => [
             'storage' => $runtime,
             'cache' => $runtime . '/cache',
@@ -50,124 +40,110 @@ function infbyteTestOptions(): array
             'sessions' => $runtime . '/sessions',
             'uploads' => $runtime . '/uploads',
         ],
-        'auth' => [
-            'drivers' => [
-                'cache' => 'array',
-            ],
-        ],
         'router' => [
             'cache' => false,
         ],
     ];
 }
 
-function expectedNotifierClass(Application $app): string
-{
-    return $app->config()->get('auth.drivers.notifications') === 'talkingbytes'
-        ? 'Infocyph\\Foundation\\Auth\\Adapter\\TalkingBytes\\TalkingBytesAuthNotifier'
-        : 'Infocyph\\Foundation\\Auth\\Support\\CollectingAuthNotifier';
-}
+it('constructs exactly the four explicit Foundation runtimes', function (): void {
+    $options = infbyteTestOptions();
+    $cases = [
+        [Foundation::web(...), RuntimeMode::Web, 'runningInWeb'],
+        [Foundation::cli(...), RuntimeMode::Cli, 'runningInCli'],
+        [Foundation::worker(...), RuntimeMode::Worker, 'runningInWorker'],
+        [Foundation::scheduler(...), RuntimeMode::Scheduler, 'runningInScheduler'],
+    ];
 
-it('boots with the expected application shape', function (): void {
-    $app = infbyteApp();
+    foreach ($cases as [$factory, $mode, $predicate]) {
+        /** @var callable(array<string, mixed>):Application $factory */
+        $app = $factory($options);
 
-    expect($app->environment())->toBeString()->not->toBeEmpty()
-        ->and($app->runningInWeb())->toBeTrue();
+        expect($app)->toBeInstanceOf(Application::class)
+            ->and($app->runtimeMode())->toBe($mode)
+            ->and($app->{$predicate}())->toBeTrue()
+            ->and($app->booted())->toBeFalse()
+            ->and($app->environment())->toBe('testing')
+            ->and($app->basePath())->toBe(dirname(__DIR__, 2));
+    }
 
-    $paths = $app->paths()->all();
-
-    expect($paths)->toHaveKey('providers');
-    expect(is_file($paths['providers']))->toBeTrue();
-    expect(is_dir($paths['storage']))->toBeTrue();
+    expect(method_exists(Foundation::class, 'console'))->toBeFalse();
 });
 
-it('keeps the console bootstrap outside the web boot graph', function (): void {
-    $app = Foundation::console(infbyteTestOptions());
+it('keeps HTTP unavailable outside the web runtime', function (): void {
+    $app = Foundation::cli(infbyteTestOptions())->boot();
 
-    expect($app)->toBeInstanceOf(Application::class)
-        ->and($app->runningInConsole())->toBeTrue()
-        ->and($app->container()->has(RouteFileLoader::class))->toBeFalse()
-        ->and($app->container()->has(HttpKernel::class))->toBeFalse();
-
-    $app->boot();
-
-    expect($app->container()->has(RouteFileLoader::class))->toBeFalse()
-        ->and($app->container()->has(HttpKernel::class))->toBeFalse()
+    expect($app->runningInCli())->toBeTrue()
+        ->and($app->booted())->toBeTrue()
         ->and(fn() => $app->http())
-        ->toThrow(LogicException::class, 'HTTP kernel is unavailable');
+        ->toThrow(LogicException::class, 'The HTTP kernel is unavailable in the cli runtime.');
 });
 
-it('defines console commands through an explicit command route map', function (): void {
-    $commands = require dirname(__DIR__, 2) . '/routes/console.php';
+it('resolves only the narrow Foundation application core directly', function (): void {
+    $app = Foundation::web(infbyteTestOptions())->boot();
 
-    expect($commands)->toBeArray()
-        ->and($commands)->toBe([]);
+    expect($app->make(Application::class))->toBe($app)
+        ->and($app->config())->toBeInstanceOf(ConfigRepository::class)
+        ->and($app->paths())->toBeInstanceOf(PathManager::class)
+        ->and($app->execution())->toBeInstanceOf(ExecutionScope::class)
+        ->and($app->http())->toBeInstanceOf(HttpKernel::class)
+        ->and($app->booted())->toBeTrue();
 
-    foreach ($commands as $command) {
-        expect(is_string($command) && is_a($command, CommandContract::class, true))->toBeTrue();
+    foreach ([
+        'auth',
+        'authManager',
+        'cache',
+        'database',
+        'filesystem',
+        'ids',
+        'notifications',
+        'router',
+        'testing',
+        'validation',
+    ] as $retiredConvenienceMethod) {
+        expect(method_exists($app, $retiredConvenienceMethod))->toBeFalse();
     }
 });
 
-it('keeps Foundation system commands out of application Composer scripts', function (): void {
+it('defines application commands through the explicit command route file', function (): void {
+    $commands = require dirname(__DIR__, 2) . '/routes/console.php';
+
+    expect($commands)->toBeArray()->toBe([]);
+});
+
+it('keeps Foundation system commands out of application Composer script keys', function (): void {
     $composer = json_decode(
-        file_get_contents(dirname(__DIR__, 2) . '/composer.json'),
+        (string) file_get_contents(dirname(__DIR__, 2) . '/composer.json'),
         true,
         flags: JSON_THROW_ON_ERROR,
     );
     $scripts = $composer['scripts'] ?? [];
 
-    expect($scripts)->toBeArray()
-        ->and(array_intersect(
-            array_keys($scripts),
-            array_keys(FoundationConsole::commands([])),
-        ))->toBe([]);
-});
+    expect($scripts)->toBeArray();
 
-it('registers the core services', function (): void {
-    $app = infbyteApp()->boot();
-
-    expect($app->auth())->toBeObject();
-    expect($app->authManager())->toBeObject();
-    expect($app->authActions())->toBeObject();
-    expect($app->http())->toBeObject();
-    expect($app->ids())->toBeObject();
-    expect($app->has(CacheManager::class))->toBeFalse();
-    expect($app->has(DatabaseManager::class))->toBeFalse();
-    expect($app->has(FilesystemManager::class))->toBeFalse();
-    expect($app->has(NotificationManager::class))->toBeFalse();
-    expect($app->has(ValidationManager::class))->toBeFalse();
-});
-
-it('serves the health and JSON routes', function (): void {
-    $app = infbyteApp()->boot();
-    $router = $app->make(RouterManager::class);
-    $registered = [];
-
-    foreach ($router->routes() as $route) {
-        $registered[$route->getMethod() . ' ' . $route->getPath()] = $route->getHandler();
+    foreach ([
+        'app:ready',
+        'config:cache',
+        'db:monitor',
+        'module:list',
+        'optimize',
+        'route:cache',
+        'schedule:run',
+        'worker:run',
+    ] as $systemCommand) {
+        expect(array_key_exists($systemCommand, $scripts))->toBeFalse();
     }
-
-    expect(array_keys($registered))->toBe(['GET /api/health', 'GET /json']);
-    expect($registered['GET /api/health'])->toBeInstanceOf(Closure::class)
-        ->and($registered['GET /json'])->toBeInstanceOf(Closure::class);
-
-    $http = $app->testing()->http();
-    $health = $http->get('/api/health')
-        ->assertStatus(200)
-        ->assertHeader('Content-Type')
-        ->assertJson(['status' => 'ok']);
-    $json = $http->get('/json')
-        ->assertStatus(200)
-        ->assertHeader('Content-Type')
-        ->json();
-
-    expect($health->json())->toBe(['status' => 'ok'])
-        ->and($json)->toHaveKey('memory')
-        ->and($json['memory'])->toBeInt();
 });
 
-it('uses the self-contained auth notifier without optional modules', function (): void {
-    $app = infbyteApp()->boot();
+it('serves the skeleton routes through canonical Foundation web handling', function (): void {
+    $app = Foundation::web(infbyteTestOptions());
 
-    expect($app->make(AuthNotifierInterface::class)::class)->toBe(expectedNotifierClass($app));
+    $health = $app->handle(Request::fake(method: 'GET', uri: 'http://localhost/api/health'));
+    $json = $app->handle(Request::fake(method: 'GET', uri: 'http://localhost/json'));
+
+    expect($app->booted())->toBeTrue()
+        ->and($health->getStatusCode())->toBe(200)
+        ->and((string) $health->getBody())->toContain('"status":"ok"')
+        ->and($json->getStatusCode())->toBe(200)
+        ->and((string) $json->getBody())->toContain('"memory"');
 });
