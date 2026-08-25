@@ -140,10 +140,13 @@ it('serves the skeleton routes through canonical Foundation web handling', funct
 
     $health = $app->handle(Request::fake(method: 'GET', uri: 'http://localhost/api/health'));
     $json = $app->handle(Request::fake(method: 'GET', uri: 'http://localhost/json'));
+    $healthPayload = json_decode((string) $health->getBody(), true, flags: JSON_THROW_ON_ERROR);
+    $jsonPayload = json_decode((string) $json->getBody(), true, flags: JSON_THROW_ON_ERROR);
 
     expect($app->booted())->toBeTrue()
         ->and($health->getStatusCode())->toBe(200)
-        ->and((string) $health->getBody())->toContain('"status":"ok"')
+        ->and($healthPayload)->toBe(['status' => 'ok'])
         ->and($json->getStatusCode())->toBe(200)
-        ->and((string) $json->getBody())->toContain('"memory"');
+        ->and($jsonPayload)->toHaveKey('memory')
+        ->and($jsonPayload['memory'])->toBeInt();
 });
