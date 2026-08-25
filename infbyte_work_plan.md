@@ -10,11 +10,11 @@
 
 ## Current checkpoint — 2026-08-25
 
-- Verified Infbyte source checkpoint: `ab011a48d08a26ed362e5b53278e249144fbe227`
-- Verified Foundation branch checkpoint consumed during integration: `0f71a61b8348173f40de212fe880d6eccacd0a85`
-- Infbyte integration Security & Standards run: `32830537262`
+- Verified Infbyte source/docs checkpoint: `f2e81b09a843a3d9ea162ed349790107078cf1f8`
+- Verified Foundation prerelease checkpoint consumed by the integration line: `f559355b785d4edc56edfde2eadd1aa652c69360`
+- Authoritative Infbyte integration Security & Standards run: `32837108534`
 - Result: PHP 8.4/8.5 × prefer-lowest/prefer-stable quality suites PASS; clean production install PASS.
-- Current phase: **prerelease integration defects resolved; final dependency/API/docs audit and stable Foundation 2.0 constraint transition remain**.
+- Current phase: **source/dependency/API/docs audit complete; stable Foundation 2.0 publication, constraint cutover, normal release-workflow restoration, and final stable run remain**.
 
 ## Ownership boundary
 
@@ -31,6 +31,7 @@ Specialist packages retain their own database/cache/messaging/communication/cryp
 - Foundation exposes exactly Web, CLI, Worker, Scheduler runtimes;
 - provider groups are `common|web|cli|worker|scheduler`;
 - checked-in config remains deliberately only `app.php`, `auth.php`, `router.php`;
+- checked-in routes are `api.php`, `console.php`, `schedule.php`, `workers.php`;
 - optional capability config is module-published on demand;
 - `routes/console.php` registers application commands;
 - `routes/schedule.php` registers schedule definitions;
@@ -68,7 +69,7 @@ During branch development Infbyte intentionally requires:
 "infocyph/foundation": "dev-feature/foundation-2.0 as 2.0.x-dev"
 ```
 
-Final release alignment must replace this with the stable Foundation `^2.0` constraint.
+Final release alignment must replace this with the stable Foundation `^2.0` constraint after Foundation 2.0 is published.
 
 ## Frozen purpose-first modules
 
@@ -213,7 +214,7 @@ Global controls include `--quiet`, `--silent`, `-v|-vv|-vvv`, `--profile`, `--js
 
 ## Resolved integration issues — evidence
 
-Draft PR #5 at checkpoint `ab011a48d08a26ed362e5b53278e249144fbe227` is validated by run `32830537262`.
+The current draft PR #5 head `f2e81b09a843a3d9ea162ed349790107078cf1f8` is validated by run `32837108534`.
 
 Resolved items:
 
@@ -227,7 +228,8 @@ Resolved items:
 - aligned create-project archive/deploy/`optimize:clear` tests with current cache-tree ownership;
 - removed stale expected `ids.php` base config; checked-in config remains `app.php`, `auth.php`, `router.php`;
 - removed obsolete PHPForge reusable-workflow inputs that caused workflow startup failure;
-- preserved PHPForge's stable runtime-constraint guard instead of weakening release policy.
+- preserved PHPForge's stable runtime-constraint guard instead of weakening release policy;
+- corrected the README skeleton tree so it no longer advertises nonexistent `routes/web.php` or `routes/auth.php` files.
 
 ### CI policy during prerelease integration
 
@@ -239,7 +241,18 @@ PHPForge's stable-runtime constraint guard correctly rejects the temporary branc
 - PHP 8.5 prefer-stable: PASS;
 - clean production install on PHP 8.5: PASS.
 
-This is temporary. Once Foundation 2.0 is tagged and Infbyte changes to `^2.0`, restore the normal reusable PHPForge Security & Standards workflow so the stable-runtime constraint guard is a release gate again.
+This is temporary. Once Foundation 2.0 is published and Infbyte changes to `^2.0`, restore the normal reusable PHPForge Security & Standards workflow so the stable-runtime constraint guard is a release gate again.
+
+## Final prerelease audit — 2026-08-25
+
+Completed against the active feature branch:
+
+- Composer remains intentionally minimal: PHP, Foundation, and PHPForge only; Infbyte does not duplicate Foundation's specialist dependencies.
+- Foundation module/dependency baseline in this plan is current: CacheLayer 3.2.0, DBLayer 5.0, Omnibus 2.5, ReqShield 3.1 and the other frozen specialist versions.
+- no stale `4.1`, `2.4`, or `3.0.1` integration-version references remain in indexed Infbyte release content;
+- no active `Foundation::console`, old manager classes, `module:install db`, or retired hyphenated module-schema command usage remains;
+- README, Composer, workflow, distribution rules and exercised integration tests are aligned with the actual branch tree;
+- draft PR #5 remains mergeable and intentionally draft until the stable Foundation dependency exists.
 
 ## Distribution contract now verified
 
@@ -258,8 +271,8 @@ A create-project archive:
 Completed with evidence:
 
 1. [x] Composer dependency resolution on PHP 8.4/8.5 lowest/stable.
-2. [x] PHPForge quality suite on PHP 8.4/8.5 lowest/stable (`32830537262`).
-3. [x] clean production install (`32830537262`).
+2. [x] PHPForge quality suite on PHP 8.4/8.5 lowest/stable (`32837108534`).
+3. [x] clean production install (`32837108534`).
 4. [x] four-runtime and narrow-Application integration tests.
 5. [x] canonical Web handling and route cache consumption.
 6. [x] config/route/command cache lifecycle through the Infbyte CLI wrapper.
@@ -267,13 +280,13 @@ Completed with evidence:
 8. [x] clean create-project/archive/install/deploy/optimize-clear path.
 9. [x] Foundation 2 cache/distribution `.gitattributes` alignment.
 10. [x] stale Foundation 1 test/API expectations removed from the exercised integration suite.
+11. [x] Finish source/docs/dependency stale-version and retired-API audit across the whole Infbyte branch (`f2e81b09a843a3d9ea162ed349790107078cf1f8`, `32837108534`).
 
 Remaining before stable release:
 
-11. [ ] Finish source/docs/dependency stale-version and retired-API audit across the whole Infbyte branch.
-12. [ ] Replace `dev-feature/foundation-2.0 as 2.0.x-dev` with stable `^2.0` after Foundation 2.0 is tagged.
+12. [ ] Publish Foundation 2.0 and replace `dev-feature/foundation-2.0 as 2.0.x-dev` with stable `^2.0`.
 13. [ ] Restore the normal reusable PHPForge release workflow and obtain a full green stable-constraint run.
-14. [ ] Record final Infbyte + Foundation source/CI checkpoints and close all release ambiguities.
+14. [ ] Record final post-publication Infbyte + Foundation source/CI checkpoints and close all release ambiguities.
 
 ## Do not regress
 
