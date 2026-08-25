@@ -1,35 +1,34 @@
 # Infbyte — Foundation 2.0 Live Work Plan
 
+> This is the evidence-driven source of truth for Infbyte's Foundation 2.0 integration. Foundation owns reusable framework/runtime behavior; Infbyte owns the opinionated application skeleton and host composition.
+
 ## Branches
 
 - Infbyte: `feature/foundation-2.0`
 - Foundation: `feature/foundation-2.0`
+- Integration PR: draft PR #5, `feature/foundation-2.0` → `main`
 
-## Current checkpoint
+## Current checkpoint — 2026-08-25
 
-- Date: 2026-08-24
-- Infbyte source checkpoint: `56cb73e18eab07f34242a929eccbc9e6572d9971`
-- Infbyte documentation checkpoint: `26a35da0926285119c31ed880bf1f5aa06f3cf19`
-- Foundation source checkpoint: `493c39a7a06bac0455397556254f0f8e7e25f973`
-- Foundation documentation checkpoint: `944220490e1c28e9945fd398265dc9d072eb4c93`
-- Infbyte branch base: `main` at `47fb985f266c977504c3dca6bd13e85c9a1b73dc`
-- Current phase: **Foundation 2.0 public-name/config freeze complete; ready for deferred verification matrix**.
-- Full PHPUnit/static/PHPForge/runtime/release matrix: **not run yet**.
+- Verified Infbyte source checkpoint: `ab011a48d08a26ed362e5b53278e249144fbe227`
+- Verified Foundation branch checkpoint consumed during integration: `0f71a61b8348173f40de212fe880d6eccacd0a85`
+- Infbyte integration Security & Standards run: `32830537262`
+- Result: PHP 8.4/8.5 × prefer-lowest/prefer-stable quality suites PASS; clean production install PASS.
+- Current phase: **prerelease integration defects resolved; final dependency/API/docs audit and stable Foundation 2.0 constraint transition remain**.
 
-# Ownership boundary
+## Ownership boundary
 
 Foundation owns reusable framework/runtime behavior: explicit runtimes, DI/provider activation, CLI, scheduler/worker composition, purpose modules, schema orchestration, optimization, operational controls, application contracts, and specialist-package integration.
 
-Infbyte owns only the opinionated host skeleton: application bootstrap, app-specific defaults, routes/application code, writable layout, deployment conventions, and final developer experience.
+Infbyte owns only the opinionated host skeleton: application bootstrap, app-specific defaults, routes/application code, writable layout, deployment conventions, distribution/archive rules, and final developer experience.
 
 Specialist packages retain their own database/cache/messaging/communication/crypto/validation/filesystem engines.
 
-# Frozen Infbyte structure
+## Frozen Infbyte structure
 
 - root `infbyte` delegates to Foundation `CommandDispatcher`;
-- Web bootstrap delegates to one `Foundation::web()` application;
-- CLI/Worker/Scheduler runtime selection is Foundation-owned;
-- Foundation has exactly Web, CLI, Worker, Scheduler runtimes;
+- Web bootstrap delegates to `Foundation::web()`;
+- Foundation exposes exactly Web, CLI, Worker, Scheduler runtimes;
 - provider groups are `common|web|cli|worker|scheduler`;
 - checked-in config remains deliberately only `app.php`, `auth.php`, `router.php`;
 - optional capability config is module-published on demand;
@@ -37,11 +36,10 @@ Specialist packages retain their own database/cache/messaging/communication/cryp
 - `routes/schedule.php` registers schedule definitions;
 - `routes/workers.php` registers non-message maintenance workers;
 - generated optimized artifacts are not committed;
-- deployment optimization uses `php infbyte optimize`.
+- deployment optimization uses `php infbyte optimize`;
+- Foundation 1 convenience APIs/runtime hierarchy are not restored.
 
-No retired Console runtime hierarchy is reintroduced.
-
-# Foundation dependency baseline consumed by Infbyte
+## Foundation dependency baseline consumed by Infbyte
 
 Core Foundation runtime:
 
@@ -51,28 +49,28 @@ Core Foundation runtime:
 - `infocyph/uid ^5.0`
 - `infocyph/webrick ^4.0.2`
 
-Optional capability packages:
+Optional capability packages owned by Foundation modules:
 
 - `infocyph/cachelayer ^3.2.0`
-- `infocyph/dblayer ^4.1`
+- `infocyph/dblayer ^5.0`
 - `infocyph/epicrypt ^2.1`
-- `infocyph/omnibus ^2.4`
+- `infocyph/omnibus ^2.5`
 - `infocyph/otp ^6.0`
 - `infocyph/pathwise ^3.1`
-- `infocyph/reqshield ^3.0.1`
+- `infocyph/reqshield ^3.1`
 - `infocyph/talkingbytes ^2.0`
 - `web-auth/webauthn-lib ^5.3.5`
 - `infocyph/phpforge dev-main@dev`
 
-During branch development Infbyte requires:
+During branch development Infbyte intentionally requires:
 
 ```json
 "infocyph/foundation": "dev-feature/foundation-2.0 as 2.0.x-dev"
 ```
 
-Final release alignment will move to the stable Foundation 2.0 constraint.
+Final release alignment must replace this with the stable Foundation `^2.0` constraint.
 
-# Frozen purpose-first modules
+## Frozen purpose-first modules
 
 Canonical modules:
 
@@ -102,7 +100,7 @@ Canonical aliases include:
 
 No standalone OTP/passkey public module exists.
 
-# Config/schema lifecycle inherited from Foundation
+## Config/schema lifecycle inherited from Foundation
 
 Commands:
 
@@ -117,43 +115,38 @@ Commands:
 
 Schema owners:
 
-- `auth` -> Foundation auth schema;
-- `cache` -> CacheLayer public PDO/SQLite/invalidation schemas;
-- `session` -> Foundation database-session schema.
+- `auth` → Foundation auth schema;
+- `cache` → CacheLayer public PDO/SQLite/invalidation schemas;
+- `session` → Foundation database-session schema.
 
 Schema status is read-only. Explicit installation owns mutation. Module removal never drops schema/data.
 
 Infbyte does not copy optional config into the skeleton merely because Foundation supports the capability.
 
-# Application API rule
+## Application API rule
 
-Foundation `Application` is a narrow runtime/composition object. Infbyte application code should resolve real services through DI:
+Foundation `Application` is a narrow runtime/composition object. Infbyte application code resolves concrete services through constructor injection or `Application::make()`.
 
-```php
-$service = $app->make(ServiceClass::class);
-```
+Do not rely on or recreate retired convenience facades such as:
 
-Do not rely on or recreate removed convenience facades such as:
-
-- `$app->auth()`;
+- `$app->auth()` / `$app->authManager()`;
 - `$app->session()` / `$app->browserSession()`;
 - `$app->router()`;
 - `$app->responses()`;
 - `$app->testing()`;
 - `$app->messaging()`;
-- generic cache/database/filesystem/security manager methods.
+- `$app->ids()`;
+- generic cache/database/filesystem/security/validation manager methods.
 
-Concrete Foundation application services and native specialist services are resolved through constructor injection or `Application::make()`.
+## Application contracts available to Infbyte apps
 
-# Application contracts available to Infbyte apps
-
-## Validation
+### Validation
 
 - Foundation `FormRequest` composes Webrick request input with ReqShield;
 - custom rules implement ReqShield `Contracts\Rule` directly;
 - generators: `create:request`, `create:rule`.
 
-## Notifications/mail
+### Notifications/mail
 
 Foundation application routing:
 
@@ -170,7 +163,7 @@ TalkingBytes-backed mail:
 
 Generators: `create:mail`, `create:notification`, `create:notification-channel`.
 
-## Messaging/jobs
+### Messaging/jobs
 
 - `Job`
 - `JobContext`
@@ -178,36 +171,33 @@ Generators: `create:mail`, `create:notification`, `create:notification-channel`.
 - Omnibus-backed handler pipeline
 - generators: `create:job`, `create:handler`, `create:job-middleware`.
 
-## Resources/testing
+### Resources/testing
 
 - `JsonResource::resolve(): mixed`;
 - `create:resource` targets the current contract;
 - resolve `JsonDispatchResponseFactory`, `AuthServices`, and `TestKit` through DI rather than Application shortcuts.
 
-# Runtime/operations inherited by Infbyte
+## Runtime/operations inherited by Infbyte
 
-## Omnibus 2.4 workers
+### Omnibus 2.5 workers
 
 - single messaging workers use native Omnibus `WorkerLifecycle` for heartbeat/reload/stop;
 - no `pcntl` requirement solely for single-worker generation polling;
 - Unix `WorkerPool` remains pcntl/posix based and retains the Foundation watchdog;
 - provider-only workers remain messaging-lazy.
 
-## Scheduler ownership
+### Scheduler/runtime control
 
 - overlap/single-server locks refresh during child execution;
 - lost lease terminates/fails the child;
 - schedule history uses stable identity;
-- `schedule:test` reports actual failure status.
-
-## Runtime control
-
+- `schedule:test` reports actual failure status;
 - file/cache generation-map mutations are atomic/serialized;
 - cache-backed runtime control requires suitable shared visibility and coordination;
 - runtime registry visibility is `host|shared`, default `host`;
 - process registry is observability metadata, not process-supervision truth.
 
-## Other operations
+### Other operations
 
 - supervised child commands do not duplicate `--profile` output;
 - `log:tail --follow` handles truncation/rotation;
@@ -215,71 +205,77 @@ Generators: `create:mail`, `create:notification`, `create:notification-channel`.
 - environment encryption remains Epicrypt-backed with external key material only;
 - cache schema status does not create a missing SQLite file.
 
-# CLI inheritance
+## CLI inheritance
 
-Because the root executable delegates directly to Foundation, Infbyte inherits the frozen Foundation command catalog without duplicate command classes.
-
-Major families:
-
-- application/config/cache/optimization;
-- database/migrations;
-- modules/config/schema lifecycle;
-- execution/maintenance/runtime control;
-- messaging/queue/scheduling/workers;
-- storage/session/auth operations;
-- environment protection/logging;
-- `create:*` generators.
+The root executable delegates directly to Foundation, so Infbyte inherits the Foundation command catalog without duplicate command classes.
 
 Global controls include `--quiet`, `--silent`, `-v|-vv|-vvv`, `--profile`, `--json`, `--env`, `--no-interaction`, help/version/completion.
 
-# Documentation alignment completed
+## Resolved integration issues — evidence
 
-Infbyte README now reflects:
+Draft PR #5 at checkpoint `ab011a48d08a26ed362e5b53278e249144fbe227` is validated by run `32830537262`.
 
-- Foundation 2.0 runtime boundary;
-- no separate Console framework;
-- current purpose-first modules;
-- unified module schema lifecycle;
-- current generators/operations;
-- DI instead of broad Application facades;
-- lean checked-in config;
-- deployment-owned optimize artifacts;
-- absence of invented Composer test/release aliases.
+Resolved items:
 
-Foundation documentation is the detailed framework source of truth; Infbyte does not duplicate it.
+- removed stale Foundation 1 test usage such as `Foundation::console()`, `$app->testing()`, broad manager/facade methods and retired schema command names;
+- verified the exactly-four-runtime contract and narrow `Application` surface;
+- made Web response tests format-independent by decoding JSON;
+- aligned route/config/command cache tests to current Foundation 2 CLI contracts and canonical cache paths;
+- isolated CLI cache tests in temporary skeletons so runtime artifacts cannot race with distribution tests;
+- verified canonical `database` module naming, built-in module status, readiness JSON and `php infbyte module:install database` guidance;
+- aligned `.gitattributes` with Foundation 2 cache artifacts (`commands.php`, `schedule.php`, `optimize.php`, `config/`, `container/`, `routes/`);
+- aligned create-project archive/deploy/`optimize:clear` tests with current cache-tree ownership;
+- removed stale expected `ids.php` base config; checked-in config remains `app.php`, `auth.php`, `router.php`;
+- removed obsolete PHPForge reusable-workflow inputs that caused workflow startup failure;
+- preserved PHPForge's stable runtime-constraint guard instead of weakening release policy.
 
-# Deliberate Infbyte non-changes
+### CI policy during prerelease integration
 
-Infbyte application source/config checkpoint remains unchanged through the Foundation cleanup/doc-freeze work. This is intentional:
+PHPForge's stable-runtime constraint guard correctly rejects the temporary branch alias as a release dependency. Therefore this feature branch currently runs an explicit integration matrix with the same PHPForge quality suite after dependency resolution:
 
-- no optional operations/messaging/notifications/database/cache/etc. config is copied into the base skeleton;
-- `.env.example` remains lean and contains no environment-encryption key;
-- no queue/cache/database/communication/validation/schema implementation is duplicated;
-- no Infbyte workaround is added for a Foundation defect;
-- no generated optimized artifacts are committed.
+- PHP 8.4 prefer-lowest: PASS;
+- PHP 8.4 prefer-stable: PASS;
+- PHP 8.5 prefer-lowest: PASS;
+- PHP 8.5 prefer-stable: PASS;
+- clean production install on PHP 8.5: PASS.
 
-# Verification status
+This is temporary. Once Foundation 2.0 is tagged and Infbyte changes to `^2.0`, restore the normal reusable PHPForge Security & Standards workflow so the stable-runtime constraint guard is a release gate again.
 
-Public names/config are frozen. The full Foundation 2.0 + Infbyte verification matrix remains **not run yet**.
+## Distribution contract now verified
 
-Next phase:
+A create-project archive:
 
-1. Composer/dependency validation;
-2. PHPForge/static analysis;
-3. PHPUnit/integration suites;
-4. clean create-project/install path;
-5. core-only Foundation/Infbyte runtime;
-6. purpose-module install/remove/config/schema matrix, including partial auth bundle/install ordering;
-7. `app:ready` / production config diagnostics;
-8. CLI/global-option/help/completion matrix;
-9. Web/CLI/Worker/Scheduler isolation;
-10. maintenance/reload/worker/scheduler lifecycle;
-11. queue failure/job middleware/pool/fork behavior;
-12. DB/destructive/env/storage/optimization safety;
-13. representative performance/soak checks;
-14. fix defects and move Foundation/Infbyte constraints to stable release alignment.
+- retains the application example tests and writable-directory placeholders;
+- excludes repository-only verification tests and development metadata;
+- contains no generated PHP cache artifacts;
+- contains no pre-created `bootstrap/cache/config`, `container`, or `routes` runtime trees;
+- provisions `.env` idempotently with secure permissions and generated auth secret;
+- `deploy.sh` builds Foundation 2 config/route/command/schedule/optimize/container artifacts;
+- `optimize:clear` removes every managed artifact and the complete dedicated config cache tree.
 
-# Do not regress
+## Verification status
+
+Completed with evidence:
+
+1. [x] Composer dependency resolution on PHP 8.4/8.5 lowest/stable.
+2. [x] PHPForge quality suite on PHP 8.4/8.5 lowest/stable (`32830537262`).
+3. [x] clean production install (`32830537262`).
+4. [x] four-runtime and narrow-Application integration tests.
+5. [x] canonical Web handling and route cache consumption.
+6. [x] config/route/command cache lifecycle through the Infbyte CLI wrapper.
+7. [x] canonical module/readiness/install-guidance contracts.
+8. [x] clean create-project/archive/install/deploy/optimize-clear path.
+9. [x] Foundation 2 cache/distribution `.gitattributes` alignment.
+10. [x] stale Foundation 1 test/API expectations removed from the exercised integration suite.
+
+Remaining before stable release:
+
+11. [ ] Finish source/docs/dependency stale-version and retired-API audit across the whole Infbyte branch.
+12. [ ] Replace `dev-feature/foundation-2.0 as 2.0.x-dev` with stable `^2.0` after Foundation 2.0 is tagged.
+13. [ ] Restore the normal reusable PHPForge release workflow and obtain a full green stable-constraint run.
+14. [ ] Record final Infbyte + Foundation source/CI checkpoints and close all release ambiguities.
+
+## Do not regress
 
 - no package-per-module public model;
 - no standalone OTP/passkey module;
@@ -291,4 +287,5 @@ Next phase:
 - no static global application state;
 - no optional config copied into the skeleton by default;
 - no environment-protection key in `.env`/`.env.example`;
-- no generated optimized artifacts committed.
+- no generated optimized artifacts committed;
+- no weakening of PHPForge stable-release dependency policy to accommodate a prerelease branch alias.
