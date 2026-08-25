@@ -39,15 +39,14 @@ return [
     |--------------------------------------------------------------------------
     |
     | Foundation 2.0 is lazy by default and owns execution scopes directly.
-    | There is no application request_scope switch. Compiled container activation
-    | remains opt-in until a deployment deliberately builds and enables it.
+    | There is no application request_scope or compiled-path switch. Foundation
+    | owns the fixed per-runtime artifact paths. Activation remains opt-in.
     |
     */
     'container' => [
         'alias' => env('APP_CONTAINER_ALIAS'),
         'environment' => env_string('APP_ENV', 'local'),
         'lazy_loading' => env_bool('APP_CONTAINER_LAZY_LOADING', true),
-        'compiled' => env_string('APP_CONTAINER_COMPILED', 'bootstrap/cache/container.php'),
         'compiled_activation' => env_string('APP_CONTAINER_COMPILED_ACTIVATION', 'off'),
         'debug_tracing' => [
             'enabled' => env_bool('APP_CONTAINER_DEBUG_TRACING', false),
