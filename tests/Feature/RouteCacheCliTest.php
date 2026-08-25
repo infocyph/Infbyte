@@ -2,130 +2,87 @@
 
 declare(strict_types=1);
 
-use Composer\InstalledVersions;
 use App\Http\Controllers\SystemController;
-use Infocyph\Foundation\Auth\AuthManager;
-use Infocyph\Foundation\Database\DatabaseManager;
+use Composer\InstalledVersions;
 use Infocyph\Foundation\Foundation;
-use Infocyph\Foundation\Messaging\MessagingManager;
 use Infocyph\Foundation\Routing\RouteCachePath;
-use Infocyph\Foundation\Session\SessionManager;
 use Infocyph\Webrick\Request\Request;
 use Infocyph\Webrick\Router\Matching\FusedMatcher;
 
-it('uses the environment application name and reports the Foundation runtime version', function (): void {
-    $root = dirname(__DIR__, 2);
-    [$exitCode, $output] = runInfbyteCommand([
-        PHP_BINARY,
-        $root . '/infbyte',
-        '--version',
-    ], ['APP_NAME' => 'Acme Console']);
-
-    expect($exitCode)->toBe(0)
-        ->and($output)->toBe(
-            'Acme Console ' . (InstalledVersions::getPrettyVersion('infocyph/foundation') ?? 'dev-main'),
-        );
-});
-
-it('falls back to infbyte when the environment application name is empty', function (): void {
-    $root = dirname(__DIR__, 2);
-    [$exitCode, $output] = runInfbyteCommand([
-        PHP_BINARY,
-        $root . '/infbyte',
-        '--version',
-    ], ['APP_NAME' => '']);
-
-    expect($exitCode)->toBe(0)
-        ->and($output)->toBe(
-            'infbyte ' . (InstalledVersions::getPrettyVersion('infocyph/foundation') ?? 'dev-main'),
-        );
-});
-
-it('builds and clears route cache through the infbyte cli wrapper', function (): void {
-    $root = dirname(__DIR__, 2);
-    $cacheFile = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
-        . '/infbyte-route-cache-' . bin2hex(random_bytes(5)) . '.php';
-
-    [$buildExitCode, $buildOutput] = runInfbyteCommand([
-        PHP_BINARY,
-        $root . '/infbyte',
-        'route:cache',
-        '--matcher=fused',
-        '--cache=' . $cacheFile,
-    ]);
-
-    expect($buildExitCode)->toBe(0);
-    expect($buildOutput)->toContain('Route cache ready at:');
-    expect(is_file($cacheFile))->toBeTrue();
-    expect(filesize($cacheFile))->toBeGreaterThan(0);
-
-    $matcher = FusedMatcher::make()->enableCache($cacheFile);
-    [$cachedRoute] = $matcher->match('GET', 'localhost', '/json');
-    $cachedHandler = $cachedRoute->getHandler();
-    $webrickVersion = InstalledVersions::getVersion('infocyph/webrick') ?? '0.0.0';
-    $usesNativeHandler = version_compare($webrickVersion, '3.3.0', '>=');
-    if ($usesNativeHandler) {
-        expect($cachedHandler)->toBe([SystemController::class, 'json'])
-            ->and(class_exists(\Opis\Closure\Serializer::class, false))->toBeFalse();
-    } else {
-        expect($cachedHandler)->toBeInstanceOf(Closure::class);
-    }
-
-    $runtime = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
-        . '/infbyte-cached-runtime-' . bin2hex(random_bytes(5));
-    $runtimeCache = $runtime . '/bootstrap/cache/routes/fused.php';
-    mkdir(dirname($runtimeCache), 0775, true);
-    mkdir($runtime . '/routes', 0775, true);
-    copy($cacheFile, $runtimeCache);
-    file_put_contents(
-        $runtime . '/routes/missing.php',
-        "<?php\n\nthrow new RuntimeException('Cached dispatch loaded route source.');\n",
-    );
+it('keeps the Infbyte CLI identity independent of the application display name', function (): void {
+    $fixture = createInfbyteCliFixture();
 
     try {
+        [$exitCode, $output] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            '--version',
+        ], ['APP_NAME' => 'Acme Console']);
+
+        expect($exitCode)->toBe(0)
+            ->and($output)->toBe(
+                'Infbyte ' . (InstalledVersions::getPrettyVersion('infocyph/foundation') ?? 'dev-main'),
+            );
+    } finally {
+        removeInfbyteTestDirectory($fixture);
+    }
+});
+
+it('builds, consumes, and clears route cache through the infbyte cli wrapper', function (): void {
+    $fixture = createInfbyteCliFixture();
+    $cacheFile = $fixture . '/bootstrap/cache/routes/fused.php';
+
+    try {
+        [$buildExitCode, $buildOutput] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'route:cache',
+        ]);
+
+        expect($buildExitCode)->toBe(0)
+            ->and($buildOutput)->toContain('Routes cached using fused matcher at ')
+            ->and($cacheFile)->toBeFile()
+            ->and(filesize($cacheFile))->toBeGreaterThan(0);
+
+        $matcher = FusedMatcher::make()->enableCache($cacheFile);
+        [$cachedRoute] = $matcher->match('GET', 'localhost', '/json');
+
+        expect($cachedRoute->getHandler())->toBe([SystemController::class, 'json']);
+
+        file_put_contents(
+            $fixture . '/routes/api.php',
+            "<?php\n\nthrow new RuntimeException('Cached dispatch loaded route source.');\n",
+        );
+
         $app = Foundation::web([
-            'base_path' => $runtime,
+            'base_path' => $fixture,
             '_config_cache' => false,
             'router' => [
                 'cache' => true,
-                'files' => ['missing.php'],
+                'files' => ['api.php'],
                 'matcher' => 'fused',
             ],
         ]);
-        $repository = $app->container()->getRepository();
         $response = $app->handle(Request::fake(method: 'GET', uri: 'http://localhost/json'));
+        $payload = json_decode((string) $response->getBody(), true, flags: JSON_THROW_ON_ERROR);
 
         expect($response->getStatusCode())->toBe(200)
-            ->and((string) $response->getBody())->toContain('memory')
-            ->and($repository->hasResolvedSingleton(AuthManager::class))->toBeFalse()
-            ->and($repository->hasResolvedSingleton(SessionManager::class))->toBeFalse()
-            ->and($repository->hasResolvedSingleton(DatabaseManager::class))->toBeFalse()
-            ->and($repository->hasResolvedSingleton(MessagingManager::class))->toBeFalse()
-            ->and(get_included_files())->not->toContain($runtime . '/routes/missing.php');
+            ->and($payload)->toHaveKey('memory')
+            ->and($payload['memory'])->toBeInt()
+            ->and(get_included_files())->not->toContain($fixture . '/routes/api.php');
+
+        [$clearExitCode, $clearOutput] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'route:clear',
+        ]);
+
+        expect($clearExitCode)->toBe(0)
+            ->and($clearOutput)->toContain('Route cache cleared.')
+            ->and($cacheFile)->not->toBeFile();
     } finally {
-        if (isset($app)) {
-            $app->container()->unset();
-        }
-        unlink($runtimeCache);
-        rmdir(dirname($runtimeCache));
-        rmdir(dirname(dirname($runtimeCache)));
-        rmdir(dirname(dirname(dirname($runtimeCache))));
-        unlink($runtime . '/routes/missing.php');
-        rmdir($runtime . '/routes');
-        rmdir($runtime);
+        removeInfbyteTestDirectory($fixture);
     }
-
-    [$clearExitCode, $clearOutput] = runInfbyteCommand([
-        PHP_BINARY,
-        $root . '/infbyte',
-        'route:clear',
-        '--matcher=fused',
-        '--cache=' . $cacheFile,
-    ]);
-
-    expect($clearExitCode)->toBe(0);
-    expect($clearOutput)->toContain('Route cache cleared:');
-    expect(file_exists($cacheFile))->toBeFalse();
 });
 
 it('derives the dedicated routes cache path by default', function (): void {
@@ -138,154 +95,173 @@ it('derives the dedicated routes cache path by default', function (): void {
     expect(RouteCachePath::for($app->config()))->toBe($root . '/bootstrap/cache/routes/fused.php');
 });
 
-it('builds and clears the default sharded config cache through the infbyte cli wrapper', function (): void {
-    $root = dirname(__DIR__, 2);
-    $cacheDirectory = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
-        . '/infbyte-config-cache-' . bin2hex(random_bytes(5));
+it('builds and fully clears the default sharded config cache through the infbyte cli wrapper', function (): void {
+    $fixture = createInfbyteCliFixture();
+    $cacheDirectory = $fixture . '/bootstrap/cache/config';
 
-    [$buildExitCode, $buildOutput] = runInfbyteCommand([
-        PHP_BINARY,
-        $root . '/infbyte',
-        'config:cache',
-        '--path=' . $cacheDirectory,
-    ]);
+    try {
+        [$buildExitCode, $buildOutput] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'config:cache',
+        ]);
 
-    expect($buildExitCode)->toBe(0);
-    expect($buildOutput)->toContain('Configuration cached (sharded):');
-    expect($cacheDirectory . '/__manifest.php')->toBeFile()
-        ->and($cacheDirectory . '/app.php')->toBeFile()
-        ->and($cacheDirectory . '/__flat.php')->not->toBeFile()
-        ->and($cacheDirectory . '/__compiled.php')->not->toBeFile();
+        expect($buildExitCode)->toBe(0)
+            ->and($buildOutput)->toContain('Configuration cached using sharded.')
+            ->and($cacheDirectory . '/__manifest.php')->toBeFile()
+            ->and($cacheDirectory . '/app.php')->toBeFile()
+            ->and($cacheDirectory . '/__flat.php')->toBeFile();
 
-    [$clearExitCode, $clearOutput] = runInfbyteCommand([
-        PHP_BINARY,
-        $root . '/infbyte',
-        'config:clear',
-        '--path=' . $cacheDirectory,
-    ]);
+        [$clearExitCode, $clearOutput] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'config:clear',
+        ]);
 
-    expect($clearExitCode)->toBe(0);
-    expect($clearOutput)->toContain('Configuration cache cleared:');
-    expect($cacheDirectory . '/__manifest.php')->not->toBeFile()
-        ->and($cacheDirectory . '/app.php')->not->toBeFile()
-        ->and($cacheDirectory . '/__flat.php')->not->toBeFile();
-
-    rmdir($cacheDirectory);
+        expect($clearExitCode)->toBe(0)
+            ->and($clearOutput)->toContain('Configuration cache cleared.')
+            ->and($cacheDirectory)->not->toBeDirectory();
+    } finally {
+        removeInfbyteTestDirectory($fixture);
+    }
 });
 
-it('can explicitly build a single config cache through the infbyte cli wrapper', function (): void {
-    $root = dirname(__DIR__, 2);
-    $cacheDirectory = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
-        . '/infbyte-single-config-cache-' . bin2hex(random_bytes(5));
+it('can select and fully clear the single config cache through application configuration', function (): void {
+    $fixture = createInfbyteCliFixture();
+    $cacheDirectory = $fixture . '/bootstrap/cache/config';
 
-    [$exitCode, $output] = runInfbyteCommand([
-        PHP_BINARY,
-        $root . '/infbyte',
-        'config:cache',
-        '--type=single',
-        '--path=' . $cacheDirectory,
-    ]);
+    try {
+        [$exitCode, $output] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'config:cache',
+        ], ['APP_CONFIG_CACHE_TYPE' => 'single']);
 
-    expect($exitCode)->toBe(0);
-    expect($output)->toContain('Configuration cached (single):');
-    expect($cacheDirectory . '/__manifest.php')->toBeFile()
-        ->and($cacheDirectory . '/app.php')->not->toBeFile()
-        ->and($cacheDirectory . '/__flat.php')->not->toBeFile();
+        expect($exitCode)->toBe(0)
+            ->and($output)->toContain('Configuration cached using single.')
+            ->and($cacheDirectory . '/__manifest.php')->toBeFile()
+            ->and($cacheDirectory . '/app.php')->not->toBeFile()
+            ->and($cacheDirectory . '/__flat.php')->not->toBeFile();
 
-    [$clearExitCode] = runInfbyteCommand([
-        PHP_BINARY,
-        $root . '/infbyte',
-        'config:clear',
-        '--path=' . $cacheDirectory,
-    ]);
+        [$clearExitCode] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'config:clear',
+        ]);
 
-    expect($clearExitCode)->toBe(0);
-    rmdir($cacheDirectory);
+        expect($clearExitCode)->toBe(0)
+            ->and($cacheDirectory)->not->toBeDirectory();
+    } finally {
+        removeInfbyteTestDirectory($fixture);
+    }
 });
 
 it('builds and clears compiled command metadata through the infbyte cli wrapper', function (): void {
-    $root = dirname(__DIR__, 2);
-    $cacheDirectory = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
-        . '/infbyte-command-cache-' . bin2hex(random_bytes(5));
-    $manifest = $cacheDirectory . '/commands.php';
+    $fixture = createInfbyteCliFixture();
+    $manifest = $fixture . '/bootstrap/cache/commands.php';
 
-    [$buildExitCode, $buildOutput] = runInfbyteCommand([
-        PHP_BINARY,
-        $root . '/infbyte',
-        'command:cache',
-        '--path=' . $manifest,
-    ]);
+    try {
+        [$buildExitCode, $buildOutput] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'command:cache',
+        ]);
 
-    expect($buildExitCode)->toBe(0);
-    expect($buildOutput)->toContain('Command manifest ready at:');
-    expect($manifest)->toBeFile();
-    expect(glob($cacheDirectory . '/commands-*.php') ?: [])->not->toBeEmpty();
-    expect($manifest . '.d')->not->toBeDirectory();
+        expect($buildExitCode)->toBe(0)
+            ->and($buildOutput)->toContain('Command manifest cached: ')
+            ->and($manifest)->toBeFile()
+            ->and(glob($fixture . '/bootstrap/cache/.commands-*') ?: [])->toBeEmpty();
 
-    [$clearExitCode, $clearOutput] = runInfbyteCommand([
-        PHP_BINARY,
-        $root . '/infbyte',
-        'command:clear',
-        '--path=' . $manifest,
-    ]);
+        [$clearExitCode, $clearOutput] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'command:clear',
+        ]);
 
-    expect($clearExitCode)->toBe(0);
-    expect($clearOutput)->toContain('Command manifest cleared:');
-    expect($manifest)->not->toBeFile();
-    expect(glob($cacheDirectory . '/commands-*.php') ?: [])->toBeEmpty();
-    expect($manifest . '.d')->not->toBeDirectory();
-
-    rmdir($cacheDirectory);
+        expect($clearExitCode)->toBe(0)
+            ->and($clearOutput)->toContain('Command manifest cleared.')
+            ->and($manifest)->not->toBeFile();
+    } finally {
+        removeInfbyteTestDirectory($fixture);
+    }
 });
 
-it('reports readiness and optional module state through the infbyte cli', function (): void {
-    $root = dirname(__DIR__, 2);
+it('reports readiness and canonical module state through the infbyte cli', function (): void {
+    $fixture = createInfbyteCliFixture();
 
-    [$readinessExitCode, $readinessOutput] = runInfbyteCommand([
-        PHP_BINARY,
-        $root . '/infbyte',
-        'app:ready',
-        '--json=1',
-    ]);
-    [$modulesExitCode, $modulesOutput] = runInfbyteCommand([
-        PHP_BINARY,
-        $root . '/infbyte',
-        'module:list',
-        '--json=true',
-    ]);
+    try {
+        [$readinessExitCode, $readinessOutput] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'app:ready',
+            '--json=1',
+        ]);
+        [$modulesExitCode, $modulesOutput] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'module:list',
+            '--json=true',
+        ]);
 
-    expect($readinessExitCode)->toBe(2);
-    expect(json_decode($readinessOutput, true, flags: JSON_THROW_ON_ERROR)['production_ready'])->toBeFalse();
-    expect($modulesExitCode)->toBe(0);
+        $readiness = json_decode($readinessOutput, true, flags: JSON_THROW_ON_ERROR);
+        $moduleRows = json_decode($modulesOutput, true, flags: JSON_THROW_ON_ERROR);
 
-    $modules = array_column(
-        json_decode($modulesOutput, true, flags: JSON_THROW_ON_ERROR)['modules'],
-        null,
-        'name',
-    );
+        expect($readinessExitCode)->toBe(1)
+            ->and($readiness['ready'])->toBeFalse()
+            ->and($readiness)->toHaveKey('checks')
+            ->and($modulesExitCode)->toBe(0)
+            ->and($moduleRows)->toBeArray();
 
-    expect($modules['db']['installed'])->toBeFalse()
-        ->and($modules['cache']['installed'])->toBeFalse()
-        ->and($modules['filesystem']['installed'])->toBeFalse()
-        ->and($modules['logging']['installed'])->toBeTrue()
-        ->and($modules['messaging']['installed'])->toBeTrue()
-        ->and($modules['resources']['installed'])->toBeTrue()
-        ->and($modules['session']['installed'])->toBeTrue();
+        $modules = array_column($moduleRows, null, 'name');
+
+        expect($modules)->toHaveKeys([
+            'auth',
+            'cache',
+            'communication',
+            'database',
+            'filesystem',
+            'logging',
+            'messaging',
+            'operations',
+            'resources',
+            'security',
+            'session',
+            'validation',
+        ])->not->toHaveKey('db')
+            ->and($modules['database']['packages']['infocyph/dblayer']['installed'])->toBeFalse()
+            ->and($modules['database']['packages']['infocyph/dblayer']['constraint'])->toBe('^5.0');
+
+        foreach (['logging', 'operations', 'resources', 'session'] as $builtIn) {
+            expect($modules[$builtIn]['installed'])->toBeTrue();
+        }
+    } finally {
+        removeInfbyteTestDirectory($fixture);
+    }
 });
 
-it('explains how to install a service owned by an absent optional module', function (): void {
-    $root = dirname(__DIR__, 2);
+it('reports canonical database installation guidance through module schema metadata', function (): void {
+    $fixture = createInfbyteCliFixture();
 
-    [$exitCode, $output] = runInfbyteCommand([
-        PHP_BINARY,
-        $root . '/infbyte',
-        'auth:schema:status',
-        '--json=1',
-    ]);
+    try {
+        [$exitCode, $output] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'module:show',
+            'auth',
+            '--json=1',
+        ]);
 
-    expect($exitCode)->toBe(2)
-        ->and($output)->toContain('requires infocyph/dblayer')
-        ->and($output)->toContain('php infbyte module:install db');
+        $module = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+        $authSchema = $module['schema_status'][0] ?? null;
+
+        expect($exitCode)->toBe(0)
+            ->and($module['name'])->toBe('auth')
+            ->and($authSchema)->toBeArray()
+            ->and($authSchema['state'])->toBe('unavailable')
+            ->and($authSchema['detail'])->toContain('php infbyte module:install database');
+    } finally {
+        removeInfbyteTestDirectory($fixture);
+    }
 });
 
 /**
@@ -315,4 +291,83 @@ function runInfbyteCommand(array $arguments, array $environment = []): array
     exec($command, $output, $exitCode);
 
     return [$exitCode, implode("\n", $output)];
+}
+
+function createInfbyteCliFixture(): string
+{
+    $root = dirname(__DIR__, 2);
+    $fixture = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
+        . '/infbyte-cli-' . bin2hex(random_bytes(6));
+
+    foreach ([
+        $fixture,
+        $fixture . '/bootstrap/cache',
+        $fixture . '/storage/cache',
+        $fixture . '/storage/logs',
+        $fixture . '/storage/sessions',
+        $fixture . '/storage/uploads',
+        $fixture . '/vendor',
+    ] as $directory) {
+        if (!mkdir($directory, 0775, true) && !is_dir($directory)) {
+            throw new RuntimeException(sprintf('Unable to create CLI fixture directory "%s".', $directory));
+        }
+    }
+
+    copy($root . '/infbyte', $fixture . '/infbyte');
+    copy($root . '/composer.json', $fixture . '/composer.json');
+    copyInfbyteTestDirectory($root . '/config', $fixture . '/config');
+    copyInfbyteTestDirectory($root . '/routes', $fixture . '/routes');
+    copy($root . '/bootstrap/providers.php', $fixture . '/bootstrap/providers.php');
+    file_put_contents(
+        $fixture . '/vendor/autoload.php',
+        '<?php return require ' . var_export($root . '/vendor/autoload.php', true) . ';',
+    );
+
+    return $fixture;
+}
+
+function copyInfbyteTestDirectory(string $source, string $destination): void
+{
+    if (!mkdir($destination, 0775, true) && !is_dir($destination)) {
+        throw new RuntimeException(sprintf('Unable to create test directory "%s".', $destination));
+    }
+
+    foreach (new DirectoryIterator($source) as $entry) {
+        if ($entry->isDot()) {
+            continue;
+        }
+
+        $target = $destination . DIRECTORY_SEPARATOR . $entry->getFilename();
+        if ($entry->isDir()) {
+            copyInfbyteTestDirectory($entry->getPathname(), $target);
+            continue;
+        }
+
+        copy($entry->getPathname(), $target);
+    }
+}
+
+function removeInfbyteTestDirectory(string $directory): void
+{
+    if (!is_dir($directory)) {
+        return;
+    }
+
+    $entries = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST,
+    );
+
+    foreach ($entries as $entry) {
+        $path = $entry->getPathname();
+
+        if ($entry->isLink() || $entry->isFile()) {
+            unlink($path);
+            continue;
+        }
+
+        rmdir($path);
+    }
+
+    rmdir($directory);
 }

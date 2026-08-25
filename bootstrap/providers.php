@@ -15,10 +15,22 @@ return [
          * \App\Providers\WebServiceProvider::class,
          */
     ],
-    'console' => [
+    'cli' => [
         /**
          * Usage:
-         * \App\Providers\ConsoleServiceProvider::class,
+         * \App\Providers\CliServiceProvider::class,
+         */
+    ],
+    'worker' => [
+        /**
+         * Usage:
+         * \App\Providers\WorkerServiceProvider::class,
+         */
+    ],
+    'scheduler' => [
+        /**
+         * Usage:
+         * \App\Providers\SchedulerServiceProvider::class,
          */
     ],
 ];

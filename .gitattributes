@@ -1,7 +1,6 @@
 /.gitattributes export-ignore
 /captainhook.json export-ignore
 /composer.lock export-ignore
-/plan.md export-ignore
 /CODE_OF_CONDUCT.md export-ignore
 /CONTRIBUTING.md export-ignore
 /SECURITY.md export-ignore
@@ -16,6 +15,7 @@
 /.github export-ignore
 /.idea export-ignore
 /.phpunit.cache export-ignore
+/.phpforge-report export-ignore
 /.psalm-cache export-ignore
 /.route-cache-* export-ignore
 /.vscode export-ignore
@@ -33,12 +33,11 @@
 /app/Services export-ignore
 /app/Support export-ignore
 /bin export-ignore
-/bootstrap/cache/config/*.php export-ignore
-/bootstrap/cache/console/*.php export-ignore
-/bootstrap/cache/container.php export-ignore
-/bootstrap/cache/modules.php export-ignore
-/bootstrap/cache/optimize.php export-ignore
-/bootstrap/cache/routes/*.php export-ignore
+/bootstrap/cache/*.php export-ignore
+/bootstrap/cache/config export-ignore
+/bootstrap/cache/console export-ignore
+/bootstrap/cache/container export-ignore
+/bootstrap/cache/routes export-ignore
 /database export-ignore
 /resources export-ignore
 /storage/app export-ignore
