@@ -82,18 +82,14 @@ it('builds, consumes, and clears route cache through the infbyte cli wrapper', f
             ],
         ]);
         $response = $app->handle(Request::fake(method: 'GET', uri: 'http://localhost/json'));
+        $payload = json_decode((string) $response->getBody(), true, flags: JSON_THROW_ON_ERROR);
 
         expect($response->getStatusCode())->toBe(200)
-            ->and((string) $response->getBody())->toContain('memory')
+            ->and($payload)->toHaveKey('memory')
+            ->and($payload['memory'])->toBeInt()
             ->and(get_included_files())->not->toContain($runtime . '/routes/missing.php');
     } finally {
-        unlink($runtimeCache);
-        rmdir(dirname($runtimeCache));
-        rmdir(dirname(dirname($runtimeCache)));
-        rmdir(dirname(dirname(dirname($runtimeCache))));
-        unlink($runtime . '/routes/missing.php');
-        rmdir($runtime . '/routes');
-        rmdir($runtime);
+        removeInfbyteTestDirectory($runtime);
     }
 
     [$clearExitCode, $clearOutput] = runInfbyteCommand([
@@ -305,4 +301,29 @@ function runInfbyteCommand(array $arguments, array $environment = []): array
     exec($command, $output, $exitCode);
 
     return [$exitCode, implode("\n", $output)];
+}
+
+function removeInfbyteTestDirectory(string $directory): void
+{
+    if (!is_dir($directory)) {
+        return;
+    }
+
+    $entries = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST,
+    );
+
+    foreach ($entries as $entry) {
+        $path = $entry->getPathname();
+
+        if ($entry->isLink() || $entry->isFile()) {
+            unlink($path);
+            continue;
+        }
+
+        rmdir($path);
+    }
+
+    rmdir($directory);
 }
