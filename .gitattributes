@@ -34,10 +34,12 @@
 /app/Support export-ignore
 /bin export-ignore
 /bootstrap/cache/*.php export-ignore
-/bootstrap/cache/config export-ignore
-/bootstrap/cache/console export-ignore
-/bootstrap/cache/container export-ignore
-/bootstrap/cache/routes export-ignore
+/bootstrap/cache/config/* export-ignore
+/bootstrap/cache/config/.gitignore -export-ignore
+/bootstrap/cache/container/* export-ignore
+/bootstrap/cache/container/.gitignore -export-ignore
+/bootstrap/cache/routes/* export-ignore
+/bootstrap/cache/routes/.gitignore -export-ignore
 /database export-ignore
 /resources export-ignore
 /storage/app export-ignore

@@ -12,6 +12,15 @@
 /.windsurf/
 /bootstrap/cache/*
 !/bootstrap/cache/.gitignore
+!/bootstrap/cache/config/
+/bootstrap/cache/config/*
+!/bootstrap/cache/config/.gitignore
+!/bootstrap/cache/container/
+/bootstrap/cache/container/*
+!/bootstrap/cache/container/.gitignore
+!/bootstrap/cache/routes/
+/bootstrap/cache/routes/*
+!/bootstrap/cache/routes/.gitignore
 /database/*.sqlite
 /vendor/
 *~

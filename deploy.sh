@@ -28,6 +28,7 @@ fi
 runtime_directories=(
     "bootstrap/cache"
     "bootstrap/cache/config"
+    "bootstrap/cache/container"
     "bootstrap/cache/routes"
     "storage"
     "storage/app"
