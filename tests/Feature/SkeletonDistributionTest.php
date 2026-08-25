@@ -13,7 +13,6 @@ it('ships only core application configuration before module installation', funct
     expect($config)->toBe([
         'app.php',
         'auth.php',
-        'ids.php',
         'router.php',
     ]);
 });
@@ -26,7 +25,11 @@ it('exports example tests while excluding repository verification tests', functi
         ->and($attributes)->not->toContain("/tests export-ignore\n")
         ->and($attributes)->toContain('/tests/Feature/FrameworkRuntimeTest.php export-ignore')
         ->and($attributes)->toContain('/tests/Feature/RouteCacheCliTest.php export-ignore')
-        ->and($attributes)->toContain('/tests/Feature/SkeletonDistributionTest.php export-ignore');
+        ->and($attributes)->toContain('/tests/Feature/SkeletonDistributionTest.php export-ignore')
+        ->and($attributes)->toContain('/bootstrap/cache/*.php export-ignore')
+        ->and($attributes)->toContain('/bootstrap/cache/config export-ignore')
+        ->and($attributes)->toContain('/bootstrap/cache/container export-ignore')
+        ->and($attributes)->toContain('/bootstrap/cache/routes export-ignore');
 });
 
 it('builds a clean create-project archive and provisions its environment', function (): void {
@@ -79,9 +82,10 @@ it('builds a clean create-project archive and provisions its environment', funct
 
         expect($project . '/composer.json')->toBeFile()
             ->and($project . '/bootstrap/install.php')->not->toBeFile()
-            ->and($project . '/bootstrap/cache/config/.gitignore')->toBeFile()
-            ->and($project . '/bootstrap/cache/console/.gitignore')->toBeFile()
-            ->and($project . '/bootstrap/cache/routes/.gitignore')->toBeFile()
+            ->and($project . '/bootstrap/cache/.gitignore')->toBeFile()
+            ->and($project . '/bootstrap/cache/config')->not->toBeDirectory()
+            ->and($project . '/bootstrap/cache/container')->not->toBeDirectory()
+            ->and($project . '/bootstrap/cache/routes')->not->toBeDirectory()
             ->and($project . '/storage/cache/.gitignore')->toBeFile()
             ->and($project . '/storage/logs/.gitignore')->toBeFile()
             ->and($project . '/storage/sessions/.gitignore')->toBeFile()
@@ -102,7 +106,6 @@ it('builds a clean create-project archive and provisions its environment', funct
             ->and($project . '/tests/Feature/RouteCacheCliTest.php')->not->toBeFile()
             ->and($project . '/tests/Feature/SkeletonDistributionTest.php')->not->toBeFile()
             ->and($project . '/vendor')->not->toBeDirectory()
-            ->and($project . '/bootstrap/cache/config/__manifest.php')->not->toBeFile()
             ->and($project . '/database')->not->toBeDirectory()
             ->and($cachedPhpFiles)->toBe([])
             ->and($exportedComposer['require']['infocyph/foundation'] ?? null)
@@ -151,8 +154,13 @@ it('builds a clean create-project archive and provisions its environment', funct
         expect($deployExitCode)->toBe(0, implode("\n", $deployOutput))
             ->and($project . '/bootstrap/cache/config/__manifest.php')->toBeFile()
             ->and($project . '/bootstrap/cache/routes/fused.php')->toBeFile()
-            ->and($project . '/bootstrap/cache/console/commands.php')->toBeFile()
-            ->and($project . '/bootstrap/cache/modules.php')->toBeFile();
+            ->and($project . '/bootstrap/cache/commands.php')->toBeFile()
+            ->and($project . '/bootstrap/cache/schedule.php')->toBeFile()
+            ->and($project . '/bootstrap/cache/optimize.php')->toBeFile()
+            ->and($project . '/bootstrap/cache/container/web.php')->toBeFile()
+            ->and($project . '/bootstrap/cache/container/cli.php')->toBeFile()
+            ->and($project . '/bootstrap/cache/container/worker.php')->toBeFile()
+            ->and($project . '/bootstrap/cache/container/scheduler.php')->toBeFile();
 
         $clearOutput = [];
         $clearExitCode = 0;
@@ -163,10 +171,15 @@ it('builds a clean create-project archive and provisions its environment', funct
         ), $clearOutput, $clearExitCode);
 
         expect($clearExitCode)->toBe(0, implode("\n", $clearOutput))
-            ->and($project . '/bootstrap/cache/config/__manifest.php')->not->toBeFile()
+            ->and($project . '/bootstrap/cache/config')->not->toBeDirectory()
             ->and($project . '/bootstrap/cache/routes/fused.php')->not->toBeFile()
-            ->and($project . '/bootstrap/cache/console/commands.php')->not->toBeFile()
-            ->and($project . '/bootstrap/cache/modules.php')->not->toBeFile();
+            ->and($project . '/bootstrap/cache/commands.php')->not->toBeFile()
+            ->and($project . '/bootstrap/cache/schedule.php')->not->toBeFile()
+            ->and($project . '/bootstrap/cache/optimize.php')->not->toBeFile()
+            ->and($project . '/bootstrap/cache/container/web.php')->not->toBeFile()
+            ->and($project . '/bootstrap/cache/container/cli.php')->not->toBeFile()
+            ->and($project . '/bootstrap/cache/container/worker.php')->not->toBeFile()
+            ->and($project . '/bootstrap/cache/container/scheduler.php')->not->toBeFile();
     } finally {
         removeInfbyteDistributionFixture($fixture);
     }
@@ -184,7 +197,7 @@ function removeInfbyteDistributionFixture(string $directory): void
     );
 
     foreach ($files as $file) {
-        if ($file->isDir()) {
+        if ($file->isDir() && !$file->isLink()) {
             rmdir($file->getPathname());
         } else {
             unlink($file->getPathname());
