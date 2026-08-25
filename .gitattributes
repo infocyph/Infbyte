@@ -33,12 +33,10 @@
 /app/Services export-ignore
 /app/Support export-ignore
 /bin export-ignore
-/bootstrap/cache/config/*.php export-ignore
-/bootstrap/cache/console/*.php export-ignore
-/bootstrap/cache/container.php export-ignore
-/bootstrap/cache/modules.php export-ignore
-/bootstrap/cache/optimize.php export-ignore
-/bootstrap/cache/routes/*.php export-ignore
+/bootstrap/cache/*.php export-ignore
+/bootstrap/cache/config export-ignore
+/bootstrap/cache/container export-ignore
+/bootstrap/cache/routes export-ignore
 /database export-ignore
 /resources export-ignore
 /storage/app export-ignore
