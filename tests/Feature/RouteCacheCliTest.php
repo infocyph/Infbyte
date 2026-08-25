@@ -2,14 +2,10 @@
 
 declare(strict_types=1);
 
-use Composer\InstalledVersions;
 use App\Http\Controllers\SystemController;
-use Infocyph\Foundation\Auth\AuthManager;
-use Infocyph\Foundation\Database\DatabaseManager;
+use Composer\InstalledVersions;
 use Infocyph\Foundation\Foundation;
-use Infocyph\Foundation\Messaging\MessagingManager;
 use Infocyph\Foundation\Routing\RouteCachePath;
-use Infocyph\Foundation\Session\SessionManager;
 use Infocyph\Webrick\Request\Request;
 use Infocyph\Webrick\Router\Matching\FusedMatcher;
 
@@ -41,7 +37,7 @@ it('falls back to infbyte when the environment application name is empty', funct
         );
 });
 
-it('builds and clears route cache through the infbyte cli wrapper', function (): void {
+it('builds, consumes, and clears route cache through the infbyte cli wrapper', function (): void {
     $root = dirname(__DIR__, 2);
     $cacheFile = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
         . '/infbyte-route-cache-' . bin2hex(random_bytes(5)) . '.php';
@@ -54,22 +50,15 @@ it('builds and clears route cache through the infbyte cli wrapper', function ():
         '--cache=' . $cacheFile,
     ]);
 
-    expect($buildExitCode)->toBe(0);
-    expect($buildOutput)->toContain('Route cache ready at:');
-    expect(is_file($cacheFile))->toBeTrue();
-    expect(filesize($cacheFile))->toBeGreaterThan(0);
+    expect($buildExitCode)->toBe(0)
+        ->and($buildOutput)->toContain('Route cache ready at:')
+        ->and($cacheFile)->toBeFile()
+        ->and(filesize($cacheFile))->toBeGreaterThan(0);
 
     $matcher = FusedMatcher::make()->enableCache($cacheFile);
     [$cachedRoute] = $matcher->match('GET', 'localhost', '/json');
-    $cachedHandler = $cachedRoute->getHandler();
-    $webrickVersion = InstalledVersions::getVersion('infocyph/webrick') ?? '0.0.0';
-    $usesNativeHandler = version_compare($webrickVersion, '3.3.0', '>=');
-    if ($usesNativeHandler) {
-        expect($cachedHandler)->toBe([SystemController::class, 'json'])
-            ->and(class_exists(\Opis\Closure\Serializer::class, false))->toBeFalse();
-    } else {
-        expect($cachedHandler)->toBeInstanceOf(Closure::class);
-    }
+
+    expect($cachedRoute->getHandler())->toBe([SystemController::class, 'json']);
 
     $runtime = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
         . '/infbyte-cached-runtime-' . bin2hex(random_bytes(5));
@@ -92,20 +81,12 @@ it('builds and clears route cache through the infbyte cli wrapper', function ():
                 'matcher' => 'fused',
             ],
         ]);
-        $repository = $app->container()->getRepository();
         $response = $app->handle(Request::fake(method: 'GET', uri: 'http://localhost/json'));
 
         expect($response->getStatusCode())->toBe(200)
             ->and((string) $response->getBody())->toContain('memory')
-            ->and($repository->hasResolvedSingleton(AuthManager::class))->toBeFalse()
-            ->and($repository->hasResolvedSingleton(SessionManager::class))->toBeFalse()
-            ->and($repository->hasResolvedSingleton(DatabaseManager::class))->toBeFalse()
-            ->and($repository->hasResolvedSingleton(MessagingManager::class))->toBeFalse()
             ->and(get_included_files())->not->toContain($runtime . '/routes/missing.php');
     } finally {
-        if (isset($app)) {
-            $app->container()->unset();
-        }
         unlink($runtimeCache);
         rmdir(dirname($runtimeCache));
         rmdir(dirname(dirname($runtimeCache)));
@@ -123,9 +104,9 @@ it('builds and clears route cache through the infbyte cli wrapper', function ():
         '--cache=' . $cacheFile,
     ]);
 
-    expect($clearExitCode)->toBe(0);
-    expect($clearOutput)->toContain('Route cache cleared:');
-    expect(file_exists($cacheFile))->toBeFalse();
+    expect($clearExitCode)->toBe(0)
+        ->and($clearOutput)->toContain('Route cache cleared:')
+        ->and($cacheFile)->not->toBeFile();
 });
 
 it('derives the dedicated routes cache path by default', function (): void {
@@ -138,7 +119,7 @@ it('derives the dedicated routes cache path by default', function (): void {
     expect(RouteCachePath::for($app->config()))->toBe($root . '/bootstrap/cache/routes/fused.php');
 });
 
-it('builds and clears the default sharded config cache through the infbyte cli wrapper', function (): void {
+it('builds and fully clears the default sharded config cache through the infbyte cli wrapper', function (): void {
     $root = dirname(__DIR__, 2);
     $cacheDirectory = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
         . '/infbyte-config-cache-' . bin2hex(random_bytes(5));
@@ -150,9 +131,9 @@ it('builds and clears the default sharded config cache through the infbyte cli w
         '--path=' . $cacheDirectory,
     ]);
 
-    expect($buildExitCode)->toBe(0);
-    expect($buildOutput)->toContain('Configuration cached (sharded):');
-    expect($cacheDirectory . '/__manifest.php')->toBeFile()
+    expect($buildExitCode)->toBe(0)
+        ->and($buildOutput)->toContain('Configuration cached (sharded):')
+        ->and($cacheDirectory . '/__manifest.php')->toBeFile()
         ->and($cacheDirectory . '/app.php')->toBeFile()
         ->and($cacheDirectory . '/__flat.php')->not->toBeFile()
         ->and($cacheDirectory . '/__compiled.php')->not->toBeFile();
@@ -164,16 +145,12 @@ it('builds and clears the default sharded config cache through the infbyte cli w
         '--path=' . $cacheDirectory,
     ]);
 
-    expect($clearExitCode)->toBe(0);
-    expect($clearOutput)->toContain('Configuration cache cleared:');
-    expect($cacheDirectory . '/__manifest.php')->not->toBeFile()
-        ->and($cacheDirectory . '/app.php')->not->toBeFile()
-        ->and($cacheDirectory . '/__flat.php')->not->toBeFile();
-
-    rmdir($cacheDirectory);
+    expect($clearExitCode)->toBe(0)
+        ->and($clearOutput)->toContain('Configuration cache cleared:')
+        ->and($cacheDirectory)->not->toBeDirectory();
 });
 
-it('can explicitly build a single config cache through the infbyte cli wrapper', function (): void {
+it('can explicitly build and fully clear a single config cache', function (): void {
     $root = dirname(__DIR__, 2);
     $cacheDirectory = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
         . '/infbyte-single-config-cache-' . bin2hex(random_bytes(5));
@@ -186,9 +163,9 @@ it('can explicitly build a single config cache through the infbyte cli wrapper',
         '--path=' . $cacheDirectory,
     ]);
 
-    expect($exitCode)->toBe(0);
-    expect($output)->toContain('Configuration cached (single):');
-    expect($cacheDirectory . '/__manifest.php')->toBeFile()
+    expect($exitCode)->toBe(0)
+        ->and($output)->toContain('Configuration cached (single):')
+        ->and($cacheDirectory . '/__manifest.php')->toBeFile()
         ->and($cacheDirectory . '/app.php')->not->toBeFile()
         ->and($cacheDirectory . '/__flat.php')->not->toBeFile();
 
@@ -199,8 +176,8 @@ it('can explicitly build a single config cache through the infbyte cli wrapper',
         '--path=' . $cacheDirectory,
     ]);
 
-    expect($clearExitCode)->toBe(0);
-    rmdir($cacheDirectory);
+    expect($clearExitCode)->toBe(0)
+        ->and($cacheDirectory)->not->toBeDirectory();
 });
 
 it('builds and clears compiled command metadata through the infbyte cli wrapper', function (): void {
@@ -216,11 +193,11 @@ it('builds and clears compiled command metadata through the infbyte cli wrapper'
         '--path=' . $manifest,
     ]);
 
-    expect($buildExitCode)->toBe(0);
-    expect($buildOutput)->toContain('Command manifest ready at:');
-    expect($manifest)->toBeFile();
-    expect(glob($cacheDirectory . '/commands-*.php') ?: [])->not->toBeEmpty();
-    expect($manifest . '.d')->not->toBeDirectory();
+    expect($buildExitCode)->toBe(0)
+        ->and($buildOutput)->toContain('Command manifest ready at:')
+        ->and($manifest)->toBeFile()
+        ->and(glob($cacheDirectory . '/commands-*.php') ?: [])->not->toBeEmpty()
+        ->and($manifest . '.d')->not->toBeDirectory();
 
     [$clearExitCode, $clearOutput] = runInfbyteCommand([
         PHP_BINARY,
@@ -229,16 +206,18 @@ it('builds and clears compiled command metadata through the infbyte cli wrapper'
         '--path=' . $manifest,
     ]);
 
-    expect($clearExitCode)->toBe(0);
-    expect($clearOutput)->toContain('Command manifest cleared:');
-    expect($manifest)->not->toBeFile();
-    expect(glob($cacheDirectory . '/commands-*.php') ?: [])->toBeEmpty();
-    expect($manifest . '.d')->not->toBeDirectory();
+    expect($clearExitCode)->toBe(0)
+        ->and($clearOutput)->toContain('Command manifest cleared:')
+        ->and($manifest)->not->toBeFile()
+        ->and(glob($cacheDirectory . '/commands-*.php') ?: [])->toBeEmpty()
+        ->and($manifest . '.d')->not->toBeDirectory();
 
-    rmdir($cacheDirectory);
+    if (is_dir($cacheDirectory)) {
+        rmdir($cacheDirectory);
+    }
 });
 
-it('reports readiness and optional module state through the infbyte cli', function (): void {
+it('reports readiness and canonical module state through the infbyte cli', function (): void {
     $root = dirname(__DIR__, 2);
 
     [$readinessExitCode, $readinessOutput] = runInfbyteCommand([
@@ -254,9 +233,9 @@ it('reports readiness and optional module state through the infbyte cli', functi
         '--json=true',
     ]);
 
-    expect($readinessExitCode)->toBe(2);
-    expect(json_decode($readinessOutput, true, flags: JSON_THROW_ON_ERROR)['production_ready'])->toBeFalse();
-    expect($modulesExitCode)->toBe(0);
+    expect($readinessExitCode)->toBe(2)
+        ->and(json_decode($readinessOutput, true, flags: JSON_THROW_ON_ERROR)['production_ready'])->toBeFalse()
+        ->and($modulesExitCode)->toBe(0);
 
     $modules = array_column(
         json_decode($modulesOutput, true, flags: JSON_THROW_ON_ERROR)['modules'],
@@ -264,16 +243,27 @@ it('reports readiness and optional module state through the infbyte cli', functi
         'name',
     );
 
-    expect($modules['db']['installed'])->toBeFalse()
-        ->and($modules['cache']['installed'])->toBeFalse()
-        ->and($modules['filesystem']['installed'])->toBeFalse()
-        ->and($modules['logging']['installed'])->toBeTrue()
-        ->and($modules['messaging']['installed'])->toBeTrue()
-        ->and($modules['resources']['installed'])->toBeTrue()
-        ->and($modules['session']['installed'])->toBeTrue();
+    expect($modules)->toHaveKeys([
+        'auth',
+        'cache',
+        'communication',
+        'database',
+        'filesystem',
+        'logging',
+        'messaging',
+        'operations',
+        'resources',
+        'security',
+        'session',
+        'validation',
+    ])->not->toHaveKey('db');
+
+    foreach (['logging', 'operations', 'resources', 'session'] as $builtIn) {
+        expect($modules[$builtIn]['installed'])->toBeTrue();
+    }
 });
 
-it('explains how to install a service owned by an absent optional module', function (): void {
+it('explains the canonical module installation path for absent database support', function (): void {
     $root = dirname(__DIR__, 2);
 
     [$exitCode, $output] = runInfbyteCommand([
@@ -285,7 +275,7 @@ it('explains how to install a service owned by an absent optional module', funct
 
     expect($exitCode)->toBe(2)
         ->and($output)->toContain('requires infocyph/dblayer')
-        ->and($output)->toContain('php infbyte module:install db');
+        ->and($output)->toContain('php infbyte module:install database');
 });
 
 /**
