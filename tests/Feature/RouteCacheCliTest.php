@@ -104,7 +104,7 @@ it('builds and fully clears the default sharded config cache through the infbyte
             PHP_BINARY,
             $fixture . '/infbyte',
             'config:cache',
-        ]);
+        ], ['APP_ENV' => 'local']);
 
         expect($buildExitCode)->toBe(0)
             ->and($buildOutput)->toContain('Configuration cached using sharded.')
@@ -151,6 +151,34 @@ it('can select and fully clear the single config cache through application confi
 
         expect($clearExitCode)->toBe(0)
             ->and($cacheDirectory)->not->toBeDirectory();
+    } finally {
+        removeInfbyteTestDirectory($fixture);
+    }
+});
+
+it('uses optimized production defaults without benchmark-only environment overrides', function (): void {
+    $fixture = createInfbyteCliFixture();
+    $manifest = $fixture . '/bootstrap/cache/config/__manifest.php';
+
+    try {
+        [$exitCode, $output] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'optimize',
+        ], [
+            'APP_ENV' => 'production',
+            'APP_CONTAINER_COMPILED_ACTIVATION' => 'off',
+        ]);
+
+        expect($exitCode)->toBe(0, $output)
+            ->and($manifest)->toBeFile();
+
+        $compiled = require $manifest;
+
+        expect($compiled)->toBeArray()
+            ->and($compiled['_type'] ?? null)->toBe('single')
+            ->and($compiled['_data']['app']['config_cache']['type'] ?? null)->toBe('single')
+            ->and($compiled['_data']['app']['container']['compiled_activation'] ?? null)->toBe('off');
     } finally {
         removeInfbyteTestDirectory($fixture);
     }
