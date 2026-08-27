@@ -5,10 +5,10 @@ Infbyte is the minimal application skeleton for
 the reusable framework/runtime layer; Infbyte provides opinionated application
 bootstrap, starter configuration, routes, writable layout, and application code.
 
-Infbyte requires PHP 8.4+ and Foundation 2.0:
+Infbyte requires PHP 8.4+ and Foundation 2.1.1:
 
 ```json
-"infocyph/foundation": "^2.0"
+"infocyph/foundation": "^2.1.1"
 ```
 
 ## Quick start
@@ -279,7 +279,7 @@ performance matrix is performed in its dedicated release-verification phase.
 
 ## Documentation
 
-- [Foundation documentation](https://github.com/infocyph/Foundation/tree/2.0/docs)
+- [Foundation documentation](https://github.com/infocyph/Foundation/tree/2.1.1/docs)
 - [Omnibus](https://github.com/infocyph/Omnibus)
 - [Webrick](https://github.com/infocyph/Webrick)
 

@@ -74,4 +74,4 @@ php_path="$(command -v "$php_bin")"
 
 "$php_path" infbyte optimize
 
-printf 'Deployment directories and Foundation 2.0 runtime artifacts are ready.\n'
+printf 'Deployment directories and Foundation 2.1.1 runtime artifacts are ready.\n'
