@@ -5,6 +5,7 @@
 /CONTRIBUTING.md export-ignore
 /plan.md export-ignore
 /SECURITY.md export-ignore
+/tests/Feature/FoundationReleaseEntrypointTest.php export-ignore
 /tests/Feature/FrameworkRuntimeTest.php export-ignore
 /tests/Feature/ReleaseRuntimeCliTest.php export-ignore
 /tests/Feature/SkeletonDistributionTest.php export-ignore
