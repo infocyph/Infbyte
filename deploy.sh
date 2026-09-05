@@ -6,14 +6,14 @@ root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 php_bin="${PHP_BIN:-php}"
 current_user="$(id -un)"
 current_uid="$(id -u)"
-warm_caches=true
+build_generation=true
 
 umask 0002
 
-if [[ "${1:-}" == "--no-cache" ]]; then
-    warm_caches=false
+if [[ "${1:-}" == "--no-optimize" ]]; then
+    build_generation=false
 elif [[ $# -gt 0 ]]; then
-    printf 'Usage: %s [--no-cache]\n' "$(basename "$0")" >&2
+    printf 'Usage: %s [--no-optimize]\n' "$(basename "$0")" >&2
     exit 64
 fi
 
@@ -27,18 +27,11 @@ fi
 
 runtime_directories=(
     "bootstrap/cache"
-    "bootstrap/cache/config"
-    "bootstrap/cache/container"
-    "bootstrap/cache/routes"
     "storage"
     "storage/app"
     "storage/cache"
-    "storage/cache/auth"
-    "storage/cache/file"
-    "storage/cache/local"
-    "storage/cache/locks"
-    "storage/cache/php-files"
     "storage/logs"
+    "storage/releases"
     "storage/sessions"
     "storage/uploads"
 )
@@ -60,8 +53,8 @@ if [[ -n "$blocked_path" ]]; then
     exit 77
 fi
 
-if [[ "$warm_caches" == false ]]; then
-    printf 'Runtime directories are writable. Cache warming skipped.\n'
+if [[ "$build_generation" == false ]]; then
+    printf 'Runtime directories are writable. Foundation release generation build skipped.\n'
     exit 0
 fi
 
@@ -72,6 +65,13 @@ command -v "$php_bin" >/dev/null 2>&1 || {
 
 php_path="$(command -v "$php_bin")"
 
+"$php_path" infbyte config:validate --production
 "$php_path" infbyte optimize
+"$php_path" infbyte optimize:report
+"$php_path" infbyte app:ready
 
-printf 'Deployment directories and Foundation 2.1.1 runtime artifacts are ready.\n'
+printf '\nFoundation 3 release generation is ready.\n'
+printf 'Configure the web process with the immutable trust values shown by optimize:report:\n'
+printf '  %s=<release root, if not using the default>\n' 'INFOCYPH_FOUNDATION_RELEASE_ROOT'
+printf '  %s=<Manifest SHA-256>\n' 'INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256'
+printf 'Keep the manifest SHA-256 in deployment/service metadata outside the writable release directory.\n'
