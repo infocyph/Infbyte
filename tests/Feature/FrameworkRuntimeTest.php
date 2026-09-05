@@ -32,6 +32,7 @@ function infbyteTestOptions(): array
         '_config_cache' => false,
         'app' => [
             'env' => 'testing',
+            'capabilities' => [],
         ],
         'paths' => [
             'storage' => $runtime,
@@ -39,9 +40,6 @@ function infbyteTestOptions(): array
             'logs' => $runtime . '/logs',
             'sessions' => $runtime . '/sessions',
             'uploads' => $runtime . '/uploads',
-        ],
-        'router' => [
-            'cache' => false,
         ],
     ];
 }
@@ -127,7 +125,6 @@ it('keeps Foundation system commands out of application Composer script keys', f
         'db:monitor',
         'module:list',
         'optimize',
-        'route:cache',
         'schedule:run',
         'worker:run',
     ] as $systemCommand) {
@@ -135,7 +132,7 @@ it('keeps Foundation system commands out of application Composer script keys', f
     }
 });
 
-it('serves the skeleton routes through canonical Foundation web handling', function (): void {
+it('serves the skeleton routes through canonical embedded Foundation handling', function (): void {
     $app = Foundation::web(infbyteTestOptions());
 
     $health = $app->handle(Request::fake(method: 'GET', uri: 'http://localhost/api/health'));
