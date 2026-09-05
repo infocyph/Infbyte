@@ -8,9 +8,9 @@ return [
     | Application Route Files
     |--------------------------------------------------------------------------
     |
-    | These files are loaded from the routes directory when route metadata has
-    | not been cached. Add a filename for each application-owned route surface.
-    | Example values: api.php, web.php, and admin.php.
+    | Foundation/Webrick read these application-owned route sources during
+    | development and immutable release generation. Production requests consume
+    | the compiled Webrick artifact and never rediscover these files.
     |
     */
     'files' => [
@@ -22,8 +22,8 @@ return [
     | Route Matcher
     |--------------------------------------------------------------------------
     |
-    | The matcher controls how Webrick compiles and dispatches routes. Build the
-    | selected form during deployment with `php infbyte route:cache` or
+    | The matcher controls how Webrick compiles and dispatches routes. The
+    | selected form is compiled into the Foundation release generation by
     | `php infbyte optimize`. Allowed values: fused|generated|sharded.
     |
     */

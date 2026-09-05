@@ -5,8 +5,10 @@
 /CONTRIBUTING.md export-ignore
 /plan.md export-ignore
 /SECURITY.md export-ignore
+/tests/Feature/Foundation3RuntimeLifecycleTest.php export-ignore
+/tests/Feature/FoundationReleaseEntrypointTest.php export-ignore
 /tests/Feature/FrameworkRuntimeTest.php export-ignore
-/tests/Feature/RouteCacheCliTest.php export-ignore
+/tests/Feature/ReleaseRuntimeCliTest.php export-ignore
 /tests/Feature/SkeletonDistributionTest.php export-ignore
 /.agents export-ignore
 /.codex export-ignore
@@ -18,7 +20,6 @@
 /.phpunit.cache export-ignore
 /.phpforge-report export-ignore
 /.psalm-cache export-ignore
-/.route-cache-* export-ignore
 /.vscode export-ignore
 /.windsurf export-ignore
 /app/Actions export-ignore
@@ -37,10 +38,6 @@
 /bootstrap/cache/*.php export-ignore
 /bootstrap/cache/config/* export-ignore
 /bootstrap/cache/config/.gitignore -export-ignore
-/bootstrap/cache/container/* export-ignore
-/bootstrap/cache/container/.gitignore -export-ignore
-/bootstrap/cache/routes/* export-ignore
-/bootstrap/cache/routes/.gitignore -export-ignore
 /database export-ignore
 /resources export-ignore
 /storage/app export-ignore
@@ -48,6 +45,8 @@
 /storage/cache/.gitignore -export-ignore
 /storage/logs/* export-ignore
 /storage/logs/.gitignore -export-ignore
+/storage/releases/* export-ignore
+/storage/releases/.gitignore -export-ignore
 /storage/sessions/* export-ignore
 /storage/sessions/.gitignore -export-ignore
 /storage/uploads/* export-ignore

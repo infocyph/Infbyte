@@ -3,13 +3,16 @@
 Infbyte is the minimal application skeleton for
 [Infocyph Foundation](https://github.com/infocyph/Foundation). Foundation owns
 the reusable framework/runtime layer; Infbyte provides opinionated application
-bootstrap, starter configuration, routes, writable layout, and application code.
+configuration, routes, writable layout, and application code.
 
-Infbyte requires PHP 8.4+ and Foundation 2.1.1:
+This integration branch targets the Foundation 3 runtime architecture:
 
 ```json
-"infocyph/foundation": "^2.1.1"
+"infocyph/foundation": "dev-foundation-3/runtime-architecture-plan as 3.0.0"
 ```
+
+The development constraint is replaced by `^3.0` when Foundation 3 is tagged.
+Infbyte requires PHP 8.4+.
 
 ## Quick start
 
@@ -26,14 +29,37 @@ only:
 php infbyte serve --host=0.0.0.0 --port=8080
 ```
 
+Foundation 3 compiles and activates one trusted release generation when `serve`
+starts, then passes its release root and manifest identity to the child server.
+Restart `serve` after changing route/configuration/graph topology that must be
+recompiled.
+
 Composer invokes Foundation's `app:install` post-create command. The application
 root executable remains `infbyte`; there is no separate Artisan/Console runtime.
 
 ## Foundation runtime boundary
 
-Infbyte does not implement a framework layer above Foundation.
+Infbyte does not implement a framework runtime above Foundation.
 
-The Web bootstrap is deliberately small:
+The production web entrypoint selects the externally trusted active Foundation
+generation and hands native request adaptation and response emission directly to
+Webrick through Foundation:
+
+```php
+use Infocyph\Foundation\Release\FoundationReleaseBootstrap;
+
+$config = ['base_path' => dirname(__DIR__)];
+$release = FoundationReleaseBootstrap::fromEnvironment($config)
+    ?? throw new RuntimeException('No trusted Foundation release generation is configured.');
+
+$release->web($config)->server->handle();
+```
+
+Infbyte therefore does not construct Webrick `Request` objects, create a second
+HTTP kernel, or call an emitter in production. Webrick's boot-selected runtime
+adapter owns the single native response write.
+
+`bootstrap/app.php` remains a small development/application façade convenience:
 
 ```php
 use Infocyph\Foundation\Foundation;
@@ -53,8 +79,9 @@ The four Foundation runtimes are:
 - Worker
 - Scheduler
 
-Optional package providers remain lazy until configuration/code selects their
-capability.
+Optional package providers are included only when the explicit application
+capability topology selects them. Set `APP_CAPABILITIES` to a comma-separated
+list such as `database,cache,messaging`; the lean skeleton defaults to none.
 
 ## CLI
 
@@ -124,6 +151,9 @@ php infbyte module:install messaging
 php infbyte module:config:publish operations
 ```
 
+Then add the capabilities the application actually uses to `APP_CAPABILITIES`
+(or directly to `app.capabilities`) before compiling a production generation.
+
 Canonical modules are:
 
 - `auth`
@@ -183,6 +213,7 @@ routes/
   schedule.php
   workers.php
 storage/
+  releases/
 tests/
 composer.json
 infbyte
@@ -244,30 +275,60 @@ replace Supervisor/systemd/Docker/Kubernetes process supervision.
 
 ## Production
 
-Build deployment-owned optimized artifacts before serving production traffic:
+Build and verify one immutable all-runtime Foundation generation before serving
+traffic:
 
 ```bash
+php infbyte config:validate --production
 php infbyte optimize
 php infbyte optimize:report
 php infbyte app:ready
 ```
 
-Clear generated artifacts with:
+`optimize` compiles web, CLI, worker, and scheduler artifacts together and only
+activates the generation after all required artifacts and identities validate.
+The previous generation remains active if compilation/verification fails.
+
+The web process must receive trust metadata from deployment/service configuration
+outside the writable release directory:
+
+```text
+INFOCYPH_FOUNDATION_RELEASE_ROOT=/absolute/path/to/storage/releases
+INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256=<Manifest SHA-256 from optimize:report>
+```
+
+`INFOCYPH_FOUNDATION_RELEASE_ROOT` may be omitted when the default
+`storage/releases` location is used. The manifest SHA-256 is mandatory for the
+trusted production web bootstrap; do not derive it from the writable generation
+being validated.
+
+The included deployment helper performs the standard validation/build/readiness
+sequence:
+
+```bash
+./deploy.sh
+```
+
+Clear generated release generations with:
 
 ```bash
 php infbyte optimize:clear
 ```
 
-Compiled config/route/command/schedule/container artifacts belong to deployment
-and are ignored by the skeleton repository.
+Release generations are deployment-owned and ignored by the skeleton repository.
+Production requests consume the generation-owned normalized config and compiled
+Webrick/InterMix artifacts; they do not rediscover project config, providers, or
+route files.
 
 Before deployment:
 
 - set production environment/debug policy;
-- configure only the modules the application actually uses;
+- explicitly select only the capabilities the application uses;
 - run application migrations;
 - provision applicable module schemas;
 - require `config:validate --production` / `app:ready` to pass;
+- build/activate the release generation;
+- install its trusted manifest SHA-256 into the web/service process environment;
 - use a production web server and external process manager.
 
 ## Testing and release checks
@@ -279,7 +340,8 @@ performance matrix is performed in its dedicated release-verification phase.
 
 ## Documentation
 
-- [Foundation documentation](https://github.com/infocyph/Foundation/tree/2.1.1/docs)
+- [Foundation documentation](https://github.com/infocyph/Foundation/tree/foundation-3/runtime-architecture-plan/docs)
+- [Foundation 3 migration guide](https://github.com/infocyph/Foundation/blob/foundation-3/runtime-architecture-plan/docs/foundation-3-migration.md)
 - [Omnibus](https://github.com/infocyph/Omnibus)
 - [Webrick](https://github.com/infocyph/Webrick)
 

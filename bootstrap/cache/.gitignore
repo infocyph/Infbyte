@@ -1,5 +1,3 @@
 *
 !.gitignore
 !config/
-!container/
-!routes/
