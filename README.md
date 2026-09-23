@@ -8,7 +8,7 @@ configuration, routes, writable layout, and application code.
 This integration branch targets the Foundation 3 runtime architecture:
 
 ```json
-"infocyph/foundation": "dev-foundation-3/runtime-architecture-plan as 3.0.0"
+"infocyph/foundation": "dev-foundation-3/close-26.6 as 3.0.0"
 ```
 
 The development constraint is replaced by `^3.0` when Foundation 3 is tagged.
@@ -340,8 +340,8 @@ performance matrix is performed in its dedicated release-verification phase.
 
 ## Documentation
 
-- [Foundation documentation](https://github.com/infocyph/Foundation/tree/foundation-3/runtime-architecture-plan/docs)
-- [Foundation 3 migration guide](https://github.com/infocyph/Foundation/blob/foundation-3/runtime-architecture-plan/docs/foundation-3-migration.md)
+- [Foundation documentation](https://github.com/infocyph/Foundation/tree/foundation-3/close-26.6/docs)
+- [Foundation 3 migration guide](https://github.com/infocyph/Foundation/blob/foundation-3/close-26.6/docs/foundation-3-migration.md)
 - [Omnibus](https://github.com/infocyph/Omnibus)
 - [Webrick](https://github.com/infocyph/Webrick)
 

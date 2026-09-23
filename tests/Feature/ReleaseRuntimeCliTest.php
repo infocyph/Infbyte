@@ -220,7 +220,7 @@ it('reports readiness and canonical module state through the infbyte cli', funct
             'validation',
         ])->not->toHaveKey('db')
             ->and($modules['database']['packages']['infocyph/dblayer']['installed'])->toBeFalse()
-            ->and($modules['database']['packages']['infocyph/dblayer']['constraint'])->toBe('^5.0');
+            ->and($modules['database']['packages']['infocyph/dblayer']['constraint'])->toBe('^5.1');
 
         foreach (['logging', 'operations', 'resources', 'session'] as $builtIn) {
             expect($modules[$builtIn]['installed'])->toBeTrue();

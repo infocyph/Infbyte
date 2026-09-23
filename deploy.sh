@@ -66,12 +66,26 @@ command -v "$php_bin" >/dev/null 2>&1 || {
 php_path="$(command -v "$php_bin")"
 
 "$php_path" infbyte config:validate --production
-"$php_path" infbyte optimize
-"$php_path" infbyte optimize:report
+release_json="$("$php_path" infbyte optimize --json=1)"
+printf '%s\n' "$release_json"
 "$php_path" infbyte app:ready
 
+release_root="$(printf '%s' "$release_json" | "$php_path" -r '
+    $release = json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR);
+    echo is_string($release["release_root"] ?? null) ? $release["release_root"] : "";
+')"
+manifest_sha256="$(printf '%s' "$release_json" | "$php_path" -r '
+    $release = json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR);
+    echo is_string($release["manifest_sha256"] ?? null) ? $release["manifest_sha256"] : "";
+')"
+
+if [[ -z "$release_root" || ! "$manifest_sha256" =~ ^[a-f0-9]{64}$ ]]; then
+    printf 'Foundation optimize did not return trusted release metadata.\n' >&2
+    exit 70
+fi
+
 printf '\nFoundation 3 release generation is ready.\n'
-printf 'Configure the web process with the immutable trust values shown by optimize:report:\n'
-printf '  %s=<release root, if not using the default>\n' 'INFOCYPH_FOUNDATION_RELEASE_ROOT'
-printf '  %s=<Manifest SHA-256>\n' 'INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256'
-printf 'Keep the manifest SHA-256 in deployment/service metadata outside the writable release directory.\n'
+printf 'Configure the web/runtime supervisor with these immutable deployment inputs:\n'
+printf 'export INFOCYPH_FOUNDATION_RELEASE_ROOT=%q\n' "$release_root"
+printf 'export INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256=%q\n' "$manifest_sha256"
+printf 'Keep these trust values in deployment/service metadata outside the writable release directory.\n'

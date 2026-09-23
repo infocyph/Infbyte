@@ -168,7 +168,9 @@ it('builds a clean create-project archive and provisions a Foundation 3 release 
         ), $deployOutput, $deployExitCode);
 
         expect($deployExitCode)->toBe(0, implode("\n", $deployOutput))
-            ->and($project . '/storage/releases/active.json')->toBeFile();
+            ->and($project . '/storage/releases/active.json')->toBeFile()
+            ->and(implode("\n", $deployOutput))->toContain('INFOCYPH_FOUNDATION_RELEASE_ROOT')
+            ->and(implode("\n", $deployOutput))->toContain('INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256');
 
         $reportOutput = [];
         $reportExitCode = 0;
