@@ -245,7 +245,7 @@ it('reports canonical database installation guidance through module schema metad
         $module = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
         $authSchema = $module['schema_status'][0] ?? null;
 
-        expect($exitCode)->toBe(0)
+        expect($exitCode)->toBe(0, $output)
             ->and($module['name'])->toBe('auth')
             ->and($authSchema)->toBeArray()
             ->and($authSchema['state'])->toBe('unavailable')

@@ -5,7 +5,7 @@ declare(strict_types=1);
 $environment = env_string('APP_ENV', 'local');
 $production = $environment === 'production';
 $capabilities = array_values(array_filter(
-    array_map('trim', explode(',', env_string('APP_CAPABILITIES', ''))),
+    array_map(trim(...), explode(',', env_string('APP_CAPABILITIES', ''))),
     static fn(string $capability): bool => $capability !== '',
 ));
 
