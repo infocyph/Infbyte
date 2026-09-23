@@ -197,8 +197,8 @@ it('reports readiness and canonical module state through the infbyte cli', funct
         $readiness = json_decode($readinessOutput, true, flags: JSON_THROW_ON_ERROR);
         $moduleRows = json_decode($modulesOutput, true, flags: JSON_THROW_ON_ERROR);
 
-        expect($readinessExitCode)->toBe(1)
-            ->and($readiness['ready'])->toBeFalse()
+        expect($readinessExitCode)->toBe(0, $readinessOutput)
+            ->and($readiness['ready'])->toBeTrue()
             ->and($readiness)->toHaveKey('checks')
             ->and($modulesExitCode)->toBe(0)
             ->and($moduleRows)->toBeArray();
