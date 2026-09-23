@@ -13,6 +13,7 @@ it('ships only core application configuration before module installation', funct
     expect($config)->toBe([
         'app.php',
         'auth.php',
+        'cache.php',
         'router.php',
     ]);
 });

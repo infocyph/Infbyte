@@ -207,7 +207,6 @@ it('reports readiness and canonical module state through the infbyte cli', funct
 
         expect($modules)->toHaveKeys([
             'auth',
-            'cache',
             'communication',
             'database',
             'filesystem',
@@ -218,7 +217,7 @@ it('reports readiness and canonical module state through the infbyte cli', funct
             'security',
             'session',
             'validation',
-        ])->not->toHaveKey('db')
+        ])->not->toHaveKeys(['cache', 'cachelayer', 'db'])
             ->and($modules['database']['packages']['infocyph/dblayer']['installed'])->toBeFalse()
             ->and($modules['database']['packages']['infocyph/dblayer']['constraint'])->toBe('^5.1');
 
