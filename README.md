@@ -5,11 +5,16 @@ Infbyte is the minimal application skeleton for
 the reusable framework/runtime layer; Infbyte provides opinionated application
 bootstrap, starter configuration, routes, writable layout, and application code.
 
-Infbyte requires PHP 8.4+ and Foundation 2.1.1:
+Infbyte requires PHP 8.4+ and targets Foundation 3:
 
 ```json
-"infocyph/foundation": "^2.1.1"
+"infocyph/foundation": "^3.0"
 ```
+
+> Foundation 3 is still on its release-candidate branch while this handoff is
+> validated. This integration branch temporarily resolves
+> `dev-foundation-3/close-26.6`; switch to `^3.0` once the Foundation 3 tag is
+> published.
 
 ## Quick start
 
@@ -53,8 +58,9 @@ The four Foundation runtimes are:
 - Worker
 - Scheduler
 
-Optional package providers remain lazy until configuration/code selects their
-capability.
+Optional package providers remain cold unless the explicit `APP_CAPABILITIES`
+topology selects their capability. The checked-in skeleton defaults to an empty
+optional-capability set.
 
 ## CLI
 
@@ -145,7 +151,9 @@ implementations inside the `auth` module rather than standalone public modules.
 
 Installing a module does not add global middleware, open connections, or start
 workers. Optional config is published only when requested/needed and remains
-outside the lean checked-in skeleton by default.
+outside the lean checked-in skeleton by default. Add the selected capability to
+`APP_CAPABILITIES` before compiling a production Foundation 3 release, for
+example `APP_CAPABILITIES=database,cache,messaging`.
 
 ## Module schema lifecycle
 
@@ -244,7 +252,9 @@ replace Supervisor/systemd/Docker/Kubernetes process supervision.
 
 ## Production
 
-Build deployment-owned optimized artifacts before serving production traffic:
+Foundation 3 deploys one immutable generation for Web, CLI, Worker, and
+Scheduler together. Build and activate that deployment-owned generation before
+serving production traffic:
 
 ```bash
 php infbyte optimize
@@ -258,12 +268,28 @@ Clear generated artifacts with:
 php infbyte optimize:clear
 ```
 
-Compiled config/route/command/schedule/container artifacts belong to deployment
-and are ignored by the skeleton repository.
+The active generation is stored under `storage/releases` and contains the
+normalized config snapshot plus compiled Webrick and InterMix artifacts for all
+four runtimes. `public/index.php` does not construct a second Request/emitter;
+it loads the trusted generation and lets Webrick's `RuntimeServer` own native
+request adaptation and response emission.
+
+`php infbyte serve` supplies the trusted release metadata automatically. For a
+real web server/process supervisor, set the two deployment values printed by
+`deploy.sh` or `php infbyte optimize --json=1`:
+
+```bash
+INFOCYPH_FOUNDATION_RELEASE_ROOT=/absolute/path/to/storage/releases
+INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256=<64-character-sha256>
+```
+
+Generated release artifacts belong to deployment and are ignored by the
+skeleton repository.
 
 Before deployment:
 
 - set production environment/debug policy;
+- set the explicit `APP_CAPABILITIES` topology;
 - configure only the modules the application actually uses;
 - run application migrations;
 - provision applicable module schemas;
@@ -279,7 +305,7 @@ performance matrix is performed in its dedicated release-verification phase.
 
 ## Documentation
 
-- [Foundation documentation](https://github.com/infocyph/Foundation/tree/2.1.1/docs)
+- [Foundation 3 documentation](https://github.com/infocyph/Foundation/tree/foundation-3/close-26.6/docs)
 - [Omnibus](https://github.com/infocyph/Omnibus)
 - [Webrick](https://github.com/infocyph/Webrick)
 

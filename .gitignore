@@ -22,6 +22,7 @@
 /bootstrap/cache/routes/*
 !/bootstrap/cache/routes/.gitignore
 /database/*.sqlite
+/storage/releases/
 /vendor/
 *~
 composer.lock

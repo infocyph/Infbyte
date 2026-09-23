@@ -6,14 +6,14 @@ root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 php_bin="${PHP_BIN:-php}"
 current_user="$(id -un)"
 current_uid="$(id -u)"
-warm_caches=true
+build_release=true
 
 umask 0002
 
-if [[ "${1:-}" == "--no-cache" ]]; then
-    warm_caches=false
+if [[ "${1:-}" == "--no-release" ]]; then
+    build_release=false
 elif [[ $# -gt 0 ]]; then
-    printf 'Usage: %s [--no-cache]\n' "$(basename "$0")" >&2
+    printf 'Usage: %s [--no-release]\n' "$(basename "$0")" >&2
     exit 64
 fi
 
@@ -27,9 +27,6 @@ fi
 
 runtime_directories=(
     "bootstrap/cache"
-    "bootstrap/cache/config"
-    "bootstrap/cache/container"
-    "bootstrap/cache/routes"
     "storage"
     "storage/app"
     "storage/cache"
@@ -39,6 +36,7 @@ runtime_directories=(
     "storage/cache/locks"
     "storage/cache/php-files"
     "storage/logs"
+    "storage/releases"
     "storage/sessions"
     "storage/uploads"
 )
@@ -60,8 +58,8 @@ if [[ -n "$blocked_path" ]]; then
     exit 77
 fi
 
-if [[ "$warm_caches" == false ]]; then
-    printf 'Runtime directories are writable. Cache warming skipped.\n'
+if [[ "$build_release" == false ]]; then
+    printf 'Runtime directories are writable. Foundation release build skipped.\n'
     exit 0
 fi
 
@@ -71,7 +69,24 @@ command -v "$php_bin" >/dev/null 2>&1 || {
 }
 
 php_path="$(command -v "$php_bin")"
+release_json="$("$php_path" infbyte optimize --json=1)"
+printf '%s\n' "$release_json"
 
-"$php_path" infbyte optimize
+release_root="$(printf '%s' "$release_json" | "$php_path" -r '
+    $release = json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR);
+    echo is_string($release["release_root"] ?? null) ? $release["release_root"] : "";
+')"
+manifest_sha256="$(printf '%s' "$release_json" | "$php_path" -r '
+    $release = json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR);
+    echo is_string($release["manifest_sha256"] ?? null) ? $release["manifest_sha256"] : "";
+')"
 
-printf 'Deployment directories and Foundation 2.1.1 runtime artifacts are ready.\n'
+if [[ -z "$release_root" || ! "$manifest_sha256" =~ ^[a-f0-9]{64}$ ]]; then
+    printf 'Foundation optimize did not return trusted release metadata.\n' >&2
+    exit 70
+fi
+
+printf '\nFoundation 3 release generation is ready.\n'
+printf 'Configure the web/runtime supervisor with these immutable deployment inputs:\n'
+printf 'export INFOCYPH_FOUNDATION_RELEASE_ROOT=%q\n' "$release_root"
+printf 'export INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256=%q\n' "$manifest_sha256"

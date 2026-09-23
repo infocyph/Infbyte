@@ -156,29 +156,52 @@ it('can select and fully clear the single config cache through application confi
     }
 });
 
-it('uses optimized production defaults without benchmark-only environment overrides', function (): void {
+it('builds one immutable Foundation 3 release generation through optimize', function (): void {
     $fixture = createInfbyteCliFixture();
-    $manifest = $fixture . '/bootstrap/cache/config/__manifest.php';
+    $releaseRoot = $fixture . '/storage/releases';
 
     try {
         [$exitCode, $output] = runInfbyteCommand([
             PHP_BINARY,
             $fixture . '/infbyte',
             'optimize',
+            '--json=1',
         ], [
             'APP_ENV' => 'production',
-            'APP_CONTAINER_COMPILED_ACTIVATION' => 'off',
+            'APP_CAPABILITIES' => '',
         ]);
 
+        $release = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+        $generation = $release['generation'] ?? null;
+        $manifestPath = $release['manifest'] ?? null;
+
         expect($exitCode)->toBe(0, $output)
-            ->and($manifest)->toBeFile();
+            ->and($release['release_root'] ?? null)->toBe($releaseRoot)
+            ->and($generation)->toBeString()->not->toBe('')
+            ->and($manifestPath)->toBeString()->toBeFile()
+            ->and($release['manifest_sha256'] ?? null)->toBeString()->toHaveLength(64)
+            ->and($release['active_pointer'] ?? null)->toBe($releaseRoot . '/active.json')->toBeFile();
 
-        $compiled = require $manifest;
+        $manifest = require $manifestPath;
+        $generationRoot = $releaseRoot . '/generations/' . $generation;
+        $releaseConfig = require $generationRoot . '/config.php';
 
-        expect($compiled)->toBeArray()
-            ->and($compiled['_type'] ?? null)->toBe('single')
-            ->and($compiled['_data']['app']['config_cache']['type'] ?? null)->toBe('single')
-            ->and($compiled['_data']['app']['container']['compiled_activation'] ?? null)->toBe('off');
+        expect($manifest)->toBeArray()
+            ->and($manifest['config_path'] ?? null)->toBe('config.php')
+            ->and($manifest)->toHaveKeys(['web', 'cli', 'worker', 'scheduler'])
+            ->and($generationRoot . '/web/container.php')->toBeFile()
+            ->and($generationRoot . '/web/router.php')->toBeFile()
+            ->and($generationRoot . '/web/release.json')->toBeFile()
+            ->and($generationRoot . '/cli/container.php')->toBeFile()
+            ->and($generationRoot . '/worker/container.php')->toBeFile()
+            ->and($generationRoot . '/worker/providers.php')->toBeFile()
+            ->and($generationRoot . '/scheduler/container.php')->toBeFile()
+            ->and($releaseConfig['app']['capabilities'] ?? null)->toBe([])
+            ->and($releaseConfig['app']['container'] ?? [])->not->toHaveKeys([
+                'alias',
+                'compiled',
+                'compiled_activation',
+            ]);
     } finally {
         removeInfbyteTestDirectory($fixture);
     }

@@ -148,6 +148,11 @@ it('builds a clean create-project archive and provisions its environment', funct
         expect($installExitCode)->toBe(0)
             ->and(hash_file('sha256', $project . '/.env'))->toBe($before);
 
+        $publicIndex = (string) file_get_contents($project . '/public/index.php');
+        expect($publicIndex)->toContain('FoundationReleaseBootstrap')
+            ->not->toContain('AutoEmitter')
+            ->not->toContain('Request::fromGlobals');
+
         $deployOutput = [];
         $deployExitCode = 0;
         exec(sprintf(
@@ -156,15 +161,28 @@ it('builds a clean create-project archive and provisions its environment', funct
         ), $deployOutput, $deployExitCode);
 
         expect($deployExitCode)->toBe(0, implode("\n", $deployOutput))
-            ->and($project . '/bootstrap/cache/config/__manifest.php')->toBeFile()
-            ->and($project . '/bootstrap/cache/routes/fused.php')->toBeFile()
-            ->and($project . '/bootstrap/cache/commands.php')->toBeFile()
-            ->and($project . '/bootstrap/cache/schedule.php')->toBeFile()
-            ->and($project . '/bootstrap/cache/optimize.php')->toBeFile()
-            ->and($project . '/bootstrap/cache/container/web.php')->toBeFile()
-            ->and($project . '/bootstrap/cache/container/cli.php')->toBeFile()
-            ->and($project . '/bootstrap/cache/container/worker.php')->toBeFile()
-            ->and($project . '/bootstrap/cache/container/scheduler.php')->toBeFile();
+            ->and($project . '/storage/releases/active.json')->toBeFile();
+
+        $active = json_decode(
+            (string) file_get_contents($project . '/storage/releases/active.json'),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+        $generation = $active['generation'] ?? null;
+        expect($generation)->toBeString()->not->toBe('');
+
+        $generationRoot = $project . '/storage/releases/generations/' . $generation;
+        expect($generationRoot . '/foundation.php')->toBeFile()
+            ->and($generationRoot . '/config.php')->toBeFile()
+            ->and($generationRoot . '/web/container.php')->toBeFile()
+            ->and($generationRoot . '/web/router.php')->toBeFile()
+            ->and($generationRoot . '/web/release.json')->toBeFile()
+            ->and($generationRoot . '/cli/container.php')->toBeFile()
+            ->and($generationRoot . '/worker/container.php')->toBeFile()
+            ->and($generationRoot . '/worker/providers.php')->toBeFile()
+            ->and($generationRoot . '/scheduler/container.php')->toBeFile()
+            ->and(implode("\n", $deployOutput))->toContain('INFOCYPH_FOUNDATION_RELEASE_ROOT')
+            ->and(implode("\n", $deployOutput))->toContain('INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256');
 
         $clearOutput = [];
         $clearExitCode = 0;
@@ -175,15 +193,8 @@ it('builds a clean create-project archive and provisions its environment', funct
         ), $clearOutput, $clearExitCode);
 
         expect($clearExitCode)->toBe(0, implode("\n", $clearOutput))
-            ->and($project . '/bootstrap/cache/config')->not->toBeDirectory()
-            ->and($project . '/bootstrap/cache/routes/fused.php')->not->toBeFile()
-            ->and($project . '/bootstrap/cache/commands.php')->not->toBeFile()
-            ->and($project . '/bootstrap/cache/schedule.php')->not->toBeFile()
-            ->and($project . '/bootstrap/cache/optimize.php')->not->toBeFile()
-            ->and($project . '/bootstrap/cache/container/web.php')->not->toBeFile()
-            ->and($project . '/bootstrap/cache/container/cli.php')->not->toBeFile()
-            ->and($project . '/bootstrap/cache/container/worker.php')->not->toBeFile()
-            ->and($project . '/bootstrap/cache/container/scheduler.php')->not->toBeFile();
+            ->and($project . '/storage/releases/active.json')->not->toBeFile()
+            ->and($project . '/storage/releases/generations')->not->toBeDirectory();
     } finally {
         removeInfbyteDistributionFixture($fixture);
     }
