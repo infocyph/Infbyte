@@ -432,8 +432,8 @@ jobs:
           export AUTH_MFA=otp
           export AUTH_NOTIFICATIONS=talkingbytes
           export AUTH_PASSKEY=disabled
-          export CACHE_STORE=redis
-          export CACHE_COUNTER=redis
+          export CACHE_STORE=auth-state
+          export CACHE_COUNTER=auth-lockouts
           export CACHE_REDIS_DSN=redis://127.0.0.1:6379
           export CACHE_INTEGRITY_KEY="$(php -r 'echo bin2hex(random_bytes(32));')"
           export AUTH_OTP_RECOVERY_HMAC_KEY="$(php -r 'echo bin2hex(random_bytes(32));')"
@@ -445,7 +445,10 @@ jobs:
           export SESSION_LOCK_ENABLED=false
 
           php infbyte module:install auth --feature=otp --json=1 | tee "$work/auth-install.json"
-          composer show infocyph/dblayer infocyph/epicrypt infocyph/talkingbytes infocyph/otp --no-interaction
+          composer show infocyph/dblayer --no-interaction >/dev/null
+          composer show infocyph/epicrypt --no-interaction >/dev/null
+          composer show infocyph/talkingbytes --no-interaction >/dev/null
+          composer show infocyph/otp --no-interaction >/dev/null
           php infbyte module:config:publish session --json=1 | tee "$work/session-config.json"
 
           php infbyte module:schema:install auth --connection=sqlite --json=1 | tee "$work/auth-schema.json"
