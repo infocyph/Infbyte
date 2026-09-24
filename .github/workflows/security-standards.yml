@@ -505,6 +505,9 @@ jobs:
           export AUTH_OTP_MFA_KEY="$(php -r 'echo rtrim(strtr(base64_encode(random_bytes(32)), "+/", "-_"), "=");')"
           export AUTH_OTP_SECRET_PROTECTION_KEYS='[{"id":"ci-primary","environment":"AUTH_OTP_MFA_KEY","status":"active"}]'
           export NOTIFICATIONS_AUTH_TRANSPORT=log
+          export COMMUNICATION_WEBHOOK_SECRET="$(php -r 'echo bin2hex(random_bytes(32));')"
+          export COMMUNICATION_WEBHOOK_REPLAY_ENABLED=true
+          export COMMUNICATION_WEBHOOK_REPLAY_STORE=auth-state
           export SESSION_DRIVER=database
           export SESSION_DB_CONNECTION=sqlite
           export SESSION_LOCK_ENABLED=false
