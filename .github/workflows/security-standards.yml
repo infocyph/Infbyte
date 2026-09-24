@@ -63,7 +63,7 @@ jobs:
           test ! -e plan.md
           test ! -d .github
 
-          foundation_version="$(php -r 'require "vendor/autoload.php"; echo Composer\\InstalledVersions::getPrettyVersion("infocyph/foundation") ?? "";')"
+          foundation_version="$(php -r 'require "vendor/autoload.php"; echo Composer\InstalledVersions::getPrettyVersion("infocyph/foundation") ?? "";')"
           if [[ "$foundation_version" != 3.* || "$foundation_version" == dev-* ]]; then
             printf 'Expected stable Foundation 3.x, got %s\n' "$foundation_version" >&2
             exit 1
@@ -509,7 +509,8 @@ jobs:
           export SESSION_DB_CONNECTION=sqlite
           export SESSION_LOCK_ENABLED=false
 
-          php infbyte module:install auth --feature=otp --json=1 | tee "$work/auth-install.json"
+          APP_CAPABILITIES= AUTH_MFA=simple \
+            php infbyte module:install auth --feature=otp --json=1 | tee "$work/auth-install.json"
           composer show infocyph/dblayer --no-interaction >/dev/null
           composer show infocyph/epicrypt --no-interaction >/dev/null
           composer show infocyph/talkingbytes --no-interaction >/dev/null
