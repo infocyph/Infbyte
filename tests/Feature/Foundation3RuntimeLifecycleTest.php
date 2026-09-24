@@ -53,7 +53,7 @@ it('documents the released module and cache lifecycle without pre-tag paths', fu
         ->and($readme)->toContain('"infocyph/foundation": "^3.0"')
         ->and($readme)->toContain('cache:schema:status')
         ->and($readme)->toContain('cache:schema:install')
-        ->and($readme)->not->toContain('module:install cache')
+        ->and($readme)->not->toContain('php infbyte module:install cache')
         ->and($readme)->not->toContain('foundation-3/close-26.6')
         ->and($auth)->toBeString()
         ->and($auth)->not->toContain('module:install cache')
