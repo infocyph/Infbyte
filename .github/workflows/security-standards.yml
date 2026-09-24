@@ -1274,7 +1274,11 @@ jobs:
           throw new RuntimeException('Production rediscovered source routes instead of the native Webrick cache.');
           PHP
 
-            port=$((18082 + RANDOM % 1000))
+            case "$matcher" in
+              fused) port=18082 ;;
+              generated) port=18083 ;;
+              sharded) port=18084 ;;
+            esac
             INFOCYPH_FOUNDATION_RELEASE_ROOT="$release_root" \
             INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256="$manifest_sha" \
             APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= ROUTER_MATCHER="$matcher" \
@@ -1304,17 +1308,18 @@ jobs:
 
           # Webrick owns shard validation. Corrupt native shard hashes, then prove
           # the error appears lazily only when a matching shard is requested.
+          tampered=0
           while IFS= read -r shard; do
-            php -r '
+            if php -r '
               $path = $argv[1];
               $source = file_get_contents($path);
               if (!is_string($source)) {
                   throw new RuntimeException("Unable to read Webrick route shard.");
               }
               $count = 0;
-              $source = preg_replace(
-                  "/('_hash'\\s*=>\\s*)'[^']+'/ ",
-                  "$1'" . str_repeat("0", 32) . "'",
+              $source = preg_replace_callback(
+                  "/('_hash'\\s*=>\\s*)'[^']+'/",
+                  static fn(array $match): string => $match[1] . "'" . str_repeat("0", 32) . "'",
                   $source,
                   1,
                   $count,
@@ -1323,8 +1328,15 @@ jobs:
                   exit(2);
               }
               file_put_contents($path, $source);
-            ' "$shard" || true
+            ' "$shard"; then
+              tampered=$((tampered + 1))
+            fi
           done < <(find "$shard_generation_root" -type f -name '*.php' ! -name '__*.php')
+
+          if [[ "$tampered" -lt 1 ]]; then
+            echo "Unable to corrupt any native Webrick route shard for lazy-validation test." >&2
+            exit 1
+          fi
 
           cat > routes/api.php <<'PHP'
           <?php
