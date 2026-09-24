@@ -49,6 +49,23 @@ it('consumes the stable Foundation 3 package and released core cache template', 
         ->and($skeletonCache)->toContain('CACHE_SQLITE_LOCK_PATH');
 });
 
+it('keeps production auth secrets indirect and hardened cache resources opt in', function (): void {
+    $root = dirname(__DIR__, 2);
+    $auth = file_get_contents($root . '/config/auth.php');
+    $cache = file_get_contents($root . '/config/cache.php');
+
+    expect($auth)->toBeString()
+        ->and($auth)->toContain("'token_secret_environment' => env_string('AUTH_TOKEN_SECRET_ENVIRONMENT', 'AUTH_TOKEN_SECRET')")
+        ->and($auth)->not->toContain("'token_secret' => env('AUTH_TOKEN_SECRET')")
+        ->and($cache)->toBeString()
+        ->and($cache)->toContain("'default' => env('CACHE_STORE', 'local')")
+        ->and($cache)->toContain("'auth-state' => [")
+        ->and($cache)->toContain("'fail_open' => false")
+        ->and($cache)->toContain("'counters' => [")
+        ->and($cache)->toContain("'redis' => [")
+        ->and($cache)->toContain("'valkey' => [");
+});
+
 it('documents the released module and cache lifecycle without pre-tag paths', function (): void {
     $readme = file_get_contents(dirname(__DIR__, 2) . '/README.md');
     $auth = file_get_contents(dirname(__DIR__, 2) . '/config/auth.php');
