@@ -1346,39 +1346,36 @@ jobs:
             exit 1
           fi
 
-          cat > routes/api.php <<'PHP'
+          cat > "$work/assert-native-shard-validation.php" <<'PHP'
           <?php
 
-          throw new RuntimeException('Production rediscovered source routes during shard validation.');
+          declare(strict_types=1);
+
+          require $argv[1] . '/vendor/autoload.php';
+
+          use Infocyph\Webrick\Router\Matching\ShardedMatcher;
+
+          $cache = $argv[2] ?? '';
+          $matcher = ShardedMatcher::make()
+              ->enableCache($cache)
+              ->verifyCacheOnLoad();
+
+          if (!$matcher->canBootFromCache()) {
+              throw new RuntimeException('Webrick native sharded cache is not bootable after publication.');
+          }
+
+          try {
+              $matcher->matchCompiled('GET', '127.0.0.1', '/alpha/one');
+          } catch (RuntimeException $exception) {
+              if (str_contains(strtolower($exception->getMessage()), 'sharded route cache hash mismatch')) {
+                  exit(0);
+              }
+
+              throw $exception;
+          }
+
+          throw new RuntimeException('Tampered Webrick shard was accepted by the native matcher.');
           PHP
 
-          port=19082
-          INFOCYPH_FOUNDATION_RELEASE_ROOT="$release_root" \
-          INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256="$manifest_sha" \
-          APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= ROUTER_MATCHER=sharded \
-            php -S "127.0.0.1:$port" -t public public/index.php >"$work/sharded-tamper.log" 2>&1 &
-          server_pid=$!
-
-          status=""
-          for attempt in {1..40}; do
-            status="$(curl --silent --output "$work/sharded-tamper-response" --write-out '%{http_code}' "http://127.0.0.1:$port/alpha/one" 2>/dev/null || true)"
-            if [[ "$status" != "000" ]]; then
-              break
-            fi
-            sleep 0.25
-          done
-
-          if [[ "$status" == "200" ]]; then
-            cat "$work/sharded-tamper.log" >&2
-            cat "$work/sharded-tamper-response" >&2
-            echo "Corrupted native Webrick shard unexpectedly served successfully." >&2
-            exit 1
-          fi
-
-          if ! grep -Eqi 'hash mismatch|cache.*mismatch|shard.*invalid|corrupt' "$work/sharded-tamper.log"; then
-            cat "$work/sharded-tamper.log" >&2
-            cat "$work/sharded-tamper-response" >&2 || true
-            echo "Webrick rejected the tampered request without exposing a recognizable native cache-integrity failure." >&2
-            exit 1
-          fi
+          php "$work/assert-native-shard-validation.php" "$PWD" "$shard_root"
 
