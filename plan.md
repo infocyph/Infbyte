@@ -3,7 +3,7 @@
 **Target:** InfByte release compatible with the published Foundation 3.0.1 package.  
 **Branch:** `foundation-3/runtime-lifecycle`.  
 **PR:** #9.  
-**Status:** Foundation 3.0.1 is published; InfByte stable-package cutover is implemented and in final exact-head qualification.  
+**Status:** Foundation 3.0.1 is published; InfByte stable-package cutover is complete and release-qualified.  
 **Updated:** 2026-09-24.
 
 This is the canonical continuation plan for the InfByte skeleton after Foundation 3 is released. It intentionally preserves the consumer-side work that was previously recorded in Foundation planning files so those Foundation plan files can be removed without losing the handoff.
@@ -81,7 +81,7 @@ The normal Security & Standards workflow is expected to reject the pre-tag branc
 | **H** | Final CI/docs/publication evidence | **DONE** | Security & Standards run #114 is fully green on released Foundation 3.x, including the normal PHPForge matrix, create-project, consumers, module lifecycle, generation lifecycle, 2.1→3.0 migration, and production auth/session lifecycle. |
 | **I** | Native Webrick + InterMix cache ownership hardening | **DONE** | Foundation #17 run #1770 and InfByte #9 run #130 prove native fused/generated/sharded Webrick caches, native InterMix generated-container validation, and no CacheLayer wrapper on compiled DI. |
 | **J** | ArrayKit-native configuration cache ownership | **DONE** | Foundation #17 run #1787 and InfByte #9 run #138 prove ArrayKit-native single/sharded caches and exported-skeleton consumption. |
-| **K** | Published Foundation 3.0.1 cutover | **IN PROGRESS** | Stable `^3.0.1`, no VCS candidate pin, normal Composer resolution, released native-cache/auth topology; final exact-head CI remains. |
+| **K** | Published Foundation 3.0.1 cutover | **DONE** | Stable `^3.0.1`, no VCS candidate pin, normal Composer resolution, released native-cache/auth topology, and final Security & Standards run #144 are green. |
 
 ---
 
@@ -438,12 +438,32 @@ handoff used before publication.
 - [x] Update current documentation/migration links to Foundation `3.0.1`.
 - [x] Fix the production TalkingBytes auth example to include Foundation's
   native `notifications` capability.
-- [ ] Final InfByte PR #9 Security & Standards run is fully green on the exact
+- [x] Final InfByte PR #9 Security & Standards run is fully green on the exact
   stable `^3.0.1` release head.
 
-**Acceptance:** pending final exact-head InfByte qualification through normal
-Composer repositories only. No VCS/path repository, development alias,
-PHPForge/PHPProbe bypass, or Foundation candidate SHA is allowed.
+**Acceptance:** DONE.
+
+Final Batch K evidence:
+
+- Published Foundation tag: `3.0.1`
+- Published Foundation merge/source commit:
+  `fc9b3258646ac744e61fd02e18d9b98e5afff2e8`
+- InfByte functional qualification head:
+  `c07b62d6fe6fa7e9a27972350a732725fff128bc`
+- Security & Standards run #144 (`36037084068`) — success
+- Released native Webrick + ArrayKit cache job: `107760131465` — success
+- Released production auth/session: `107760131353` — success
+- Released generation lifecycle: `107760131444` — success
+- Released module lifecycle: `107760131344` — success
+- Release-candidate create-project: `107760131519` — success
+- InfByte 2.1 → Foundation 3 migration: `107760131252` — success
+- Released PHP 8.4 consumer: `107760131470` — success
+- Released PHP 8.5 consumer: `107760131413` — success
+- PHP 8.4/8.5 lowest/stable QA, analysis, benchmarks and clean install — success
+- Stable runtime constraint guard resolved Foundation `3.0.1` through normal
+  Composer repositories.
+- No VCS/path repository, development alias, candidate SHA, PHPForge/PHPProbe
+  bypass, or weakened quality threshold remains.
 
 ---
 
