@@ -479,7 +479,7 @@ jobs:
           php infbyte app:install
 
           foundation_reference="$(composer show infocyph/foundation --format=json | php -r '$p=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $p["source"]["reference"] ?? "";')"
-          test "$foundation_reference" = "e78c8fc7b15c069b44ec6f95bd80ec5ec16f2365"
+          test "$foundation_reference" = "b59eacea763b8fb954581a2e6e81abdb33532bb6"
 
           APP_CAPABILITIES= php infbyte module:install database --json=1 | tee "$work/database-install.json"
           APP_CAPABILITIES= php infbyte module:install security --json=1 | tee "$work/security-install.json"
