@@ -33,7 +33,7 @@ it('consumes the stable Foundation 3 package and released core cache template', 
     $version = InstalledVersions::getPrettyVersion('infocyph/foundation');
     $foundationPath = InstalledVersions::getInstallPath('infocyph/foundation');
 
-    expect($composer['require']['infocyph/foundation'] ?? null)->toBe('^3.0')
+    expect($composer['require']['infocyph/foundation'] ?? null)->toBe('^3.0.1')
         ->and($version)->toBeString()
         ->and(str_starts_with($version, 'dev-'))->toBeFalse()
         ->and($foundationPath)->toBeString();
