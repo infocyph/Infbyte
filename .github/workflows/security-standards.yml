@@ -370,3 +370,200 @@ jobs:
 
           test -f config/database.php
 
+  released-auth-session:
+    name: "Released production auth/session"
+    needs: phpforge
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pcntl, pdo_sqlite, redis, sodium
+          tools: composer:v2
+          coverage: none
+
+      - name: Verify production auth and browser-session lifecycle
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+
+          composer archive --format=tar --dir="$work" --file=infbyte
+          mkdir "$work/project"
+          tar -xf "$work/infbyte.tar" -C "$work/project"
+          cd "$work/project"
+
+          composer install --no-interaction --prefer-dist --no-progress
+          php infbyte app:install
+
+          php infbyte module:install database --json=1 >"$work/database-install.json"
+          php infbyte module:install security --json=1 >"$work/security-install.json"
+          php infbyte module:install communication --json=1 >"$work/communication-install.json"
+          php infbyte module:install auth --feature=otp --json=1 >"$work/auth-install.json"
+          php infbyte module:config:publish session --json=1 >"$work/session-config.json"
+
+          mkdir -p database
+          touch database/database.sqlite
+
+          export APP_ENV=production
+          export APP_DEBUG=false
+          export APP_URL=https://infbyte.example.test
+          export APP_CAPABILITIES=auth,cache,database,security,communication,session
+          export DB_CONNECTION=sqlite
+          export DB_DATABASE=database/database.sqlite
+          export AUTH_STORAGE=database
+          export AUTH_CACHE=cache
+          export AUTH_PASSWORDS=native
+          export AUTH_TOKENS=security
+          export AUTH_MFA=otp
+          export AUTH_NOTIFICATIONS=talkingbytes
+          export AUTH_PASSKEY=disabled
+          export CACHE_STORE=redis
+          export CACHE_COUNTER=redis
+          export CACHE_REDIS_DSN=redis://127.0.0.1:6379
+          export CACHE_INTEGRITY_KEY="$(php -r 'echo bin2hex(random_bytes(32));')"
+          export AUTH_OTP_RECOVERY_HMAC_KEY="$(php -r 'echo bin2hex(random_bytes(32));')"
+          export AUTH_OTP_MFA_KEY="$(php -r 'echo rtrim(strtr(base64_encode(random_bytes(32)), "+/", "-_"), "=");')"
+          export AUTH_OTP_SECRET_PROTECTION_KEYS='[{"id":"ci-primary","environment":"AUTH_OTP_MFA_KEY","status":"active"}]'
+          export NOTIFICATIONS_AUTH_TRANSPORT=log
+          export SESSION_DRIVER=database
+          export SESSION_DB_CONNECTION=sqlite
+          export SESSION_LOCK_ENABLED=false
+
+          php infbyte module:schema:install auth --connection=sqlite --json=1 >"$work/auth-schema.json"
+          php infbyte module:schema:install session --connection=sqlite --json=1 >"$work/session-schema.json"
+          grep -q '"installed":true' "$work/auth-schema.json"
+          grep -q '"installed":true' "$work/session-schema.json"
+
+          php infbyte config:validate --production
+          php infbyte app:ready
+          php infbyte optimize --json=1 >"$work/auth-release.json"
+
+          php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          use Infocyph\Foundation\Auth\AuthServices;
+          use Infocyph\Foundation\Auth\Authentication\Login\LoginRequest;
+          use Infocyph\Foundation\Foundation;
+          use Infocyph\Foundation\Session\BrowserSession;
+          use Infocyph\Foundation\Session\SessionConfig;
+          use Infocyph\Foundation\Session\SessionStoreFactory;
+
+          require 'vendor/autoload.php';
+
+          $app = Foundation::cli([
+              'base_path' => getcwd(),
+              '_config_cache' => false,
+          ])->boot();
+
+          $auth = $app->make(AuthServices::class);
+          $password = 'production-auth-smoke-secret';
+          $hash = $auth->passwordHasher()->hash($password);
+          $created = $auth->accounts()->create('production-auth@example.test', $hash);
+
+          if (!$created->successful() || $created->account === null) {
+              fwrite(STDERR, "Production account creation failed.\n");
+              exit(1);
+          }
+
+          $login = $auth->authenticator()->login(new LoginRequest(
+              $created->account->identifier(),
+              $password,
+          ));
+          if (!$login->successful() || $login->principal === null || $login->session === null) {
+              fwrite(STDERR, "Production login/session issuance failed.\n");
+              exit(1);
+          }
+
+          $oldAuthSessionId = $login->session->id;
+          $rotated = $auth->sessions()->rotate($oldAuthSessionId);
+          if ($rotated->id === $oldAuthSessionId || $auth->sessions()->touch($oldAuthSessionId) !== null) {
+              fwrite(STDERR, "Auth session rotation did not retire the stale session id.\n");
+              exit(1);
+          }
+
+          $auth->authenticator()->logout($login->principal, $rotated->id);
+          if ($auth->sessions()->touch($rotated->id) !== null) {
+              fwrite(STDERR, "Auth logout did not revoke the rotated session.\n");
+              exit(1);
+          }
+
+          $sessionConfig = $app->make(SessionConfig::class);
+          $storeFactory = $app->make(SessionStoreFactory::class);
+          $browser = static fn(?string $candidateId): BrowserSession => new BrowserSession(
+              $candidateId,
+              fn() => $storeFactory->make(),
+              static fn() => null,
+              $sessionConfig,
+          );
+
+          $initial = $browser(null);
+          $initial->put('account_id', $created->account->id());
+          $initialCommit = $initial->commit(time());
+          $initialId = $initialCommit->id;
+          if (!is_string($initialId) || strlen($initialId) !== 64) {
+              fwrite(STDERR, "Browser session issuance failed.\n");
+              exit(1);
+          }
+          $initial->release();
+
+          $current = $browser($initialId);
+          if ($current->get('account_id') !== $created->account->id()) {
+              fwrite(STDERR, "Browser session persistence failed.\n");
+              exit(1);
+          }
+          $rotatedBrowserId = $current->regenerate();
+          $current->commit(time());
+          $current->release();
+
+          if ($rotatedBrowserId === $initialId) {
+              fwrite(STDERR, "Browser session regeneration reused the old id.\n");
+              exit(1);
+          }
+
+          $stale = $browser($initialId);
+          if ($stale->get('account_id') !== null) {
+              fwrite(STDERR, "Stale browser session id retained authority after regeneration.\n");
+              exit(1);
+          }
+          $stale->release();
+
+          $active = $browser($rotatedBrowserId);
+          if ($active->get('account_id') !== $created->account->id()) {
+              fwrite(STDERR, "Regenerated browser session lost persisted state.\n");
+              exit(1);
+          }
+          $active->invalidate();
+          $invalidatedId = $active->commit(time())->id;
+          $active->release();
+
+          if (!is_string($invalidatedId) || $invalidatedId === $rotatedBrowserId) {
+              fwrite(STDERR, "Browser session invalidation did not issue a clean id.\n");
+              exit(1);
+          }
+
+          $revoked = $browser($rotatedBrowserId);
+          if ($revoked->get('account_id') !== null) {
+              fwrite(STDERR, "Invalidated browser session id remained usable.\n");
+              exit(1);
+          }
+          $revoked->release();
+          PHP
+
