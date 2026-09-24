@@ -23,3 +23,177 @@ jobs:
       security-events: write
       actions: read
       contents: read
+
+  released-consumer:
+    name: "Released consumer - PHP ${{ matrix.php }}"
+    needs: phpforge
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ["8.4", "8.5"]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "${{ matrix.php }}"
+          extensions: pcntl, pdo_sqlite
+          tools: composer:v2
+          coverage: none
+
+      - name: Verify exported stable Foundation 3 consumer
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          work="$(mktemp -d)"
+          server_pid=""
+          cleanup() {
+            if [[ -n "$server_pid" ]]; then
+              kill "$server_pid" 2>/dev/null || true
+              wait "$server_pid" 2>/dev/null || true
+            fi
+            rm -rf "$work"
+          }
+          trap cleanup EXIT
+
+          composer archive --format=tar --dir="$work" --file=infbyte
+          mkdir "$work/project"
+          tar -xf "$work/infbyte.tar" -C "$work/project"
+          cd "$work/project"
+
+          test ! -e plan.md
+          test ! -d .github
+
+          composer install --no-dev --no-interaction --prefer-dist --no-progress --classmap-authoritative
+          composer check-platform-reqs --no-dev
+          php infbyte app:install
+
+          foundation_version="$(php -r 'require "vendor/autoload.php"; echo Composer\\InstalledVersions::getPrettyVersion("infocyph/foundation") ?? "";')"
+          if [[ -z "$foundation_version" || "$foundation_version" == dev-* ]]; then
+            printf 'Expected stable Foundation 3, got: %s\n' "$foundation_version" >&2
+            exit 1
+          fi
+
+          APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte config:validate --production
+          release_json="$(APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte optimize --json=1)"
+          APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte app:ready
+
+          release_root="$(printf '%s' "$release_json" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["release_root"] ?? "";')"
+          manifest_sha="$(printf '%s' "$release_json" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["manifest_sha256"] ?? "";')"
+          generation="$(printf '%s' "$release_json" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["generation"] ?? "";')"
+
+          test -n "$release_root"
+          test -n "$generation"
+          [[ "$manifest_sha" =~ ^[a-f0-9]{64}$ ]]
+
+          wrong_sha="$(printf '0%.0s' {1..64})"
+          set +e
+          INFOCYPH_FOUNDATION_RELEASE_ROOT="$release_root" \
+          INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256="$wrong_sha" \
+          APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= \
+            php public/index.php >"$work/wrong-trust.log" 2>&1
+          wrong_status=$?
+          set -e
+          if [[ "$wrong_status" -eq 0 ]]; then
+            cat "$work/wrong-trust.log" >&2
+            echo "Production entrypoint accepted an invalid release manifest digest." >&2
+            exit 1
+          fi
+
+          port=18080
+          INFOCYPH_FOUNDATION_RELEASE_ROOT="$release_root" \
+          INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256="$manifest_sha" \
+          APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= \
+            php -S "127.0.0.1:$port" -t public public/index.php >"$work/server.log" 2>&1 &
+          server_pid=$!
+
+          response=""
+          for attempt in {1..40}; do
+            if response="$(curl --fail --silent "http://127.0.0.1:$port/api/health" 2>/dev/null)"; then
+              break
+            fi
+            sleep 0.25
+          done
+
+          if [[ "$response" != *'"status":"ok"'* ]]; then
+            cat "$work/server.log" >&2
+            printf 'Unexpected health response: %s\n' "$response" >&2
+            exit 1
+          fi
+
+          kill "$server_pid"
+          wait "$server_pid" 2>/dev/null || true
+          server_pid=""
+
+          php infbyte module:plan database --json=1 >"$work/database-plan.json"
+          grep -q '"infocyph/dblayer"' "$work/database-plan.json"
+
+          APP_CAPABILITIES=cache php infbyte cache:schema:status --json=1 >"$work/cache-schema.json"
+          grep -q '"schemas"' "$work/cache-schema.json"
+
+          if php infbyte module:show cache --json=1 >"$work/cache-module.log" 2>&1; then
+            cat "$work/cache-module.log" >&2
+            echo "Cache unexpectedly resolved as a specialist module." >&2
+            exit 1
+          fi
+
+  released-module-lifecycle:
+    name: "Released module lifecycle"
+    needs: phpforge
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pcntl, pdo_sqlite
+          tools: composer:v2
+          coverage: none
+
+      - name: Verify specialist module lifecycle in exported skeleton
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+
+          composer archive --format=tar --dir="$work" --file=infbyte
+          mkdir "$work/project"
+          tar -xf "$work/infbyte.tar" -C "$work/project"
+          cd "$work/project"
+
+          composer install --no-interaction --prefer-dist --no-progress
+          php infbyte app:install
+
+          php infbyte module:plan database --json=1 >"$work/plan.json"
+          grep -q '"infocyph/dblayer"' "$work/plan.json"
+
+          php infbyte module:install database --json=1 >"$work/install.json"
+          composer show infocyph/dblayer --no-interaction >/dev/null
+          test -f config/database.php
+
+          mkdir -p database
+          touch database/database.sqlite
+
+          php infbyte module:enable database --json=1 >"$work/enable.json"
+          php infbyte module:show database --json=1 >"$work/show.json"
+          grep -q '"direct":true' "$work/show.json"
+
+          php infbyte module:repair database --json=1 >"$work/repair.json"
+          php infbyte module:disable database --json=1 >"$work/disable.json"
+          php infbyte module:remove database --dry-run --json=1 >"$work/remove-plan.json"
+          php infbyte module:remove database --json=1 >"$work/remove.json"
+
+          if composer show infocyph/dblayer --no-interaction >/dev/null 2>&1; then
+            echo "DBLayer remained installed after specialist module removal." >&2
+            exit 1
+          fi
+
+          test -f config/database.php
+
