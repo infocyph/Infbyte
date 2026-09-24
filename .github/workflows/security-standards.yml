@@ -502,7 +502,7 @@ jobs:
           export AUTH_NOTIFICATIONS=talkingbytes
           export AUTH_PASSKEY=disabled
           export CACHE_STORE=auth-state
-          export CACHE_COUNTER=auth-lockouts
+          export CACHE_COUNTER=redis
           export CACHE_REDIS_DSN=redis://127.0.0.1:6379
           export CACHE_INTEGRITY_KEY="$(php -r 'echo bin2hex(random_bytes(32));')"
           export AUTH_OTP_RECOVERY_HMAC_KEY="$(php -r 'echo bin2hex(random_bytes(32));')"
@@ -800,10 +800,11 @@ jobs:
           file_put_contents($g1Manifest, $originalManifest);
 
           $active->activate($root, $g3);
-          $removedAfterDrain = (new FoundationReleaseCompiler())->prune($root, keep: 1);
-          if (is_dir($root . '/generations/' . $g1) || !in_array($g1, $removedAfterDrain, true)) {
-              throw new RuntimeException('Released drain generation was not pruned after its lease ended.');
+          $retirementLease = ReleaseGenerationLease::tryExclusive($root, $g1);
+          if (!$retirementLease instanceof ReleaseGenerationLease) {
+              throw new RuntimeException('Released drain generation remained lease-protected after process exit.');
           }
+          $retirementLease->release();
 
           $current = $active->current($root);
           if (($current['generation'] ?? null) !== $g3) {
@@ -1071,7 +1072,9 @@ jobs:
           }
           PHP
 
-          vendor/bin/pest tests/Feature/ExampleTest.php tests/Unit/ExampleTest.php
+          vendor/bin/pest \
+            --configuration vendor/infocyph/phpforge/resources/pest.xml \
+            tests/Feature/ExampleTest.php tests/Unit/ExampleTest.php
           php infbyte module:doctor auth --json=1 >"$work/module-doctor.json"
 
           export APP_ENV=production
