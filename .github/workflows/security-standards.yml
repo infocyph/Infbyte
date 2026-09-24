@@ -965,8 +965,8 @@ jobs:
               $config,
           );
 
-          if ($session->get('migration_marker') !== 'foundation-2.1-session') {
-              throw new RuntimeException('Foundation 2.1 browser session did not survive the 3.0 migration.');
+          if ($session->get('migration_marker') !== null) {
+              throw new RuntimeException('Foundation 2.1 browser session was silently trusted after the 3.0 migration.');
           }
           $session->release();
 
