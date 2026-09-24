@@ -1172,11 +1172,11 @@ jobs:
 
           composer install --no-interaction --prefer-dist --no-progress
           composer config repositories.foundation-candidate vcs https://github.com/infocyph/Foundation.git
-          composer require 'infocyph/foundation:dev-foundation-3.0/notification-static-compile-fix#98a7a9e38419462da3e230767048e6000a79ed99 as 3.0.1' \
+          composer require 'infocyph/foundation:dev-foundation-3.0/notification-static-compile-fix#4560e91265be49ca815d8b113523c04efe1ff601 as 3.0.1' \
             --with-all-dependencies --no-interaction --prefer-dist --no-progress
 
           foundation_reference="$(composer show infocyph/foundation --format=json | php -r '$p=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $p["source"]["reference"] ?? "";')"
-          test "$foundation_reference" = "98a7a9e38419462da3e230767048e6000a79ed99"
+          test "$foundation_reference" = "4560e91265be49ca815d8b113523c04efe1ff601"
 
           php infbyte app:install
           cp routes/api.php "$work/api.php"
@@ -1399,11 +1399,11 @@ jobs:
 
           composer install --no-interaction --prefer-dist --no-progress
           composer config repositories.foundation-candidate vcs https://github.com/infocyph/Foundation.git
-          composer require 'infocyph/foundation:dev-foundation-3.0/notification-static-compile-fix#98a7a9e38419462da3e230767048e6000a79ed99 as 3.0.1' \
+          composer require 'infocyph/foundation:dev-foundation-3.0/notification-static-compile-fix#4560e91265be49ca815d8b113523c04efe1ff601 as 3.0.1' \
             --with-all-dependencies --no-interaction --prefer-dist --no-progress
 
           foundation_reference="$(composer show infocyph/foundation --format=json | php -r '$p=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $p["source"]["reference"] ?? "";')"
-          test "$foundation_reference" = "98a7a9e38419462da3e230767048e6000a79ed99"
+          test "$foundation_reference" = "4560e91265be49ca815d8b113523c04efe1ff601"
 
           php infbyte app:install
           cp config/app.php "$work/app.php"
