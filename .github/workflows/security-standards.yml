@@ -711,3 +711,292 @@ jobs:
           }
           PHP
 
+  foundation21-migration:
+    name: "Infbyte 2.1 to Foundation 3 migration"
+    needs: phpforge
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pcntl, pdo_sqlite
+          tools: composer:v2
+          coverage: none
+
+      - name: Rehearse representative 2.1 application upgrade
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          root="$PWD"
+          work="$(mktemp -d)"
+          server_pid=""
+          cleanup() {
+            if [[ -n "$server_pid" ]]; then
+              kill "$server_pid" 2>/dev/null || true
+              wait "$server_pid" 2>/dev/null || true
+            fi
+            git -C "$root" worktree remove --force "$work/legacy" 2>/dev/null || true
+            rm -rf "$work"
+          }
+          trap cleanup EXIT
+
+          composer archive --format=tar --dir="$work" --file=infbyte3
+          git worktree add --detach "$work/legacy" origin/main
+          cd "$work/legacy"
+
+          composer install --no-dev --no-interaction --prefer-dist --no-progress
+          php infbyte app:install
+
+          foundation_before="$(php -r 'require "vendor/autoload.php"; echo Composer\InstalledVersions::getPrettyVersion("infocyph/foundation") ?? "";')"
+          if [[ "$foundation_before" != 2.1.* ]]; then
+            printf 'Expected Foundation 2.1.x migration baseline, got %s\n' "$foundation_before" >&2
+            exit 1
+          fi
+
+          mkdir -p app/Providers routes database storage/sessions
+          cat > app/Providers/LegacyProvider.php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          namespace App\Providers;
+
+          use Infocyph\Foundation\Application\Application;
+          use Infocyph\Foundation\Application\ServiceProviderInterface;
+
+          final class LegacyProvider implements ServiceProviderInterface
+          {
+              public function register(Application $app): void {}
+
+              public function boot(Application $app): void {}
+          }
+          PHP
+
+          cat > routes/custom.php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          use App\Http\Controllers\SystemController;
+          use Infocyph\Webrick\Router\Definition\Registrar;
+
+          /** @var Registrar $router */
+          $router->get('/migration-health', SystemController::health(...));
+          PHP
+
+          php -r '
+            $pdo = new PDO("sqlite:database/application.sqlite");
+            $pdo->exec("CREATE TABLE preserved_data (id INTEGER PRIMARY KEY, value TEXT NOT NULL)");
+            $stmt = $pdo->prepare("INSERT INTO preserved_data (value) VALUES (?)");
+            $stmt->execute(["foundation-2.1-preserved"]);
+          '
+
+          export LEGACY_SESSION_ID_FILE="$work/legacy-session-id"
+          php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          use Infocyph\Foundation\Session\BrowserSession;
+          use Infocyph\Foundation\Session\SessionConfig;
+          use Infocyph\Foundation\Session\Store\FileSessionStore;
+
+          require 'vendor/autoload.php';
+
+          $directory = getcwd() . '/storage/sessions';
+          $config = new SessionConfig(
+              driver: 'file',
+              lifetimeSeconds: 7200,
+              maxPayloadBytes: 65536,
+              cookieName: 'foundation_session',
+              cookiePath: '/',
+              cookieDomain: null,
+              cookieSecure: true,
+              cookieHttpOnly: true,
+              cookieSameSite: 'Lax',
+              filePath: $directory,
+              cacheStore: null,
+              databaseConnection: null,
+              databaseTable: 'sessions',
+              lockEnabled: false,
+              lockStore: null,
+              lockWaitSeconds: 2.0,
+              lockLeaseSeconds: 30.0,
+              csrfHeader: 'X-CSRF-Token',
+              csrfField: '_token',
+              csrfCheckOrigin: true,
+              csrfOrigin: null,
+          );
+          $store = new FileSessionStore($directory);
+          $session = new BrowserSession(null, static fn() => $store, static fn() => null, $config);
+          $session->put('migration_marker', 'foundation-2.1-session');
+          $commit = $session->commit(time());
+          $session->release();
+
+          if (!is_string($commit->id)) {
+              throw new RuntimeException('Unable to create Foundation 2.1 browser session fixture.');
+          }
+          file_put_contents((string) getenv('LEGACY_SESSION_ID_FILE'), $commit->id);
+          PHP
+
+          legacy_session_id="$(cat "$work/legacy-session-id")"
+          test -n "$legacy_session_id"
+
+          rm -rf vendor composer.lock
+          tar -xf "$work/infbyte3.tar" -C "$work/legacy"
+
+          test -f app/Providers/LegacyProvider.php
+          test -f routes/custom.php
+          test -f database/application.sqlite
+          test -n "$(find storage/sessions -type f -name '*.json' -print -quit)"
+
+          cat > app/Providers/LegacyProvider.php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          namespace App\Providers;
+
+          use Infocyph\Foundation\Application\Application;
+          use Infocyph\Foundation\Application\FoundationBuildContext;
+          use Infocyph\Foundation\Application\ServiceProviderInterface;
+          use Infocyph\InterMix\DI\ContainerBuilder;
+
+          final class LegacyProvider implements ServiceProviderInterface
+          {
+              public function contribute(ContainerBuilder $builder, FoundationBuildContext $context): void {}
+
+              public function boot(Application $app): void {}
+          }
+          PHP
+
+          php -r '
+            $path = "bootstrap/providers.php";
+            $content = file_get_contents($path);
+            $needle = "    '''common''' => [\n";
+            $replacement = $needle . "        \\App\\Providers\\LegacyProvider::class,\n";
+            if (!is_string($content) || !str_contains($content, $needle)) {
+                throw new RuntimeException("Unable to migrate provider registration.");
+            }
+            file_put_contents($path, str_replace($needle, $replacement, $content));
+          '
+
+          php -r '
+            $path = "config/router.php";
+            $content = file_get_contents($path);
+            $needle = "        '''api.php''',\n";
+            $replacement = $needle . "        '''custom.php''',\n";
+            if (!is_string($content) || !str_contains($content, $needle)) {
+                throw new RuntimeException("Unable to migrate custom route registration.");
+            }
+            file_put_contents($path, str_replace($needle, $replacement, $content));
+          '
+
+          composer install --no-interaction --prefer-dist --no-progress
+          php infbyte app:install
+
+          foundation_after="$(php -r 'require "vendor/autoload.php"; echo Composer\InstalledVersions::getPrettyVersion("infocyph/foundation") ?? "";')"
+          if [[ "$foundation_after" != 3.* ]]; then
+            printf 'Expected Foundation 3.x after migration, got %s\n' "$foundation_after" >&2
+            exit 1
+          fi
+
+          export LEGACY_SESSION_ID="$legacy_session_id"
+          php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          use Infocyph\Foundation\Session\BrowserSession;
+          use Infocyph\Foundation\Session\SessionConfig;
+          use Infocyph\Foundation\Session\Store\FileSessionStore;
+
+          require 'vendor/autoload.php';
+
+          $directory = getcwd() . '/storage/sessions';
+          $config = new SessionConfig(
+              driver: 'file',
+              lifetimeSeconds: 7200,
+              maxPayloadBytes: 65536,
+              cookieName: 'foundation_session',
+              cookiePath: '/',
+              cookieDomain: null,
+              cookieSecure: true,
+              cookieHttpOnly: true,
+              cookieSameSite: 'Lax',
+              filePath: $directory,
+              cacheStore: null,
+              databaseConnection: null,
+              databaseTable: 'sessions',
+              lockEnabled: false,
+              lockStore: null,
+              lockWaitSeconds: 2.0,
+              lockLeaseSeconds: 30.0,
+              csrfHeader: 'X-CSRF-Token',
+              csrfField: '_token',
+              csrfCheckOrigin: true,
+              csrfOrigin: null,
+          );
+          $store = new FileSessionStore($directory);
+          $session = new BrowserSession(
+              (string) getenv('LEGACY_SESSION_ID'),
+              static fn() => $store,
+              static fn() => null,
+              $config,
+          );
+
+          if ($session->get('migration_marker') !== 'foundation-2.1-session') {
+              throw new RuntimeException('Foundation 2.1 browser session did not survive the 3.0 migration.');
+          }
+          $session->release();
+
+          $pdo = new PDO('sqlite:database/application.sqlite');
+          $value = $pdo->query('SELECT value FROM preserved_data WHERE id = 1')->fetchColumn();
+          if ($value !== 'foundation-2.1-preserved') {
+              throw new RuntimeException('Application-owned persisted data did not survive the skeleton migration.');
+          }
+          PHP
+
+          vendor/bin/pest tests/Feature/ExampleTest.php tests/Unit/ExampleTest.php
+          php infbyte module:doctor auth --json=1 >"$work/module-doctor.json"
+
+          export APP_ENV=production
+          export APP_DEBUG=false
+          export APP_CAPABILITIES=
+          php infbyte config:validate --production
+          release="$(php infbyte optimize --json=1)"
+          php infbyte app:ready
+
+          release_root="$(printf '%s' "$release" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["release_root"] ?? "";')"
+          manifest_sha="$(printf '%s' "$release" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["manifest_sha256"] ?? "";')"
+
+          port=18081
+          INFOCYPH_FOUNDATION_RELEASE_ROOT="$release_root" \
+          INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256="$manifest_sha" \
+            php -S "127.0.0.1:$port" -t public public/index.php >"$work/migration-server.log" 2>&1 &
+          server_pid=$!
+
+          response=""
+          for attempt in {1..40}; do
+            if response="$(curl --fail --silent "http://127.0.0.1:$port/migration-health" 2>/dev/null)"; then
+              break
+            fi
+            sleep 0.25
+          done
+
+          if [[ "$response" != *'"status":"ok"'* ]]; then
+            cat "$work/migration-server.log" >&2
+            printf 'Migrated custom route failed: %s\n' "$response" >&2
+            exit 1
+          fi
+
+          kill "$server_pid"
+          wait "$server_pid" 2>/dev/null || true
+          server_pid=""
+
