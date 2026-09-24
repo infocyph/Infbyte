@@ -89,7 +89,14 @@ jobs:
           $auth = $app->make(AuthServices::class);
           $password = 'infbyte-auth-smoke-secret';
           $hash = $auth->passwordHasher()->hash($password);
-          $account = $auth->accounts()->create('auth-smoke@example.test', $hash);
+          $created = $auth->accounts()->create('auth-smoke@example.test', $hash);
+          $account = $created->account;
+
+          if (!$created->successful() || $account === null) {
+              fwrite(STDERR, "Dependency-light account creation failed.\n");
+              exit(1);
+          }
+
           $result = $auth->authenticator()->login(new LoginRequest(
               $account->identifier(),
               $password,
