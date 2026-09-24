@@ -264,6 +264,49 @@ jobs:
           composer show infocyph/dblayer --no-interaction >/dev/null
           test -f config/database.php
 
+          cp composer.json "$work/composer.direct.json"
+          php -r '
+            $path = "composer.json";
+            $composer = json_decode(file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+            unset($composer["require"]["infocyph/dblayer"]);
+            file_put_contents($path, json_encode($composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL);
+          '
+          php infbyte module:show database --json=1 >"$work/show-transitive.json"
+          grep -q '"available":true' "$work/show-transitive.json"
+          grep -q '"direct":false' "$work/show-transitive.json"
+          grep -q '"transitive":true' "$work/show-transitive.json"
+          grep -q '"ownership_unknown":false' "$work/show-transitive.json"
+
+          printf '{invalid-json' > composer.json
+          set +e
+          php infbyte module:show database --json=1 >"$work/show-unknown.json" 2>"$work/show-unknown.err"
+          ownership_status=$?
+          set -e
+          cat "$work/show-unknown.err" >>"$work/show-unknown.json"
+          grep -q 'ownership_unknown' "$work/show-unknown.json"
+          grep -q 'composer.json is invalid' "$work/show-unknown.json"
+          if [[ "$ownership_status" -eq 0 ]]; then
+            echo "Invalid root Composer metadata unexpectedly reported healthy module ownership." >&2
+            exit 1
+          fi
+          cp "$work/composer.direct.json" composer.json
+
+          set +e
+          APP_CAPABILITIES=auth AUTH_STORAGE=database DB_CONNECTION=sqlite \
+            php infbyte module:schema:status auth --connection=sqlite --json=1 >"$work/auth-schema-without-db-capability.json" 2>&1
+          auth_schema_status=$?
+          set -e
+          if grep -qi 'database capability.*required\|enable.*database capability' "$work/auth-schema-without-db-capability.json"; then
+            cat "$work/auth-schema-without-db-capability.json" >&2
+            echo "Targeted auth schema inspection invented a database-capability prerequisite." >&2
+            exit 1
+          fi
+          if [[ "$auth_schema_status" -eq 0 ]]; then
+            grep -q '"schemas"' "$work/auth-schema-without-db-capability.json"
+          else
+            grep -q '"installed":false\|"state":"missing"\|"state":"unavailable"' "$work/auth-schema-without-db-capability.json"
+          fi
+
           printf '\n// infbyte-owned-config-marker\n' >> config/database.php
           php infbyte module:config:publish database --json=1 >"$work/publish-existing.json"
           grep -q 'infbyte-owned-config-marker' config/database.php
