@@ -3,7 +3,7 @@
 **Target:** InfByte release compatible with the published Foundation 3.0 package.  
 **Branch:** `foundation-3/runtime-lifecycle`.  
 **PR:** #9.  
-**Status:** pre-tag migration implementation is substantially complete; stable-package cutover and post-release consumer certification remain.  
+**Status:** Foundation 3.0 is released; stable-package cutover is complete and post-release consumer/module/runtime certification is in progress.  
 **Updated:** 2026-09-24.
 
 This is the canonical continuation plan for the InfByte skeleton after Foundation 3 is released. It intentionally preserves the consumer-side work that was previously recorded in Foundation planning files so those Foundation plan files can be removed without losing the handoff.
@@ -45,7 +45,7 @@ This file is self-contained. Completion must not depend on those Foundation plan
 
 ## 2. Current PR #9 baseline
 
-Current migration branch head reviewed: `0b6b035f0133fd9606e2e72291651dad0802bd28`.
+Foundation release baseline: tag `3.0`, source commit `441ccd713233036d927df98f402a0b36cd4d91da`. Stable InfByte cutover was validated by Security & Standards run #55 before the deeper consumer-rehearsal additions.
 
 Already implemented on the InfByte branch:
 
@@ -72,13 +72,13 @@ The normal Security & Standards workflow is expected to reject the pre-tag branc
 | Batch | Scope | Status | Completion gate |
 | --- | --- | --- | --- |
 | **A** | Pre-tag migration implementation | **DONE** | PR #9 baseline above remains green under the temporary handoff workflow. |
-| **B** | Stable Foundation 3 package cutover | **BLOCKED ON FOUNDATION RELEASE** | Replace branch alias with stable constraint and remove temporary workflow. |
-| **C** | Final released-contract resync | **TODO** | Skeleton defaults/docs/module expectations match the actual tagged package. |
-| **D** | Fresh-install and capability scenarios | **TODO** | Stable create-project plus lean and featureful applications pass. |
-| **E** | Module/config/schema lifecycle | **TODO** | Module planning/install/repair/config/schema/readiness flows pass on the real skeleton. |
-| **F** | Production release/runtime rehearsal | **TODO** | Trusted build, request, reload, drain and rollback behavior pass. |
-| **G** | 2.1 → 3.0 migration rehearsal | **TODO** | Representative existing application upgrades without hidden compatibility paths. |
-| **H** | Final CI/docs/publication evidence | **TODO** | Normal PHPForge release gates are green on the exact final InfByte revision. |
+| **B** | Stable Foundation 3 package cutover | **DONE** | Stable `^3.0`, no temporary workflow, normal PHPForge release guard/clean install green in run #55. |
+| **C** | Final released-contract resync | **IN PROGRESS** | Released catalog/docs/config audited; contract regressions added and current-head CI pending. |
+| **D** | Fresh-install and capability scenarios | **IN PROGRESS** | Exported stable-consumer CI gate added; current-head execution pending. |
+| **E** | Module/config/schema lifecycle | **IN PROGRESS** | Released module lifecycle CI gate added; current-head execution pending. |
+| **F** | Production release/runtime rehearsal | **IN PROGRESS** | Trusted digest, real HTTP, generation replacement/failure retention/read-only source gate added; current-head execution pending. |
+| **G** | 2.1 → 3.0 migration rehearsal | **IN PROGRESS** | Migration guide and legacy-artifact regression added; broader representative state migration remains. |
+| **H** | Final CI/docs/publication evidence | **IN PROGRESS** | Stable cutover matrix green in #55; exact final head must be green after post-release gates close. |
 
 ---
 
@@ -86,16 +86,16 @@ The normal Security & Standards workflow is expected to reject the pre-tag branc
 
 Start only after Foundation 3.0 is published through normal Composer resolution.
 
-- [ ] Confirm the released Foundation tag and source SHA.
-- [ ] Replace `"infocyph/foundation": "dev-foundation-3/close-26.6 as 3.0.0"` with the intended stable Foundation 3 constraint, normally `^3.0`.
-- [ ] Remove `.github/workflows/foundation3-handoff.yml`; it is a temporary pre-tag exception only.
-- [ ] Remove README/PR wording that points consumers at the Foundation development branch.
-- [ ] Resolve dependencies using normal Composer repositories with no path/VCS branch workaround.
-- [ ] Run `composer validate --strict`.
-- [ ] Run PHPForge's stable runtime constraint guard unchanged.
-- [ ] Verify no development-only Foundation/PHPForge dependency leaks into production `--no-dev` installation.
+- [x] Confirm the released Foundation tag and source SHA.
+- [x] Replace `"infocyph/foundation": "dev-foundation-3/close-26.6 as 3.0.0"` with the intended stable Foundation 3 constraint, normally `^3.0`.
+- [x] Remove `.github/workflows/foundation3-handoff.yml`; it is a temporary pre-tag exception only.
+- [x] Remove README/PR wording that points consumers at the Foundation development branch.
+- [x] Resolve dependencies using normal Composer repositories with no path/VCS branch workaround.
+- [x] Run `composer validate --strict`.
+- [x] Run PHPForge's stable runtime constraint guard unchanged.
+- [x] Verify no development-only Foundation/PHPForge dependency leaks into production `--no-dev` installation.
 
-**Acceptance:** InfByte installs the real Foundation 3 package normally and no pre-tag exception remains.
+**Acceptance:** DONE. Foundation `3.0` resolves normally through `^3.0`; the temporary handoff workflow is removed; PHPForge run #55 passed the stable release guard, all four QA variants, analysis, benchmarks and clean production install.
 
 ---
 
@@ -105,29 +105,29 @@ PR #9 predates the final Foundation 3 release-closure work, so re-audit it again
 
 ### Configuration and topology
 
-- [ ] Compare every checked-in InfByte config template with the released Foundation defaults/public contract.
-- [ ] Keep `config/cache.php` as a default application config, while keeping the cache capability cold when explicit topology omits `cache`.
-- [ ] Verify `APP_CAPABILITIES=` still creates the intended lean skeleton.
+- [x] Compare every checked-in InfByte config template with the released Foundation defaults/public contract.
+- [x] Keep `config/cache.php` as a default application config, while keeping the cache capability cold when explicit topology omits `cache`.
+- [x] Verify `APP_CAPABILITIES=` still creates the intended lean skeleton.
 - [ ] Verify omitted topology is documented only as compatibility/development inference where Foundation supports it; production examples should prefer explicit topology.
-- [ ] Verify provider registration remains application-owned and does not duplicate lower-library mechanics.
+- [x] Verify provider registration remains application-owned and does not duplicate lower-library mechanics.
 
 ### Module contract
 
-- [ ] Verify the seven specialist module names/aliases/features against the released catalog.
-- [ ] Verify built-in logging/operations/resources/session surfaces remain non-installable built-ins.
-- [ ] Verify `cache`/`cachelayer` are rejected as module lifecycle targets.
-- [ ] Verify current specialist package floors exposed by `module:show`/planning match the released Foundation catalog.
+- [x] Verify the seven specialist module names/aliases/features against the released catalog.
+- [x] Verify built-in logging/operations/resources/session surfaces remain non-installable built-ins.
+- [x] Verify `cache`/`cachelayer` are rejected as module lifecycle targets.
+- [x] Verify current specialist package floors exposed by `module:show`/planning match the released Foundation catalog.
 - [ ] Verify direct/transitive/ownership-unknown package reporting and constraint compatibility remain visible rather than inferred incorrectly.
-- [ ] Keep `module:install`, feature selection, enablement, config publication, schema applicability and readiness separate in docs/examples.
+- [x] Keep `module:install`, feature selection, enablement, config publication, schema applicability and readiness separate in docs/examples.
 
 ### Runtime/release contract
 
-- [ ] Recheck `public/index.php`, `bootstrap/app.php`, `deploy.sh`, writable paths, and archive filters against the released APIs.
-- [ ] Confirm the release manifest/dependency fingerprint contract used by InfByte matches the tagged Foundation implementation.
-- [ ] Confirm release trust remains external deployment/service configuration and is never learned from the writable generation itself.
-- [ ] Confirm documentation does not claim native FPM/Runwire/FrankenPHP/RoadRunner/Swoole certification beyond Foundation's declared 3.0 support statement.
+- [x] Recheck `public/index.php`, `bootstrap/app.php`, `deploy.sh`, writable paths, and archive filters against the released APIs.
+- [x] Confirm the release manifest/dependency fingerprint contract used by InfByte matches the tagged Foundation implementation.
+- [x] Confirm release trust remains external deployment/service configuration and is never learned from the writable generation itself.
+- [x] Confirm documentation does not claim native FPM/Runwire/FrankenPHP/RoadRunner/Swoole certification beyond Foundation's declared 3.0 support statement.
 
-**Acceptance:** there is no stale pre-release API/config/module assumption in the skeleton.
+**Acceptance:** implementation/docs audit is complete; current-head regression/consumer CI must pass before Batch C is closed.
 
 ---
 
@@ -232,16 +232,16 @@ Exercise the public lifecycle exactly as an application operator would.
 
 Use a representative InfByte/Foundation 2.1 application fixture rather than validating only a fresh install.
 
-- [ ] Record the starting Composer constraints/configuration/bootstrap/layout.
-- [ ] Upgrade to the released Foundation 3-compatible InfByte contract.
-- [ ] Replace implicit package activation with explicit capabilities.
-- [ ] Migrate retired route/container generated-artifact assumptions to the release-generation model.
-- [ ] Preserve application-owned custom providers and routes.
+- [x] Record the starting Composer constraints/configuration/bootstrap/layout.
+- [x] Upgrade to the released Foundation 3-compatible InfByte contract.
+- [x] Replace implicit package activation with explicit capabilities.
+- [x] Migrate retired route/container generated-artifact assumptions to the release-generation model.
+- [x] Preserve application-owned custom providers and routes.
 - [ ] Review auth credentials/tokens, browser sessions, OAuth/passkey data, module schemas and queued/durable payload compatibility where the fixture uses them.
 - [ ] Apply additive/expand-contract schema changes before incompatible cleanup.
-- [ ] Verify old generated artifacts cannot be trusted by the new dependency/configuration identity.
+- [x] Verify old generated artifacts cannot be trusted by the new dependency/configuration identity.
 - [ ] Run application tests, `module:doctor`, `optimize`, `app:ready`, and one real request after migration.
-- [ ] Document required manual changes and anything that cannot be automatically migrated.
+- [x] Document required manual changes and anything that cannot be automatically migrated.
 
 **Acceptance:** migration guidance is proven by an executable representative upgrade, not only by a new-project test.
 
