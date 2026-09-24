@@ -1,9 +1,9 @@
 # InfByte — Foundation 3 Post-Release Handoff Plan
 
-**Target:** InfByte release compatible with the published Foundation 3.0 package.  
+**Target:** InfByte release compatible with the published Foundation 3.0.1 package.  
 **Branch:** `foundation-3/runtime-lifecycle`.  
 **PR:** #9.  
-**Status:** Foundation 3.0 is released; stable-package cutover and all post-release native runtime/cache hardening are complete.  
+**Status:** Foundation 3.0.1 is published; InfByte stable-package cutover is implemented and in final exact-head qualification.  
 **Updated:** 2026-09-24.
 
 This is the canonical continuation plan for the InfByte skeleton after Foundation 3 is released. It intentionally preserves the consumer-side work that was previously recorded in Foundation planning files so those Foundation plan files can be removed without losing the handoff.
@@ -38,14 +38,14 @@ This file is self-contained. Completion must not depend on those Foundation plan
 8. Module package installation, feature selection, capability activation, configuration publication, schema applicability, and readiness are separate states.
 9. Release generations are dependency/configuration-bound; stale or incompatible artifacts must fail closed.
 10. Foundation owns generation activation/replacement and drain-safe generation retention; InfByte only supplies deployment UX and writable layout.
-11. The declared Foundation 3.0 support scope must not be broadened in InfByte documentation into unverified native-host compatibility claims.
+11. The declared Foundation 3.x support scope must not be broadened in InfByte documentation into unverified native-host compatibility claims.
 12. Migration is cumulative from Foundation 2.x to 3.0 and must account for configuration, generated artifacts, auth/session state, schemas, providers, and queued/persisted payload contracts where applicable.
 
 ---
 
 ## 2. Current PR #9 baseline
 
-Foundation release baseline: tag `3.0`, source commit `441ccd713233036d927df98f402a0b36cd4d91da`. Stable InfByte cutover was validated by Security & Standards run #55 before the deeper consumer-rehearsal additions.
+Current Foundation release baseline: tag `3.0.1`, merge/source commit `fc9b3258646ac744e61fd02e18d9b98e5afff2e8`. The original 3.0 cutover was validated by Security & Standards run #55 before the deeper post-release hardening and 3.0.1 publication.
 
 Already implemented on the InfByte branch:
 
@@ -81,6 +81,7 @@ The normal Security & Standards workflow is expected to reject the pre-tag branc
 | **H** | Final CI/docs/publication evidence | **DONE** | Security & Standards run #114 is fully green on released Foundation 3.x, including the normal PHPForge matrix, create-project, consumers, module lifecycle, generation lifecycle, 2.1→3.0 migration, and production auth/session lifecycle. |
 | **I** | Native Webrick + InterMix cache ownership hardening | **DONE** | Foundation #17 run #1770 and InfByte #9 run #130 prove native fused/generated/sharded Webrick caches, native InterMix generated-container validation, and no CacheLayer wrapper on compiled DI. |
 | **J** | ArrayKit-native configuration cache ownership | **DONE** | Foundation #17 run #1787 and InfByte #9 run #138 prove ArrayKit-native single/sharded caches and exported-skeleton consumption. |
+| **K** | Published Foundation 3.0.1 cutover | **IN PROGRESS** | Stable `^3.0.1`, no VCS candidate pin, normal Composer resolution, released native-cache/auth topology; final exact-head CI remains. |
 
 ---
 
@@ -414,7 +415,39 @@ Final Batch J evidence:
 
 ---
 
-## 13. Non-blocking application backlog preserved from Foundation review
+## 13. Batch K — published Foundation 3.0.1 cutover
+
+Foundation #17 is merged and published as Foundation `3.0.1`. InfByte must now
+consume the stable package directly and remove every certification-only VCS
+handoff used before publication.
+
+- [x] Confirm published tag `3.0.1` resolves to merge/source commit
+  `fc9b3258646ac744e61fd02e18d9b98e5afff2e8`.
+- [x] Raise the application runtime floor to
+  `"infocyph/foundation": "^3.0.1"`.
+- [x] Remove the Foundation VCS repository override from native runtime-cache
+  certification.
+- [x] Remove the development-branch alias and exact PR-head assertion from
+  certification.
+- [x] Certify Webrick fused/generated/sharded caches through the normally
+  resolved stable Foundation package.
+- [x] Certify ArrayKit single/sharded config caches through the normally
+  resolved stable Foundation package.
+- [x] Keep InterMix generated PHP as the native compiled DI cache with
+  CacheLayer outside the compiled-container hot path.
+- [x] Update current documentation/migration links to Foundation `3.0.1`.
+- [x] Fix the production TalkingBytes auth example to include Foundation's
+  native `notifications` capability.
+- [ ] Final InfByte PR #9 Security & Standards run is fully green on the exact
+  stable `^3.0.1` release head.
+
+**Acceptance:** pending final exact-head InfByte qualification through normal
+Composer repositories only. No VCS/path repository, development alias,
+PHPForge/PHPProbe bypass, or Foundation candidate SHA is allowed.
+
+---
+
+## 14. Non-blocking application backlog preserved from Foundation review
 
 These are **not Foundation 3 / InfByte migration blockers**. Re-evaluate them only against concrete application needs after the stable handoff is complete:
 
@@ -432,7 +465,7 @@ Each item needs a separate small design, compatibility decision, tests and perfo
 
 ---
 
-## 14. Guardrails
+## 15. Guardrails
 
 - Do not edit Foundation merely to satisfy an InfByte preference unless the **released Foundation contract itself is objectively broken** and reproduced independently of the skeleton.
 - Do not restore Foundation 2 route-cache/container-resolver switches.
