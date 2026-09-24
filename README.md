@@ -210,6 +210,7 @@ config/
   app.php
   auth.php
   cache.php
+  notifications.php
   router.php
 public/
 routes/
@@ -225,9 +226,11 @@ infbyte
 ```
 
 Only application-default config is checked in. `cache.php` is included because
-CacheLayer is Foundation core infrastructure. Database/filesystem/messaging/
-operations/security/session/validation/communication configuration is published
-only when the application chooses those specialist or built-in surfaces.
+CacheLayer is Foundation core infrastructure, and `notifications.php` is included
+because notifications are a Foundation-native application surface independent
+of the optional communication module. Database/filesystem/messaging/operations/
+security/session/validation/communication configuration is published only when
+the application chooses those specialist or built-in surfaces.
 
 ## Database
 
