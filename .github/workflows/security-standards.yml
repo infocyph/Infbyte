@@ -680,6 +680,10 @@ jobs:
               throw new RuntimeException('Rollback bootstrap did not consume the retained generation.');
           }
 
+          $originalManifest = file_get_contents($g1Manifest);
+          if (!is_string($originalManifest)) {
+              throw new RuntimeException('Unable to read rollback generation manifest.');
+          }
           $manifest = FoundationReleaseManifest::load($g1Manifest);
           $manifest['dependency_fingerprint'] = str_repeat('0', 32);
           FoundationReleaseManifest::write($g1Manifest, $manifest);
@@ -698,6 +702,7 @@ jobs:
           if (!$staleRejected) {
               throw new RuntimeException('Stale dependency-bound generation was not rejected.');
           }
+          file_put_contents($g1Manifest, $originalManifest);
 
           $active->activate($root, $g3);
           $removedAfterDrain = (new FoundationReleaseCompiler())->prune($root, keep: 1);
