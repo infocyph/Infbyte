@@ -71,6 +71,48 @@ jobs:
           composer check-platform-reqs --no-dev
           php infbyte app:install
 
+          APP_ENV=local APP_CAPABILITIES=auth php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          use Infocyph\Foundation\Auth\AuthServices;
+          use Infocyph\Foundation\Auth\Authentication\Login\LoginRequest;
+          use Infocyph\Foundation\Foundation;
+
+          require 'vendor/autoload.php';
+
+          $app = Foundation::web([
+              'base_path' => getcwd(),
+              '_config_cache' => false,
+          ])->boot();
+          $auth = $app->make(AuthServices::class);
+          $password = 'infbyte-auth-smoke-secret';
+          $hash = $auth->passwordHasher()->hash($password);
+          $account = $auth->accounts()->create('auth-smoke@example.test', $hash);
+          $result = $auth->authenticator()->login(new LoginRequest(
+              $account->identifier(),
+              $password,
+          ));
+
+          if (!$result->successful() || $result->principal === null || $result->session === null) {
+              fwrite(STDERR, "Dependency-light auth smoke failed.\n");
+              exit(1);
+          }
+          PHP
+
+          set +e
+          APP_ENV=production APP_DEBUG=false APP_CAPABILITIES=auth \
+            php infbyte config:validate --production >"$work/auth-production-guard.log" 2>&1
+          auth_guard_status=$?
+          set -e
+          if [[ "$auth_guard_status" -eq 0 ]]; then
+            cat "$work/auth-production-guard.log" >&2
+            echo "Production auth unexpectedly accepted the development-only simple MFA default." >&2
+            exit 1
+          fi
+          grep -q 'auth.drivers.mfa must not be "simple" in production' "$work/auth-production-guard.log"
+
           foundation_version="$(php -r 'require "vendor/autoload.php"; echo Composer\\InstalledVersions::getPrettyVersion("infocyph/foundation") ?? "";')"
           if [[ -z "$foundation_version" || "$foundation_version" == dev-* ]]; then
             printf 'Expected stable Foundation 3, got: %s\n' "$foundation_version" >&2
