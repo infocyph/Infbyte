@@ -1308,27 +1308,38 @@ jobs:
 
           # Webrick owns shard validation. Corrupt native shard hashes, then prove
           # the error appears lazily only when a matching shard is requested.
+          cat > "$work/tamper-shard.php" <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          $path = $argv[1] ?? '';
+          $source = file_get_contents($path);
+          if (!is_string($source)) {
+              throw new RuntimeException('Unable to read Webrick route shard.');
+          }
+
+          $count = 0;
+          $source = preg_replace_callback(
+              "/('_hash'\\s*=>\\s*)'[^']+'/ ",
+              static fn(array $match): string => $match[1] . "'" . str_repeat('0', 32) . "'",
+              $source,
+              1,
+              $count,
+          );
+          if (!is_string($source) || $count !== 1) {
+              exit(2);
+          }
+
+          file_put_contents($path, $source);
+          PHP
+
+          # Remove the readability space in the regex literal above before execution.
+          sed -i "s/'\/ $/\/\'/" "$work/tamper-shard.php"
+
           tampered=0
           while IFS= read -r shard; do
-            if php -r '
-              $path = $argv[1];
-              $source = file_get_contents($path);
-              if (!is_string($source)) {
-                  throw new RuntimeException("Unable to read Webrick route shard.");
-              }
-              $count = 0;
-              $source = preg_replace_callback(
-                  "/('_hash'\\s*=>\\s*)'[^']+'/",
-                  static fn(array $match): string => $match[1] . "'" . str_repeat("0", 32) . "'",
-                  $source,
-                  1,
-                  $count,
-              );
-              if (!is_string($source) || $count !== 1) {
-                  exit(2);
-              }
-              file_put_contents($path, $source);
-            ' "$shard"; then
+            if php "$work/tamper-shard.php" "$shard"; then
               tampered=$((tampered + 1))
             fi
           done < <(find "$shard_generation_root" -type f -name '*.php' ! -name '__*.php')
