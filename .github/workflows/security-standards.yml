@@ -1172,11 +1172,11 @@ jobs:
 
           composer install --no-interaction --prefer-dist --no-progress
           composer config repositories.foundation-candidate vcs https://github.com/infocyph/Foundation.git
-          composer require 'infocyph/foundation:dev-foundation-3.0/notification-static-compile-fix#0d68456b9b8eb0eae49dbd8f779182ba78bee3e0 as 3.0.1' \
+          composer require 'infocyph/foundation:dev-foundation-3.0/notification-static-compile-fix#e2fa2b809a0e17c278e6ddcb4fde9dfb391705f7 as 3.0.1' \
             --with-all-dependencies --no-interaction --prefer-dist --no-progress
 
           foundation_reference="$(composer show infocyph/foundation --format=json | php -r '$p=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $p["source"]["reference"] ?? "";')"
-          test "$foundation_reference" = "0d68456b9b8eb0eae49dbd8f779182ba78bee3e0"
+          test "$foundation_reference" = "e2fa2b809a0e17c278e6ddcb4fde9dfb391705f7"
 
           php infbyte app:install
           cp routes/api.php "$work/api.php"
