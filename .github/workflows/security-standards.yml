@@ -55,6 +55,7 @@ jobs:
               kill "$server_pid" 2>/dev/null || true
               wait "$server_pid" 2>/dev/null || true
             fi
+            chmod -R u+w "$work" 2>/dev/null || true
             rm -rf "$work"
           }
           trap cleanup EXIT
