@@ -435,7 +435,7 @@ jobs:
           test -f config/database.php
 
   released-auth-session:
-    name: "Foundation patch production auth/session"
+    name: "Released production auth/session"
     needs: phpforge
     runs-on: ubuntu-latest
     services:
@@ -473,13 +473,13 @@ jobs:
           cd "$work/project"
 
           composer install --no-interaction --prefer-dist --no-progress
-          composer config repositories.foundation-patch vcs https://github.com/infocyph/Foundation.git
-          composer require 'infocyph/foundation:dev-foundation-3.0/notification-static-compile-fix as 3.0.1' \
-            --with-all-dependencies --no-interaction --prefer-dist --no-progress
           php infbyte app:install
 
-          foundation_reference="$(composer show infocyph/foundation --format=json | php -r '$p=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $p["source"]["reference"] ?? "";')"
-          test "$foundation_reference" = "b59eacea763b8fb954581a2e6e81abdb33532bb6"
+          foundation_version="$(php -r 'require "vendor/autoload.php"; echo Composer\InstalledVersions::getPrettyVersion("infocyph/foundation") ?? "";')"
+          if [[ "$foundation_version" != 3.* ]]; then
+            printf 'Expected released Foundation 3.x, got %s\n' "$foundation_version" >&2
+            exit 1
+          fi
 
           APP_CAPABILITIES= php infbyte module:install database --json=1 | tee "$work/database-install.json"
           APP_CAPABILITIES= php infbyte module:install security --json=1 | tee "$work/security-install.json"
