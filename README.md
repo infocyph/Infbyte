@@ -265,7 +265,7 @@ php infbyte module:schema:install session --connection=sqlite
 Then configure the production topology explicitly, for example:
 
 ```text
-APP_CAPABILITIES=auth,cache,database,security,communication,session
+APP_CAPABILITIES=auth,cache,database,security,communication,notifications,session
 
 AUTH_STORAGE=database
 AUTH_CACHE=cache
@@ -431,7 +431,7 @@ Before deployment:
 Foundation 3 is a runtime-generation migration, not an in-place reuse of
 Foundation 2 generated caches. For a representative 2.1 application:
 
-1. change the Foundation runtime constraint from `^2.1.1` to `^3.0`;
+1. change the Foundation runtime constraint from `^2.1.1` to `^3.0.1`;
 2. add an explicit `APP_CAPABILITIES` topology for production;
 3. remove `app.container.alias`, `app.container.compiled_activation`, and any
    retired compiled-container path assumptions;
@@ -462,7 +462,7 @@ while old/new generations can coexist. Durable queue/message payloads likewise
 need version-compatible consumers before incompatible cleanup.
 
 See the
-[Foundation 2.x → 3.0 migration guide](https://github.com/infocyph/Foundation/blob/3.0/docs/foundation-3-migration.md)
+[Foundation 2.x → 3.0 migration guide](https://github.com/infocyph/Foundation/blob/3.0.1/docs/foundation-3-migration.md)
 for provider API, persisted-state, lower-library, and rollout details.
 
 ## Testing and release checks
@@ -474,8 +474,8 @@ performance matrix is performed in its dedicated release-verification phase.
 
 ## Documentation
 
-- [Foundation 3.0 documentation](https://github.com/infocyph/Foundation/tree/3.0/docs)
-- [Foundation 3 migration guide](https://github.com/infocyph/Foundation/blob/3.0/docs/foundation-3-migration.md)
+- [Foundation 3.0.1 documentation](https://github.com/infocyph/Foundation/tree/3.0.1/docs)
+- [Foundation 3 migration guide](https://github.com/infocyph/Foundation/blob/3.0.1/docs/foundation-3-migration.md)
 - [Omnibus](https://github.com/infocyph/Omnibus)
 - [Webrick](https://github.com/infocyph/Webrick)
 
