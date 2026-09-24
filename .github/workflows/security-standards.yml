@@ -78,16 +78,37 @@ jobs:
           fi
 
           APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte config:validate --production
-          release_json="$(APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte optimize --json=1)"
+          first_release_json="$(APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte optimize --json=1)"
           APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte app:ready
 
-          release_root="$(printf '%s' "$release_json" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["release_root"] ?? "";')"
-          manifest_sha="$(printf '%s' "$release_json" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["manifest_sha256"] ?? "";')"
-          generation="$(printf '%s' "$release_json" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["generation"] ?? "";')"
+          release_root="$(printf '%s' "$first_release_json" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["release_root"] ?? "";')"
+          first_generation="$(printf '%s' "$first_release_json" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["generation"] ?? "";')"
 
           test -n "$release_root"
+          test -n "$first_generation"
+
+          second_release_json="$(APP_NAME=InfbyteReplacement APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte optimize --json=1)"
+          generation="$(printf '%s' "$second_release_json" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["generation"] ?? "";')"
+          manifest_sha="$(printf '%s' "$second_release_json" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["manifest_sha256"] ?? "";')"
+
           test -n "$generation"
+          test "$generation" != "$first_generation"
+          test -d "$release_root/generations/$first_generation"
           [[ "$manifest_sha" =~ ^[a-f0-9]{64}$ ]]
+
+          set +e
+          ROUTER_MATCHER=invalid APP_NAME=BrokenRelease APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= \
+            php infbyte optimize --json=1 >"$work/failed-build.log" 2>&1
+          failed_build_status=$?
+          set -e
+          if [[ "$failed_build_status" -eq 0 ]]; then
+            cat "$work/failed-build.log" >&2
+            echo "Invalid release build unexpectedly succeeded." >&2
+            exit 1
+          fi
+
+          active_generation="$(APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte optimize:report --json=1 | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["generation"] ?? "";')"
+          test "$active_generation" = "$generation"
 
           wrong_sha="$(printf '0%.0s' {1..64})"
           set +e
@@ -102,6 +123,8 @@ jobs:
             echo "Production entrypoint accepted an invalid release manifest digest." >&2
             exit 1
           fi
+
+          chmod -R a-w app bootstrap config public routes
 
           port=18080
           INFOCYPH_FOUNDATION_RELEASE_ROOT="$release_root" \
@@ -178,14 +201,18 @@ jobs:
           composer show infocyph/dblayer --no-interaction >/dev/null
           test -f config/database.php
 
+          rm config/database.php
+          php infbyte module:repair database --json=1 >"$work/repair.json"
+          test -f config/database.php
+
           mkdir -p database
           touch database/database.sqlite
 
           php infbyte module:enable database --json=1 >"$work/enable.json"
           php infbyte module:show database --json=1 >"$work/show.json"
           grep -q '"direct":true' "$work/show.json"
+          php infbyte module:doctor database --json=1 >"$work/doctor.json"
 
-          php infbyte module:repair database --json=1 >"$work/repair.json"
           php infbyte module:disable database --json=1 >"$work/disable.json"
           php infbyte module:remove database --dry-run --json=1 >"$work/remove-plan.json"
           php infbyte module:remove database --json=1 >"$work/remove.json"
