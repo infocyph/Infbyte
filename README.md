@@ -336,6 +336,37 @@ Before deployment:
 - install its trusted manifest SHA-256 into the web/service process environment;
 - use a production web server and external process manager.
 
+
+## Upgrading an Infbyte 2.1 application
+
+Foundation 3 is a runtime-generation migration, not an in-place reuse of
+Foundation 2 generated caches. For a representative 2.1 application:
+
+1. change the Foundation runtime constraint from `^2.1.1` to `^3.0`;
+2. add an explicit `APP_CAPABILITIES` topology for production;
+3. remove `app.container.alias`, `app.container.compiled_activation`, and any
+   retired compiled-container path assumptions;
+4. remove any `router.cache` or `route:cache` deployment path assumptions;
+5. delete/ignore old `bootstrap/cache/container/*` and
+   `bootstrap/cache/routes/*` artifacts rather than trusting them after upgrade;
+6. add the core `config/cache.php` template, but do not install cache as a
+   module;
+7. update the production front controller to the trusted
+   `FoundationReleaseBootstrap` path and keep manifest trust in deployment
+   metadata outside the writable release directory;
+8. review specialist modules separately: installation does not enable a
+   capability, auth OTP/passkey features are explicit, and cache schemas use
+   `cache:schema:*`;
+9. rebuild with `php infbyte optimize`, install the returned manifest SHA-256
+   into the process environment, then run `php infbyte app:ready`;
+10. rehearse persisted auth/session/schema/queue data changes before rollout.
+    Code rollback does not automatically roll back database rows, queue payloads,
+    or key formats written by a newer generation.
+
+See the
+[Foundation 2.x → 3.0 migration guide](https://github.com/infocyph/Foundation/blob/3.0/docs/foundation-3-migration.md)
+for provider API, persisted-state, lower-library, and rollout details.
+
 ## Testing and release checks
 
 The current skeleton Composer file does not invent generic test/release script
