@@ -135,6 +135,7 @@ return [
         'redis' => [
             'driver' => 'redis',
             'connection' => 'redis',
+            'fail_open' => env_bool('CACHE_REDIS_FAIL_OPEN', false),
         ],
         'redis_cluster' => [
             'driver' => 'redis_cluster',
@@ -149,6 +150,7 @@ return [
         'valkey' => [
             'driver' => 'valkey',
             'connection' => 'valkey',
+            'fail_open' => env_bool('CACHE_VALKEY_FAIL_OPEN', false),
         ],
         'memcached' => [
             'driver' => 'memcached',
@@ -212,7 +214,16 @@ return [
     | is not a substitute for cross-process atomicity. Supported configured
     | counter drivers are Redis and Valkey.
     */
-    'counters' => [],
+    'counters' => [
+        'redis' => [
+            'driver' => 'redis',
+            'connection' => 'redis',
+        ],
+        'valkey' => [
+            'driver' => 'valkey',
+            'connection' => 'valkey',
+        ],
+    ],
 
     /*
     | Cluster invalidation transports are created only when a configured
