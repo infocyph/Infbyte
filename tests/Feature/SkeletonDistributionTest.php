@@ -14,6 +14,7 @@ it('ships only core application configuration before module installation', funct
         'app.php',
         'auth.php',
         'cache.php',
+        'notifications.php',
         'router.php',
     ]);
 });
