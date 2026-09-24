@@ -25,8 +25,8 @@ jobs:
       contents: read
 
 
-  release-candidate-create-project:
-    name: "Release-candidate create-project"
+  create-project:
+    name: "InfByte create-project"
     needs: phpforge
     runs-on: ubuntu-latest
     steps:
