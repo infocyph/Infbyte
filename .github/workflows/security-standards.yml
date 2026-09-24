@@ -115,10 +115,16 @@ jobs:
           set -e
           if [[ "$auth_guard_status" -eq 0 ]]; then
             cat "$work/auth-production-guard.log" >&2
-            echo "Production auth unexpectedly accepted the development-only simple MFA default." >&2
+            echo "Production auth unexpectedly accepted dependency-light development defaults." >&2
             exit 1
           fi
-          grep -q 'auth.drivers.mfa must not be "simple" in production' "$work/auth-production-guard.log"
+
+          auth_token_secret="$(grep '^AUTH_TOKEN_SECRET=' .env | cut -d= -f2-)"
+          if [[ -n "$auth_token_secret" ]] && grep -Fq "$auth_token_secret" "$work/auth-production-guard.log"; then
+            cat "$work/auth-production-guard.log" >&2
+            echo "Production validation leaked AUTH_TOKEN_SECRET." >&2
+            exit 1
+          fi
 
           foundation_version="$(php -r 'require "vendor/autoload.php"; echo Composer\\InstalledVersions::getPrettyVersion("infocyph/foundation") ?? "";')"
           if [[ -z "$foundation_version" || "$foundation_version" == dev-* ]]; then
