@@ -153,11 +153,11 @@ Test the **published** package, not only the repository checkout.
 
 ### D3 — auth/session application
 
-- [ ] Enable the required auth/session topology explicitly.
-- [ ] Install/configure the selected auth feature(s), including OTP/passkey only when selected.
-- [ ] Provision applicable schemas.
+- [x] Enable the required auth/session topology explicitly.
+- [x] Install/configure the selected auth feature(s), including OTP/passkey only when selected.
+- [x] Provision applicable schemas.
 - [ ] Exercise login/session issuance, rotation/invalidation, logout and one negative/stale-session path through the skeleton.
-- [ ] Verify secrets/tokens/cookies are not exposed by public errors/readiness output.
+- [x] Verify secrets/tokens/cookies are not exposed by public errors/readiness output.
 
 ### D4 — representative specialist application
 
@@ -246,6 +246,10 @@ Use a representative InfByte/Foundation 2.1 application fixture rather than vali
 **Acceptance:** DONE. Run #103 proves the representative Foundation 2.1 → 3.0 application upgrade and explicit persisted-state compatibility boundary.
 
 ---
+
+### Current external release blocker
+
+Foundation 3.0 production auth with `talkingbytes` notifications exposes a released static-compilation defect during `optimize`. The minimal Foundation fix is tracked in draft PR #17 (`foundation-3.0/notification-static-compile-fix`). InfByte keeps `infocyph/foundation:^3.0`; CI may pin the patch candidate only inside the dedicated auth certification fixture until a stable Foundation patch containing the fix is published.
 
 ## 10. Batch H — final release qualification
 
