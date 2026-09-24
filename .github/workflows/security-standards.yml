@@ -52,7 +52,7 @@ jobs:
             --repository='{"type":"vcs","url":"https://github.com/infocyph/Infbyte.git"}' \
             --no-dev \
             --no-interaction \
-            --prefer-source \
+            --prefer-dist \
             infocyph/infbyte \
             "$work/project" \
             'dev-foundation-3/runtime-lifecycle'
@@ -63,7 +63,10 @@ jobs:
           test ! -e plan.md
           test ! -d .github
 
-          source_sha="$(git rev-parse HEAD)"
+          source_sha="$(composer show --self --format=json | php -r '
+            $package = json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR);
+            echo $package["source"]["reference"] ?? "";
+          ')"
           if [[ "$source_sha" != "$HEAD_SHA" ]]; then
             printf 'create-project resolved %s instead of PR head %s\n' "$source_sha" "$HEAD_SHA" >&2
             exit 1
@@ -518,6 +521,10 @@ jobs:
           composer show infocyph/epicrypt --no-interaction >/dev/null
           composer show infocyph/talkingbytes --no-interaction >/dev/null
           composer show infocyph/otp --no-interaction >/dev/null
+          if composer show web-auth/webauthn-lib --no-interaction >/dev/null 2>&1; then
+            echo "OTP-only auth installation unexpectedly installed the passkey-only WebAuthn package." >&2
+            exit 1
+          fi
           php infbyte module:config:publish session --json=1 | tee "$work/session-config.json"
 
           php infbyte module:schema:install auth --connection=sqlite --json=1 | tee "$work/auth-schema.json"
@@ -525,8 +532,17 @@ jobs:
           grep -q '"installed":true' "$work/auth-schema.json"
           grep -q '"installed":true' "$work/session-schema.json"
 
-          php infbyte config:validate --production
-          php infbyte app:ready
+          php infbyte config:validate --production >"$work/auth-config-validate.log"
+          php infbyte app:ready >"$work/auth-ready.log"
+
+          auth_token_secret="$(grep '^AUTH_TOKEN_SECRET=' .env | cut -d= -f2-)"
+          for secret in "$auth_token_secret" "$CACHE_INTEGRITY_KEY" "$AUTH_OTP_RECOVERY_HMAC_KEY" "$AUTH_OTP_MFA_KEY"; do
+            if [[ -n "$secret" ]] && grep -Fq "$secret" "$work/auth-config-validate.log" "$work/auth-ready.log"; then
+              echo "Production auth diagnostics exposed secret material." >&2
+              exit 1
+            fi
+          done
+
           php infbyte optimize --json=1 >"$work/auth-release.json"
 
           php <<'PHP'
