@@ -285,8 +285,9 @@ jobs:
           cat "$work/show-unknown.err" >>"$work/show-unknown.json"
           grep -q 'ownership_unknown' "$work/show-unknown.json"
           grep -q 'composer.json is invalid' "$work/show-unknown.json"
-          if [[ "$ownership_status" -eq 0 ]]; then
-            echo "Invalid root Composer metadata unexpectedly reported healthy module ownership." >&2
+          if [[ "$ownership_status" -ne 0 ]]; then
+            cat "$work/show-unknown.json" >&2
+            echo "module:show should remain inspectable when root ownership metadata is unknown." >&2
             exit 1
           fi
           cp "$work/composer.direct.json" composer.json
@@ -411,11 +412,9 @@ jobs:
           composer install --no-interaction --prefer-dist --no-progress
           php infbyte app:install
 
-          php infbyte module:install database --json=1 >"$work/database-install.json"
-          php infbyte module:install security --json=1 >"$work/security-install.json"
-          php infbyte module:install communication --json=1 >"$work/communication-install.json"
-          php infbyte module:install auth --feature=otp --json=1 >"$work/auth-install.json"
-          php infbyte module:config:publish session --json=1 >"$work/session-config.json"
+          APP_CAPABILITIES= php infbyte module:install database --json=1 >"$work/database-install.json"
+          APP_CAPABILITIES= php infbyte module:install security --json=1 >"$work/security-install.json"
+          APP_CAPABILITIES= php infbyte module:install communication --json=1 >"$work/communication-install.json"
 
           mkdir -p database
           touch database/database.sqlite
@@ -445,8 +444,11 @@ jobs:
           export SESSION_DB_CONNECTION=sqlite
           export SESSION_LOCK_ENABLED=false
 
-          php infbyte module:schema:install auth --connection=sqlite --json=1 >"$work/auth-schema.json"
-          php infbyte module:schema:install session --connection=sqlite --json=1 >"$work/session-schema.json"
+          php infbyte module:install auth --feature=otp --json=1 | tee "$work/auth-install.json"
+          php infbyte module:config:publish session --json=1 | tee "$work/session-config.json"
+
+          php infbyte module:schema:install auth --connection=sqlite --json=1 | tee "$work/auth-schema.json"
+          php infbyte module:schema:install session --connection=sqlite --json=1 | tee "$work/session-schema.json"
           grep -q '"installed":true' "$work/auth-schema.json"
           grep -q '"installed":true' "$work/session-schema.json"
 
