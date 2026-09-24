@@ -1135,7 +1135,7 @@ jobs:
           server_pid=""
 
   released-native-route-caches:
-    name: "Foundation candidate native runtime caches"
+    name: "Released Foundation native runtime caches"
     needs: phpforge
     runs-on: ubuntu-latest
     steps:
@@ -1171,12 +1171,16 @@ jobs:
           cd "$work/project"
 
           composer install --no-interaction --prefer-dist --no-progress
-          composer config repositories.foundation-candidate vcs https://github.com/infocyph/Foundation.git
-          composer require 'infocyph/foundation:dev-foundation-3.0/notification-static-compile-fix#4560e91265be49ca815d8b113523c04efe1ff601 as 3.0.1' \
-            --with-all-dependencies --no-interaction --prefer-dist --no-progress
 
-          foundation_reference="$(composer show infocyph/foundation --format=json | php -r '$p=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $p["source"]["reference"] ?? "";')"
-          test "$foundation_reference" = "4560e91265be49ca815d8b113523c04efe1ff601"
+          php -r '
+            require "vendor/autoload.php";
+            $version = Composer\InstalledVersions::getVersion("infocyph/foundation") ?? "";
+            if (!version_compare($version, "3.0.1.0", ">=")
+                || version_compare($version, "4.0.0.0", ">=")
+            ) {
+                throw new RuntimeException("Expected released Foundation ^3.0.1, got " . $version);
+            }
+          '
 
           php infbyte app:install
           cp routes/api.php "$work/api.php"
@@ -1398,12 +1402,16 @@ jobs:
           cd "$work/project"
 
           composer install --no-interaction --prefer-dist --no-progress
-          composer config repositories.foundation-candidate vcs https://github.com/infocyph/Foundation.git
-          composer require 'infocyph/foundation:dev-foundation-3.0/notification-static-compile-fix#4560e91265be49ca815d8b113523c04efe1ff601 as 3.0.1' \
-            --with-all-dependencies --no-interaction --prefer-dist --no-progress
 
-          foundation_reference="$(composer show infocyph/foundation --format=json | php -r '$p=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $p["source"]["reference"] ?? "";')"
-          test "$foundation_reference" = "4560e91265be49ca815d8b113523c04efe1ff601"
+          php -r '
+            require "vendor/autoload.php";
+            $version = Composer\InstalledVersions::getVersion("infocyph/foundation") ?? "";
+            if (!version_compare($version, "3.0.1.0", ">=")
+                || version_compare($version, "4.0.0.0", ">=")
+            ) {
+                throw new RuntimeException("Expected released Foundation ^3.0.1, got " . $version);
+            }
+          '
 
           php infbyte app:install
           cp config/app.php "$work/app.php"
