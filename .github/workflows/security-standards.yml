@@ -23,3 +23,1446 @@ jobs:
       security-events: write
       actions: read
       contents: read
+
+
+  create-project:
+    name: "InfByte create-project"
+    needs: phpforge
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pcntl, pdo_sqlite
+          tools: composer:v2
+          coverage: none
+
+      - name: Create project through Composer VCS resolution
+        shell: bash
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+
+          composer create-project \
+            --repository='{"type":"vcs","url":"https://github.com/infocyph/Infbyte.git"}' \
+            --no-dev \
+            --no-interaction \
+            --prefer-dist \
+            infocyph/infbyte \
+            "$work/project" \
+            "dev-foundation-3/runtime-lifecycle#$HEAD_SHA"
+
+          cd "$work/project"
+
+          test -f .env
+          test ! -e plan.md
+          test ! -d .github
+
+          foundation_version="$(php -r 'require "vendor/autoload.php"; echo Composer\InstalledVersions::getPrettyVersion("infocyph/foundation") ?? "";')"
+          if [[ "$foundation_version" != 3.* || "$foundation_version" == dev-* ]]; then
+            printf 'Expected stable Foundation 3.x, got %s\n' "$foundation_version" >&2
+            exit 1
+          fi
+
+          APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte config:validate --production
+          release="$(APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte optimize --json=1)"
+          APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte app:ready
+
+          printf '%s' "$release" | php -r '
+            $r = json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR);
+            if (!is_string($r["generation"] ?? null) || ($r["generation"] ?? "") === "") {
+                fwrite(STDERR, "create-project release generation is missing.\n");
+                exit(1);
+            }
+            if (!is_string($r["manifest_sha256"] ?? null)
+                || preg_match("/^[a-f0-9]{64}$/D", $r["manifest_sha256"]) !== 1
+            ) {
+                fwrite(STDERR, "create-project manifest digest is invalid.\n");
+                exit(1);
+            }
+          '
+
+  released-consumer:
+    name: "Released consumer - PHP ${{ matrix.php }}"
+    needs: phpforge
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ["8.4", "8.5"]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "${{ matrix.php }}"
+          extensions: pcntl, pdo_sqlite
+          tools: composer:v2
+          coverage: none
+
+      - name: Verify exported stable Foundation 3 consumer
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          work="$(mktemp -d)"
+          server_pid=""
+          cleanup() {
+            if [[ -n "$server_pid" ]]; then
+              kill "$server_pid" 2>/dev/null || true
+              wait "$server_pid" 2>/dev/null || true
+            fi
+            chmod -R u+w "$work" 2>/dev/null || true
+            rm -rf "$work"
+          }
+          trap cleanup EXIT
+
+          composer archive --format=tar --dir="$work" --file=infbyte
+          mkdir "$work/project"
+          tar -xf "$work/infbyte.tar" -C "$work/project"
+          cd "$work/project"
+
+          test ! -e plan.md
+          test ! -d .github
+
+          composer install --no-dev --no-interaction --prefer-dist --no-progress --classmap-authoritative
+          composer check-platform-reqs --no-dev
+          php infbyte app:install
+
+          APP_ENV=local APP_CAPABILITIES=auth php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          use Infocyph\Foundation\Auth\AuthServices;
+          use Infocyph\Foundation\Auth\Authentication\Login\LoginRequest;
+          use Infocyph\Foundation\Foundation;
+
+          require 'vendor/autoload.php';
+
+          $app = Foundation::web([
+              'base_path' => getcwd(),
+              '_config_cache' => false,
+          ])->boot();
+          $auth = $app->make(AuthServices::class);
+          $password = 'infbyte-auth-smoke-secret';
+          $hash = $auth->passwordHasher()->hash($password);
+          $created = $auth->accounts()->create('auth-smoke@example.test', $hash);
+          $account = $created->account;
+
+          if (!$created->successful() || $account === null) {
+              fwrite(STDERR, "Dependency-light account creation failed.\n");
+              exit(1);
+          }
+
+          $result = $auth->authenticator()->login(new LoginRequest(
+              $account->identifier(),
+              $password,
+          ));
+
+          if (!$result->successful() || $result->principal === null || $result->session === null) {
+              fwrite(STDERR, "Dependency-light auth smoke failed.\n");
+              exit(1);
+          }
+          PHP
+
+          set +e
+          APP_ENV=production APP_DEBUG=false APP_CAPABILITIES=auth \
+            php infbyte config:validate --production >"$work/auth-production-guard.log" 2>&1
+          auth_guard_status=$?
+          set -e
+          if [[ "$auth_guard_status" -eq 0 ]]; then
+            cat "$work/auth-production-guard.log" >&2
+            echo "Production auth unexpectedly accepted dependency-light development defaults." >&2
+            exit 1
+          fi
+
+          auth_token_secret="$(grep '^AUTH_TOKEN_SECRET=' .env | cut -d= -f2-)"
+          if [[ -n "$auth_token_secret" ]] && grep -Fq "$auth_token_secret" "$work/auth-production-guard.log"; then
+            cat "$work/auth-production-guard.log" >&2
+            echo "Production validation leaked AUTH_TOKEN_SECRET." >&2
+            exit 1
+          fi
+
+          foundation_version="$(php -r 'require "vendor/autoload.php"; echo Composer\InstalledVersions::getPrettyVersion("infocyph/foundation") ?? "";')"
+          if [[ -z "$foundation_version" || "$foundation_version" == dev-* ]]; then
+            printf 'Expected stable Foundation 3, got: %s\n' "$foundation_version" >&2
+            exit 1
+          fi
+
+          APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte config:validate --production
+          first_release_json="$(APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte optimize --json=1)"
+          APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte app:ready
+
+          release_root="$(printf '%s' "$first_release_json" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["release_root"] ?? "";')"
+          first_generation="$(printf '%s' "$first_release_json" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["generation"] ?? "";')"
+
+          test -n "$release_root"
+          test -n "$first_generation"
+
+          second_release_json="$(APP_NAME=InfbyteReplacement APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte optimize --json=1)"
+          generation="$(printf '%s' "$second_release_json" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["generation"] ?? "";')"
+          manifest_sha="$(printf '%s' "$second_release_json" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["manifest_sha256"] ?? "";')"
+
+          test -n "$generation"
+          test "$generation" != "$first_generation"
+          test -d "$release_root/generations/$first_generation"
+          [[ "$manifest_sha" =~ ^[a-f0-9]{64}$ ]]
+
+          cp routes/api.php "$work/api.php"
+          printf '%s\n' '<?php throw new RuntimeException("Deliberate release-build failure.");' > routes/api.php
+          set +e
+          APP_NAME=BrokenRelease APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= \
+            php infbyte optimize --json=1 >"$work/failed-build.log" 2>&1
+          failed_build_status=$?
+          set -e
+          mv "$work/api.php" routes/api.php
+          if [[ "$failed_build_status" -eq 0 ]]; then
+            cat "$work/failed-build.log" >&2
+            echo "Deliberately broken release build unexpectedly succeeded." >&2
+            exit 1
+          fi
+
+          active_generation="$(APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte optimize:report --json=1 | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["generation"] ?? "";')"
+          test "$active_generation" = "$generation"
+
+          wrong_sha="$(printf '0%.0s' {1..64})"
+          set +e
+          INFOCYPH_FOUNDATION_RELEASE_ROOT="$release_root" \
+          INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256="$wrong_sha" \
+          APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= \
+            php public/index.php >"$work/wrong-trust.log" 2>&1
+          wrong_status=$?
+          set -e
+          if [[ "$wrong_status" -eq 0 ]]; then
+            cat "$work/wrong-trust.log" >&2
+            echo "Production entrypoint accepted an invalid release manifest digest." >&2
+            exit 1
+          fi
+
+          chmod -R a-w app bootstrap config public routes
+
+          port=18080
+          INFOCYPH_FOUNDATION_RELEASE_ROOT="$release_root" \
+          INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256="$manifest_sha" \
+          APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= \
+            php -S "127.0.0.1:$port" -t public public/index.php >"$work/server.log" 2>&1 &
+          server_pid=$!
+
+          response=""
+          for attempt in {1..40}; do
+            if response="$(curl --fail --silent "http://127.0.0.1:$port/api/health" 2>/dev/null)"; then
+              break
+            fi
+            sleep 0.25
+          done
+
+          if [[ "$response" != *'"status":"ok"'* ]]; then
+            cat "$work/server.log" >&2
+            printf 'Unexpected health response: %s\n' "$response" >&2
+            exit 1
+          fi
+
+          kill "$server_pid"
+          wait "$server_pid" 2>/dev/null || true
+          server_pid=""
+
+          php infbyte module:plan database --json=1 >"$work/database-plan.json"
+          grep -q '"infocyph/dblayer"' "$work/database-plan.json"
+
+          APP_CAPABILITIES=cache php infbyte cache:schema:status --json=1 >"$work/cache-schema.json"
+          grep -q '"schemas"' "$work/cache-schema.json"
+
+          if php infbyte module:show cache --json=1 >"$work/cache-module.log" 2>&1; then
+            cat "$work/cache-module.log" >&2
+            echo "Cache unexpectedly resolved as a specialist module." >&2
+            exit 1
+          fi
+
+  released-module-lifecycle:
+    name: "Released module lifecycle"
+    needs: phpforge
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pcntl, pdo_sqlite
+          tools: composer:v2
+          coverage: none
+
+      - name: Verify specialist module lifecycle in exported skeleton
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+
+          composer archive --format=tar --dir="$work" --file=infbyte
+          mkdir "$work/project"
+          tar -xf "$work/infbyte.tar" -C "$work/project"
+          cd "$work/project"
+
+          composer install --no-interaction --prefer-dist --no-progress
+          php infbyte app:install
+
+          php infbyte module:list --json=1 >"$work/modules.json"
+          grep -q '"database"' "$work/modules.json"
+          grep -q '"session"' "$work/modules.json"
+
+          php infbyte module:plan database --json=1 >"$work/plan.json"
+          grep -q '"infocyph/dblayer"' "$work/plan.json"
+
+          php infbyte module:install database --json=1 >"$work/install.json"
+          composer show infocyph/dblayer --no-interaction >/dev/null
+          test -f config/database.php
+
+          cp composer.json "$work/composer.direct.json"
+          php -r '
+            $path = "composer.json";
+            $composer = json_decode(file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+            unset($composer["require"]["infocyph/dblayer"]);
+            file_put_contents($path, json_encode($composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL);
+          '
+          php infbyte module:show database --json=1 >"$work/show-transitive.json"
+          grep -q '"available":true' "$work/show-transitive.json"
+          grep -q '"direct":false' "$work/show-transitive.json"
+          grep -q '"transitive":true' "$work/show-transitive.json"
+          grep -q '"ownership_unknown":false' "$work/show-transitive.json"
+
+          printf '{invalid-json' > composer.json
+          set +e
+          php infbyte module:show database --json=1 >"$work/show-unknown.json" 2>"$work/show-unknown.err"
+          ownership_status=$?
+          set -e
+          cat "$work/show-unknown.err" >>"$work/show-unknown.json"
+          grep -q 'ownership_unknown' "$work/show-unknown.json"
+          grep -q 'composer.json is invalid' "$work/show-unknown.json"
+          if [[ "$ownership_status" -ne 0 ]]; then
+            cat "$work/show-unknown.json" >&2
+            echo "module:show should remain inspectable when root ownership metadata is unknown." >&2
+            exit 1
+          fi
+          cp "$work/composer.direct.json" composer.json
+
+          set +e
+          APP_CAPABILITIES=auth AUTH_STORAGE=database DB_CONNECTION=sqlite \
+            php infbyte module:schema:status auth --connection=sqlite --json=1 >"$work/auth-schema-without-db-capability.json" 2>&1
+          auth_schema_status=$?
+          set -e
+          if grep -qi 'database capability.*required\|enable.*database capability' "$work/auth-schema-without-db-capability.json"; then
+            cat "$work/auth-schema-without-db-capability.json" >&2
+            echo "Targeted auth schema inspection invented a database-capability prerequisite." >&2
+            exit 1
+          fi
+          if [[ "$auth_schema_status" -eq 0 ]]; then
+            grep -q '"schemas"' "$work/auth-schema-without-db-capability.json"
+          else
+            grep -q '"installed":false\|"state":"missing"\|"state":"unavailable"' "$work/auth-schema-without-db-capability.json"
+          fi
+
+          printf '\n// infbyte-owned-config-marker\n' >> config/database.php
+          php infbyte module:config:publish database --json=1 >"$work/publish-existing.json"
+          grep -q 'infbyte-owned-config-marker' config/database.php
+
+          rm config/database.php
+          php infbyte module:repair database --json=1 >"$work/repair.json"
+          test -f config/database.php
+
+          mkdir -p database
+          touch database/database.sqlite
+
+          php infbyte module:enable database --json=1 >"$work/enable.json"
+          php infbyte module:show database --json=1 >"$work/show.json"
+          grep -q '"direct":true' "$work/show.json"
+          php infbyte module:doctor database --json=1 >"$work/doctor.json"
+
+          php infbyte module:config:publish session --json=1 >"$work/session-config.json"
+          test -f config/session.php
+
+          set +e
+          APP_CAPABILITIES=database,session SESSION_DRIVER=database DB_CONNECTION=sqlite \
+            php infbyte module:schema:status session --json=1 >"$work/session-schema-before.json"
+          session_schema_before=$?
+          set -e
+          if [[ "$session_schema_before" -eq 0 ]]; then
+            cat "$work/session-schema-before.json" >&2
+            echo "Database session schema unexpectedly reported ready before installation." >&2
+            exit 1
+          fi
+
+          APP_CAPABILITIES=database,session SESSION_DRIVER=database DB_CONNECTION=sqlite \
+            php infbyte module:schema:install session --json=1 >"$work/session-schema-install.json"
+          APP_CAPABILITIES=database,session SESSION_DRIVER=database DB_CONNECTION=sqlite \
+            php infbyte module:schema:status session --json=1 >"$work/session-schema-after.json"
+          grep -q '"installed":true' "$work/session-schema-after.json"
+
+          APP_CAPABILITIES=database,session SESSION_DRIVER=database DB_CONNECTION=sqlite \
+            php infbyte module:schema:sync --json=1 >"$work/schema-sync.json"
+
+          APP_CAPABILITIES=cache CACHE_STORE=sqlite \
+            php infbyte cache:schema:status --json=1 >"$work/cache-schema-before.json"
+          grep -q '"applicable":true' "$work/cache-schema-before.json"
+          grep -q '"installed":true' "$work/cache-schema-before.json"
+
+          APP_CAPABILITIES=cache CACHE_STORE=sqlite \
+            php infbyte cache:schema:install --json=1 >"$work/cache-schema-install.json"
+          grep -q '"installed":true' "$work/cache-schema-install.json"
+
+          APP_CAPABILITIES=cache CACHE_STORE=sqlite \
+            php infbyte cache:schema:status --json=1 >"$work/cache-schema-after.json"
+          grep -q '"installed":true' "$work/cache-schema-after.json"
+
+          php infbyte module:disable database --json=1 >"$work/disable.json"
+          php infbyte module:remove database --dry-run --json=1 >"$work/remove-plan.json"
+          php infbyte module:remove database --json=1 >"$work/remove.json"
+
+          if composer show infocyph/dblayer --no-interaction >/dev/null 2>&1; then
+            echo "DBLayer remained installed after specialist module removal." >&2
+            exit 1
+          fi
+
+          test -f config/database.php
+
+  released-auth-session:
+    name: "Released production auth/session"
+    needs: phpforge
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pcntl, pdo_sqlite, redis, sodium
+          tools: composer:v2
+          coverage: none
+
+      - name: Verify production auth and browser-session lifecycle
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+
+          composer archive --format=tar --dir="$work" --file=infbyte
+          mkdir "$work/project"
+          tar -xf "$work/infbyte.tar" -C "$work/project"
+          cd "$work/project"
+
+          composer install --no-interaction --prefer-dist --no-progress
+          php infbyte app:install
+
+          foundation_version="$(php -r 'require "vendor/autoload.php"; echo Composer\InstalledVersions::getPrettyVersion("infocyph/foundation") ?? "";')"
+          if [[ "$foundation_version" != 3.* ]]; then
+            printf 'Expected released Foundation 3.x, got %s\n' "$foundation_version" >&2
+            exit 1
+          fi
+
+          APP_CAPABILITIES= php infbyte module:install database --json=1 | tee "$work/database-install.json"
+          APP_CAPABILITIES= php infbyte module:install security --json=1 | tee "$work/security-install.json"
+          APP_CAPABILITIES= php infbyte module:install communication --json=1 | tee "$work/communication-install.json"
+
+          mkdir -p database
+          touch database/database.sqlite
+
+          export APP_ENV=production
+          export APP_DEBUG=false
+          export APP_URL=https://infbyte.example.test
+          export APP_CAPABILITIES=auth,cache,database,security,communication,notifications,session
+          export DB_CONNECTION=sqlite
+          export DB_DATABASE=database/database.sqlite
+          export AUTH_STORAGE=database
+          export AUTH_CACHE=cache
+          export AUTH_PASSWORDS=native
+          export AUTH_TOKENS=security
+          export SECURITY_JWT_ISSUER=https://infbyte.example.test
+          export SECURITY_JWT_AUDIENCE=infbyte-clients
+          export AUTH_MFA=otp
+          export AUTH_NOTIFICATIONS=talkingbytes
+          export AUTH_PASSKEY=disabled
+          export CACHE_STORE=auth-state
+          export CACHE_COUNTER=redis
+          export CACHE_REDIS_DSN=redis://127.0.0.1:6379
+          export CACHE_INTEGRITY_KEY="$(php -r 'echo bin2hex(random_bytes(32));')"
+          export AUTH_OTP_RECOVERY_HMAC_KEY="$(php -r 'echo bin2hex(random_bytes(32));')"
+          export AUTH_OTP_MFA_KEY="$(php -r 'echo rtrim(strtr(base64_encode(random_bytes(32)), "+/", "-_"), "=");')"
+          export AUTH_OTP_SECRET_PROTECTION_KEYS='[{"id":"ci-primary","environment":"AUTH_OTP_MFA_KEY","status":"active"}]'
+          export NOTIFICATIONS_AUTH_TRANSPORT=log
+          export COMMUNICATION_WEBHOOK_SECRET="$(php -r 'echo bin2hex(random_bytes(32));')"
+          export COMMUNICATION_WEBHOOK_REPLAY_ENABLED=true
+          export COMMUNICATION_WEBHOOK_REPLAY_STORE=auth-state
+          export SESSION_DRIVER=database
+          export SESSION_DB_CONNECTION=sqlite
+          export SESSION_LOCK_ENABLED=true
+          export SESSION_LOCK_STORE=auth-state
+
+          APP_ENV=local APP_CAPABILITIES=auth,database AUTH_STORAGE=database AUTH_MFA=simple \
+            php infbyte module:install auth --feature=otp --connection=sqlite --json=1 | tee "$work/auth-install.json"
+          composer show infocyph/dblayer --no-interaction >/dev/null
+          composer show infocyph/epicrypt --no-interaction >/dev/null
+          composer show infocyph/talkingbytes --no-interaction >/dev/null
+          composer show infocyph/otp --no-interaction >/dev/null
+          if composer show web-auth/webauthn-lib --no-interaction >/dev/null 2>&1; then
+            echo "OTP-only auth installation unexpectedly installed the passkey-only WebAuthn package." >&2
+            exit 1
+          fi
+          php infbyte module:config:publish session --json=1 | tee "$work/session-config.json"
+
+          php infbyte module:schema:install auth --connection=sqlite --json=1 | tee "$work/auth-schema.json"
+          php infbyte module:schema:install session --connection=sqlite --json=1 | tee "$work/session-schema.json"
+          grep -q '"installed":true' "$work/auth-schema.json"
+          grep -q '"installed":true' "$work/session-schema.json"
+
+          php infbyte config:validate --production >"$work/auth-config-validate.log"
+          php infbyte app:ready >"$work/auth-ready.log"
+
+          auth_token_secret="$(grep '^AUTH_TOKEN_SECRET=' .env | cut -d= -f2-)"
+          for secret in "$auth_token_secret" "$CACHE_INTEGRITY_KEY" "$AUTH_OTP_RECOVERY_HMAC_KEY" "$AUTH_OTP_MFA_KEY"; do
+            if [[ -n "$secret" ]] && grep -Fq "$secret" "$work/auth-config-validate.log" "$work/auth-ready.log"; then
+              echo "Production auth diagnostics exposed secret material." >&2
+              exit 1
+            fi
+          done
+
+          php infbyte optimize --json=1 >"$work/auth-release.json"
+
+          php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          use Infocyph\Foundation\Auth\AuthServices;
+          use Infocyph\Foundation\Auth\Authentication\Login\LoginRequest;
+          use Infocyph\Foundation\Foundation;
+          use Infocyph\Foundation\Session\SessionManager;
+
+          require 'vendor/autoload.php';
+
+          $app = Foundation::cli([
+              'base_path' => getcwd(),
+              '_config_cache' => false,
+          ])->boot();
+
+          $auth = $app->make(AuthServices::class);
+          $password = 'production-auth-smoke-secret';
+          $hash = $auth->passwordHasher()->hash($password);
+          $created = $auth->accounts()->create('production-auth@example.test', $hash);
+
+          if (!$created->successful() || $created->account === null) {
+              fwrite(STDERR, "Production account creation failed.\n");
+              exit(1);
+          }
+
+          $login = $auth->authenticator()->login(new LoginRequest(
+              $created->account->identifier(),
+              $password,
+          ));
+          if (!$login->successful() || $login->principal === null || $login->session === null) {
+              fwrite(STDERR, "Production login/session issuance failed.\n");
+              exit(1);
+          }
+
+          $oldAuthSessionId = $login->session->id;
+          $rotated = $auth->sessions()->rotate($oldAuthSessionId);
+          if ($rotated->id === $oldAuthSessionId || $auth->sessions()->touch($oldAuthSessionId) !== null) {
+              fwrite(STDERR, "Auth session rotation did not retire the stale session id.\n");
+              exit(1);
+          }
+
+          $auth->authenticator()->logout($login->principal, $rotated->id);
+          if ($auth->sessions()->touch($rotated->id) !== null) {
+              fwrite(STDERR, "Auth logout did not revoke the rotated session.\n");
+              exit(1);
+          }
+
+          $sessionManager = $app->make(SessionManager::class);
+          $browser = static fn(?string $candidateId) => $sessionManager->open($candidateId);
+
+          $initial = $browser(null);
+          $initial->put('account_id', $created->account->id());
+          $initialCommit = $initial->commit(time());
+          $initialId = $initialCommit->id;
+          if (!is_string($initialId) || strlen($initialId) !== 64) {
+              fwrite(STDERR, "Browser session issuance failed.\n");
+              exit(1);
+          }
+          $initial->release();
+
+          $current = $browser($initialId);
+          if ($current->get('account_id') !== $created->account->id()) {
+              fwrite(STDERR, "Browser session persistence failed.\n");
+              exit(1);
+          }
+          $rotatedBrowserId = $current->regenerate();
+          $current->commit(time());
+          $current->release();
+
+          if ($rotatedBrowserId === $initialId) {
+              fwrite(STDERR, "Browser session regeneration reused the old id.\n");
+              exit(1);
+          }
+
+          $stale = $browser($initialId);
+          if ($stale->get('account_id') !== null) {
+              fwrite(STDERR, "Stale browser session id retained authority after regeneration.\n");
+              exit(1);
+          }
+          $stale->release();
+
+          $active = $browser($rotatedBrowserId);
+          if ($active->get('account_id') !== $created->account->id()) {
+              fwrite(STDERR, "Regenerated browser session lost persisted state.\n");
+              exit(1);
+          }
+          $active->invalidate();
+          $invalidatedId = $active->commit(time())->id;
+          $active->release();
+
+          if (!is_string($invalidatedId) || $invalidatedId === $rotatedBrowserId) {
+              fwrite(STDERR, "Browser session invalidation did not issue a clean id.\n");
+              exit(1);
+          }
+
+          $revoked = $browser($rotatedBrowserId);
+          if ($revoked->get('account_id') !== null) {
+              fwrite(STDERR, "Invalidated browser session id remained usable.\n");
+              exit(1);
+          }
+          $revoked->release();
+          PHP
+
+  released-generation-lifecycle:
+    name: "Released generation lifecycle"
+    needs: phpforge
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pcntl, pdo_sqlite
+          tools: composer:v2
+          coverage: none
+
+      - name: Verify release replacement, drain, rollback and stale rejection
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+
+          composer archive --format=tar --dir="$work" --file=infbyte
+          mkdir "$work/project"
+          tar -xf "$work/infbyte.tar" -C "$work/project"
+          cd "$work/project"
+
+          composer install --no-dev --no-interaction --prefer-dist --no-progress --classmap-authoritative
+          php infbyte app:install
+
+          export APP_ENV=production
+          export APP_DEBUG=false
+          export APP_CAPABILITIES=
+
+          one="$(APP_NAME=GenerationOne php infbyte optimize --json=1)"
+          two="$(APP_NAME=GenerationTwo php infbyte optimize --json=1)"
+          three="$(APP_NAME=GenerationThree php infbyte optimize --json=1)"
+
+          export RELEASE_ROOT="$(printf '%s' "$three" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["release_root"] ?? "";')"
+          export G1="$(printf '%s' "$one" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["generation"] ?? "";')"
+          export G2="$(printf '%s' "$two" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["generation"] ?? "";')"
+          export G3="$(printf '%s' "$three" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["generation"] ?? "";')"
+
+          test -n "$RELEASE_ROOT"
+          test -n "$G1"
+          test -n "$G2"
+          test -n "$G3"
+
+          php infbyte runtime:reload --json=1 >"$work/runtime-reload.json"
+          grep -q '"scope":"runtime"' "$work/runtime-reload.json"
+          grep -q '"token":"' "$work/runtime-reload.json"
+
+          php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          use Infocyph\Foundation\Application\RuntimeMode;
+          use Infocyph\Foundation\Release\ActiveGeneration;
+          use Infocyph\Foundation\Release\FoundationReleaseBootstrap;
+          use Infocyph\Foundation\Release\FoundationReleaseCompiler;
+          use Infocyph\Foundation\Release\FoundationReleaseManifest;
+          use Infocyph\Foundation\Runtime\ReleaseGenerationLease;
+
+          require 'vendor/autoload.php';
+
+          $root = (string) getenv('RELEASE_ROOT');
+          $g1 = (string) getenv('G1');
+          $g2 = (string) getenv('G2');
+          $g3 = (string) getenv('G3');
+
+          foreach ([$root, $g1, $g2, $g3] as $value) {
+              if ($value === '') {
+                  throw new RuntimeException('Release lifecycle environment is incomplete.');
+              }
+          }
+
+          touch($root . '/generations/' . $g1, 100);
+          touch($root . '/generations/' . $g2, 200);
+          touch($root . '/generations/' . $g3, 300);
+
+          $lease = ReleaseGenerationLease::acquireShared($root, $g1);
+          $removedWhileDraining = (new FoundationReleaseCompiler())->prune($root, keep: 1);
+
+          if (!is_dir($root . '/generations/' . $g1)) {
+              throw new RuntimeException('Draining generation was pruned while its shared lease was held.');
+          }
+          if (is_dir($root . '/generations/' . $g2)) {
+              throw new RuntimeException('Unleased obsolete generation was not pruned.');
+          }
+          if (in_array($g1, $removedWhileDraining, true)) {
+              throw new RuntimeException('Drain-protected generation was reported as removed.');
+          }
+
+          $lease->release();
+
+          $active = new ActiveGeneration();
+          $active->activate($root, $g1);
+          $g1Manifest = $root . '/generations/' . $g1 . '/foundation.php';
+          $g1Sha = hash_file('sha256', $g1Manifest);
+          if (!is_string($g1Sha)) {
+              throw new RuntimeException('Unable to hash rollback generation manifest.');
+          }
+
+          $rollbackCode = <<<'ROLLBACK'
+          require 'vendor/autoload.php';
+
+          $bootstrap = new \Infocyph\Foundation\Release\FoundationReleaseBootstrap(
+              (string) getenv('RELEASE_ROOT'),
+              (string) getenv('ROLLBACK_SHA'),
+          );
+          $app = $bootstrap->nonWeb(
+              ['base_path' => getcwd()],
+              \Infocyph\Foundation\Application\RuntimeMode::Cli,
+          );
+          if ($app->config()->get('app.name') !== 'GenerationOne') {
+              fwrite(STDERR, "Rollback bootstrap did not consume the retained generation.\n");
+              exit(1);
+          }
+          ROLLBACK;
+          putenv('ROLLBACK_SHA=' . $g1Sha);
+          $rollbackOutput = [];
+          $rollbackStatus = 0;
+          exec(
+              escapeshellarg(PHP_BINARY) . ' -r ' . escapeshellarg($rollbackCode),
+              $rollbackOutput,
+              $rollbackStatus,
+          );
+          if ($rollbackStatus !== 0) {
+              throw new RuntimeException('Rollback generation subprocess failed.');
+          }
+
+          $originalManifest = file_get_contents($g1Manifest);
+          if (!is_string($originalManifest)) {
+              throw new RuntimeException('Unable to read rollback generation manifest.');
+          }
+          $manifest = FoundationReleaseManifest::load($g1Manifest);
+          $manifest['dependency_fingerprint'] = str_repeat('0', 32);
+          FoundationReleaseManifest::write($g1Manifest, $manifest);
+          $tamperedSha = hash_file('sha256', $g1Manifest);
+          if (!is_string($tamperedSha)) {
+              throw new RuntimeException('Unable to hash stale generation manifest.');
+          }
+
+          $staleRejected = false;
+          try {
+              (new FoundationReleaseBootstrap($root, $tamperedSha))
+                  ->nonWeb(['base_path' => getcwd()], RuntimeMode::Cli);
+          } catch (Throwable) {
+              $staleRejected = true;
+          }
+          if (!$staleRejected) {
+              throw new RuntimeException('Stale dependency-bound generation was not rejected.');
+          }
+          file_put_contents($g1Manifest, $originalManifest);
+
+          $active->activate($root, $g3);
+          $retirementLease = ReleaseGenerationLease::tryExclusive($root, $g1);
+          if (!$retirementLease instanceof ReleaseGenerationLease) {
+              throw new RuntimeException('Released drain generation remained lease-protected after process exit.');
+          }
+          $retirementLease->release();
+
+          $current = $active->current($root);
+          if (($current['generation'] ?? null) !== $g3) {
+              throw new RuntimeException('Active generation changed unexpectedly after rollback rehearsal.');
+          }
+          PHP
+
+  foundation21-migration:
+    name: "Infbyte 2.1 to Foundation 3 migration"
+    needs: phpforge
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pcntl, pdo_sqlite
+          tools: composer:v2
+          coverage: none
+
+      - name: Rehearse representative 2.1 application upgrade
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          root="$PWD"
+          work="$(mktemp -d)"
+          server_pid=""
+          cleanup() {
+            if [[ -n "$server_pid" ]]; then
+              kill "$server_pid" 2>/dev/null || true
+              wait "$server_pid" 2>/dev/null || true
+            fi
+            git -C "$root" worktree remove --force "$work/legacy" 2>/dev/null || true
+            rm -rf "$work"
+          }
+          trap cleanup EXIT
+
+          composer archive --format=tar --dir="$work" --file=infbyte3
+          git worktree add --detach "$work/legacy" origin/main
+          cd "$work/legacy"
+
+          composer install --no-dev --no-interaction --prefer-dist --no-progress
+          php infbyte app:install
+
+          foundation_before="$(php -r 'require "vendor/autoload.php"; echo Composer\InstalledVersions::getPrettyVersion("infocyph/foundation") ?? "";')"
+          if [[ "$foundation_before" != 2.1.* ]]; then
+            printf 'Expected Foundation 2.1.x migration baseline, got %s\n' "$foundation_before" >&2
+            exit 1
+          fi
+
+          mkdir -p app/Providers routes database storage/sessions
+          cat > app/Providers/LegacyProvider.php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          namespace App\Providers;
+
+          use Infocyph\Foundation\Application\Application;
+          use Infocyph\Foundation\Application\ServiceProviderInterface;
+
+          final class LegacyProvider implements ServiceProviderInterface
+          {
+              public function register(Application $app): void {}
+
+              public function boot(Application $app): void {}
+          }
+          PHP
+
+          cat > routes/custom.php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          use App\Http\Controllers\SystemController;
+          use Infocyph\Webrick\Router\Definition\Registrar;
+
+          /** @var Registrar $router */
+          $router->get('/migration-health', SystemController::health(...));
+          PHP
+
+          php -r '
+            $pdo = new PDO("sqlite:database/application.sqlite");
+            $pdo->exec("CREATE TABLE preserved_data (id INTEGER PRIMARY KEY, value TEXT NOT NULL)");
+            $stmt = $pdo->prepare("INSERT INTO preserved_data (value) VALUES (?)");
+            $stmt->execute(["foundation-2.1-preserved"]);
+          '
+
+          export LEGACY_SESSION_ID_FILE="$work/legacy-session-id"
+          php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          use Infocyph\Foundation\Session\BrowserSession;
+          use Infocyph\Foundation\Session\SessionConfig;
+          use Infocyph\Foundation\Session\Store\FileSessionStore;
+
+          require 'vendor/autoload.php';
+
+          $directory = getcwd() . '/storage/sessions';
+          $config = new SessionConfig(
+              driver: 'file',
+              lifetimeSeconds: 7200,
+              maxPayloadBytes: 65536,
+              cookieName: 'foundation_session',
+              cookiePath: '/',
+              cookieDomain: null,
+              cookieSecure: true,
+              cookieHttpOnly: true,
+              cookieSameSite: 'Lax',
+              filePath: $directory,
+              cacheStore: null,
+              databaseConnection: null,
+              databaseTable: 'sessions',
+              lockEnabled: false,
+              lockStore: null,
+              lockWaitSeconds: 2.0,
+              lockLeaseSeconds: 30.0,
+              csrfHeader: 'X-CSRF-Token',
+              csrfField: '_token',
+              csrfCheckOrigin: true,
+              csrfOrigin: null,
+          );
+          $store = new FileSessionStore($directory);
+          $session = new BrowserSession(null, static fn() => $store, static fn() => null, $config);
+          $session->put('migration_marker', 'foundation-2.1-session');
+          $commit = $session->commit(time());
+          $session->release();
+
+          if (!is_string($commit->id)) {
+              throw new RuntimeException('Unable to create Foundation 2.1 browser session fixture.');
+          }
+          file_put_contents((string) getenv('LEGACY_SESSION_ID_FILE'), $commit->id);
+          PHP
+
+          legacy_session_id="$(cat "$work/legacy-session-id")"
+          test -n "$legacy_session_id"
+
+          rm -rf vendor composer.lock
+          tar -xf "$work/infbyte3.tar" -C "$work/legacy"
+
+          test -f app/Providers/LegacyProvider.php
+          test -f routes/custom.php
+          test -f database/application.sqlite
+          test -n "$(find storage/sessions -type f -name '*.json' -print -quit)"
+
+          cat > app/Providers/LegacyProvider.php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          namespace App\Providers;
+
+          use Infocyph\Foundation\Application\Application;
+          use Infocyph\Foundation\Application\FoundationBuildContext;
+          use Infocyph\Foundation\Application\ServiceProviderInterface;
+          use Infocyph\InterMix\DI\ContainerBuilder;
+
+          final class LegacyProvider implements ServiceProviderInterface
+          {
+              public function contribute(ContainerBuilder $builder, FoundationBuildContext $context): void {}
+
+              public function boot(Application $app): void {}
+          }
+          PHP
+
+          cat > bootstrap/providers.php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          return [
+              'common' => [
+                  \App\Providers\LegacyProvider::class,
+              ],
+              'web' => [],
+              'cli' => [],
+              'worker' => [],
+              'scheduler' => [],
+          ];
+          PHP
+
+          cat > config/router.php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          return [
+              'files' => [
+                  'api.php',
+                  'custom.php',
+              ],
+              'matcher' => env_string('ROUTER_MATCHER', 'fused'),
+          ];
+          PHP
+
+          composer install --no-interaction --prefer-dist --no-progress
+          php infbyte app:install
+
+          foundation_after="$(php -r 'require "vendor/autoload.php"; echo Composer\InstalledVersions::getPrettyVersion("infocyph/foundation") ?? "";')"
+          if [[ "$foundation_after" != 3.* ]]; then
+            printf 'Expected Foundation 3.x after migration, got %s\n' "$foundation_after" >&2
+            exit 1
+          fi
+
+          export LEGACY_SESSION_ID="$legacy_session_id"
+          php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          use Infocyph\Foundation\Session\BrowserSession;
+          use Infocyph\Foundation\Session\SessionConfig;
+          use Infocyph\Foundation\Session\Store\FileSessionStore;
+
+          require 'vendor/autoload.php';
+
+          $directory = getcwd() . '/storage/sessions';
+          $config = new SessionConfig(
+              driver: 'file',
+              lifetimeSeconds: 7200,
+              maxPayloadBytes: 65536,
+              cookieName: 'foundation_session',
+              cookiePath: '/',
+              cookieDomain: null,
+              cookieSecure: true,
+              cookieHttpOnly: true,
+              cookieSameSite: 'Lax',
+              filePath: $directory,
+              cacheStore: null,
+              databaseConnection: null,
+              databaseTable: 'sessions',
+              lockEnabled: false,
+              lockStore: null,
+              lockWaitSeconds: 2.0,
+              lockLeaseSeconds: 30.0,
+              csrfHeader: 'X-CSRF-Token',
+              csrfField: '_token',
+              csrfCheckOrigin: true,
+              csrfOrigin: null,
+          );
+          $store = new FileSessionStore($directory);
+          $session = new BrowserSession(
+              (string) getenv('LEGACY_SESSION_ID'),
+              static fn() => $store,
+              static fn() => null,
+              $config,
+          );
+
+          if ($session->get('migration_marker') !== null) {
+              throw new RuntimeException('Foundation 2.1 browser session was silently trusted after the 3.0 migration.');
+          }
+          $session->release();
+
+          $pdo = new PDO('sqlite:database/application.sqlite');
+          $value = $pdo->query('SELECT value FROM preserved_data WHERE id = 1')->fetchColumn();
+          if ($value !== 'foundation-2.1-preserved') {
+              throw new RuntimeException('Application-owned persisted data did not survive the skeleton migration.');
+          }
+          PHP
+
+          cat > .migration-phpunit.xml <<'XML'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <phpunit bootstrap="vendor/autoload.php" colors="true" cacheDirectory=".phpunit.cache">
+              <testsuites>
+                  <testsuite name="Infbyte migrated application">
+                      <directory>tests</directory>
+                  </testsuite>
+              </testsuites>
+          </phpunit>
+          XML
+          vendor/bin/pest \
+            --configuration .migration-phpunit.xml \
+            tests/Feature/ExampleTest.php tests/Unit/ExampleTest.php
+          rm .migration-phpunit.xml
+          php infbyte module:doctor auth --json=1 >"$work/module-doctor.json"
+
+          export APP_ENV=production
+          export APP_DEBUG=false
+          export APP_CAPABILITIES=
+          php infbyte config:validate --production
+          release="$(php infbyte optimize --json=1)"
+          php infbyte app:ready
+
+          release_root="$(printf '%s' "$release" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["release_root"] ?? "";')"
+          manifest_sha="$(printf '%s' "$release" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["manifest_sha256"] ?? "";')"
+
+          port=18081
+          INFOCYPH_FOUNDATION_RELEASE_ROOT="$release_root" \
+          INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256="$manifest_sha" \
+            php -S "127.0.0.1:$port" -t public public/index.php >"$work/migration-server.log" 2>&1 &
+          server_pid=$!
+
+          response=""
+          for attempt in {1..40}; do
+            if response="$(curl --fail --silent "http://127.0.0.1:$port/migration-health" 2>/dev/null)"; then
+              break
+            fi
+            sleep 0.25
+          done
+
+          if [[ "$response" != *'"status":"ok"'* ]]; then
+            cat "$work/migration-server.log" >&2
+            printf 'Migrated custom route failed: %s\n' "$response" >&2
+            exit 1
+          fi
+
+          kill "$server_pid"
+          wait "$server_pid" 2>/dev/null || true
+          server_pid=""
+
+  released-native-route-caches:
+    name: "Released Foundation native runtime caches"
+    needs: phpforge
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pcntl, pdo_sqlite
+          tools: composer:v2
+          coverage: none
+
+      - name: Verify native Webrick matcher caches
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          work="$(mktemp -d)"
+          server_pid=""
+          cleanup() {
+            if [[ -n "$server_pid" ]]; then
+              kill "$server_pid" 2>/dev/null || true
+              wait "$server_pid" 2>/dev/null || true
+            fi
+            rm -rf "$work"
+          }
+          trap cleanup EXIT
+
+          composer archive --format=tar --dir="$work" --file=infbyte
+          mkdir "$work/project"
+          tar -xf "$work/infbyte.tar" -C "$work/project"
+          cd "$work/project"
+
+          composer install --no-interaction --prefer-dist --no-progress
+
+          php -r '
+            require "vendor/autoload.php";
+            $version = Composer\InstalledVersions::getVersion("infocyph/foundation") ?? "";
+            if (!version_compare($version, "3.0.1.0", ">=")
+                || version_compare($version, "4.0.0.0", ">=")
+            ) {
+                throw new RuntimeException("Expected released Foundation ^3.0.1, got " . $version);
+            }
+          '
+
+          php infbyte app:install
+          cp routes/api.php "$work/api.php"
+
+          cat > routes/native-cache.php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          use App\Http\Controllers\SystemController;
+          use Infocyph\Webrick\Router\Definition\Registrar;
+
+          /** @var Registrar $router */
+          $router->get('/alpha/one', SystemController::health(...));
+          $router->get('/beta/two', SystemController::health(...));
+          $router->get('/gamma/three', SystemController::health(...));
+          $router->get('/delta/four', SystemController::health(...));
+          PHP
+
+          cat > config/router.php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          return [
+              'files' => [
+                  'api.php',
+                  'native-cache.php',
+              ],
+              'matcher' => env_string('ROUTER_MATCHER', 'fused'),
+          ];
+          PHP
+
+          export APP_ENV=production
+          export APP_DEBUG=false
+          export APP_CAPABILITIES=
+
+          for matcher in fused generated sharded; do
+            cp "$work/api.php" routes/api.php
+            export ROUTER_MATCHER="$matcher"
+
+            php infbyte config:validate --production
+            release="$(php infbyte optimize --json=1)"
+
+            release_root="$(printf '%s' "$release" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["release_root"] ?? "";')"
+            generation="$(printf '%s' "$release" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["generation"] ?? "";')"
+            manifest_sha="$(printf '%s' "$release" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["manifest_sha256"] ?? "";')"
+            generation_root="$release_root/generations/$generation"
+
+            case "$matcher" in
+              fused)
+                expected_cache="web/router-cache/fused.php"
+                test -f "$generation_root/$expected_cache"
+                ;;
+              generated)
+                expected_cache="web/router-cache/generated.php"
+                test -f "$generation_root/$expected_cache"
+                ;;
+              sharded)
+                expected_cache="web/router-shards"
+                shard_root="$generation_root/$expected_cache"
+                test -f "$shard_root/__manifest.php"
+                test -L "$shard_root/__current"
+
+                shard_generation="$(readlink "$shard_root/__current")"
+                test -n "$shard_generation"
+                shard_generation_root="$shard_root/$shard_generation"
+                test -d "$shard_generation_root"
+                test -f "$shard_generation_root/__metadata.php"
+                test -f "$shard_generation_root/__aliases.php"
+
+                shard_count="$(find "$shard_generation_root" -type f -name '*.php' ! -name '__*.php' | wc -l | tr -d ' ')"
+                if [[ "$shard_count" -lt 3 ]]; then
+                  find "$shard_generation_root" -maxdepth 4 -type f -print >&2
+                  printf 'Expected multiple physical route shards, got %s\n' "$shard_count" >&2
+                  exit 1
+                fi
+                ;;
+            esac
+
+            php -r '
+              $manifest = require $argv[1];
+              $expected = $argv[2];
+              if (($manifest["web"]["matcher_cache_path"] ?? null) !== $expected) {
+                  throw new RuntimeException("Foundation manifest does not point to the native Webrick matcher cache.");
+              }
+              if (array_key_exists("matcher_cache_sha256", $manifest["web"])) {
+                  throw new RuntimeException("Foundation must not wrap Webrick matcher caches with a whole-tree digest.");
+              }
+            ' "$generation_root/foundation.php" "$expected_cache"
+
+            cat > routes/api.php <<'PHP'
+          <?php
+
+          throw new RuntimeException('Production rediscovered source routes instead of the native Webrick cache.');
+          PHP
+
+            case "$matcher" in
+              fused) port=18082 ;;
+              generated) port=18083 ;;
+              sharded) port=18084 ;;
+            esac
+            INFOCYPH_FOUNDATION_RELEASE_ROOT="$release_root" \
+            INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256="$manifest_sha" \
+            APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= ROUTER_MATCHER="$matcher" \
+              php -S "127.0.0.1:$port" -t public public/index.php >"$work/$matcher-server.log" 2>&1 &
+            server_pid=$!
+
+            response=""
+            for attempt in {1..40}; do
+              if response="$(curl --fail --silent "http://127.0.0.1:$port/alpha/one" 2>/dev/null)"; then
+                break
+              fi
+              sleep 0.25
+            done
+
+            if [[ "$response" != *'"status":"ok"'* ]]; then
+              cat "$work/$matcher-server.log" >&2
+              printf '%s native route runtime request failed: %s\n' "$matcher" "$response" >&2
+              exit 1
+            fi
+
+            kill "$server_pid"
+            wait "$server_pid" 2>/dev/null || true
+            server_pid=""
+          done
+
+          cp "$work/api.php" routes/api.php
+
+          # Webrick owns shard validation. Corrupt native shard hashes, then prove
+          # the error appears lazily only when a matching shard is requested.
+          cat > "$work/tamper-shard.php" <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          $path = $argv[1] ?? '';
+          $source = file_get_contents($path);
+          if (!is_string($source)) {
+              throw new RuntimeException('Unable to read Webrick route shard.');
+          }
+
+          $count = 0;
+          $source = preg_replace_callback(
+              "/('_hash'\\s*=>\\s*)'[^']+'/",
+              static fn(array $match): string => $match[1] . "'" . str_repeat('0', 32) . "'",
+              $source,
+              1,
+              $count,
+          );
+          if (!is_string($source) || $count !== 1) {
+              exit(2);
+          }
+
+          file_put_contents($path, $source);
+          PHP
+
+          tampered=0
+          while IFS= read -r shard; do
+            if php "$work/tamper-shard.php" "$shard"; then
+              tampered=$((tampered + 1))
+            fi
+          done < <(find "$shard_generation_root" -type f -name '*.php' ! -name '__*.php')
+
+          if [[ "$tampered" -lt 1 ]]; then
+            echo "Unable to corrupt any native Webrick route shard for lazy-validation test." >&2
+            exit 1
+          fi
+
+          cat > "$work/assert-native-shard-validation.php" <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          require $argv[1] . '/vendor/autoload.php';
+
+          use Infocyph\Webrick\Router\Matching\ShardedMatcher;
+
+          $cache = $argv[2] ?? '';
+          $matcher = ShardedMatcher::make()
+              ->enableCache($cache)
+              ->verifyCacheOnLoad();
+
+          if (!$matcher->canBootFromCache()) {
+              throw new RuntimeException('Webrick native sharded cache is not bootable after publication.');
+          }
+
+          $matcher->finalize();
+
+          try {
+              $matcher->matchCompiled('GET', '127.0.0.1', '/alpha/one');
+          } catch (RuntimeException $exception) {
+              if (str_contains(strtolower($exception->getMessage()), 'sharded route cache hash mismatch')) {
+                  exit(0);
+              }
+
+              throw $exception;
+          }
+
+          throw new RuntimeException('Tampered Webrick shard was accepted by the native matcher.');
+          PHP
+
+          php "$work/assert-native-shard-validation.php" "$PWD" "$shard_root"
+
+      - name: Verify native ArrayKit configuration caches
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          work="$(mktemp -d)"
+          cleanup() {
+            rm -rf "$work"
+          }
+          trap cleanup EXIT
+
+          composer archive --format=tar --dir="$work" --file=infbyte
+          mkdir "$work/project"
+          tar -xf "$work/infbyte.tar" -C "$work/project"
+          cd "$work/project"
+
+          composer install --no-interaction --prefer-dist --no-progress
+
+          php -r '
+            require "vendor/autoload.php";
+            $version = Composer\InstalledVersions::getVersion("infocyph/foundation") ?? "";
+            if (!version_compare($version, "3.0.1.0", ">=")
+                || version_compare($version, "4.0.0.0", ">=")
+            ) {
+                throw new RuntimeException("Expected released Foundation ^3.0.1, got " . $version);
+            }
+          '
+
+          php infbyte app:install
+          cp config/app.php "$work/app.php"
+
+          for type in single sharded; do
+            cp "$work/app.php" config/app.php
+            php infbyte config:clear
+            APP_CONFIG_CACHE_TYPE="$type" php infbyte config:cache
+
+            cache_root="$PWD/bootstrap/cache/config"
+            test -f "$cache_root/__manifest.php"
+
+            if [[ "$type" == "single" ]]; then
+              test -f "$cache_root/config.php"
+              test ! -f "$cache_root/app.php"
+              test ! -f "$cache_root/__flat.php"
+
+              php -r '
+                require "vendor/autoload.php";
+                $config = new Infocyph\ArrayKit\Config\Config();
+                if (!$config->loadCache($argv[1]) || $config->get("app.name") !== "Infbyte") {
+                    throw new RuntimeException("ArrayKit native single config cache failed.");
+                }
+              ' "$cache_root/config.php"
+            else
+              test ! -f "$cache_root/config.php"
+              test -f "$cache_root/app.php"
+              test -f "$cache_root/__flat.php"
+
+              php -r '
+                require "vendor/autoload.php";
+                $config = new Infocyph\ArrayKit\Config\LazyFileConfig(
+                    $argv[1],
+                    namespaceCacheDirectory: $argv[1],
+                );
+                if ($config->get("app.name") !== "Infbyte") {
+                    throw new RuntimeException("ArrayKit native sharded config cache failed.");
+                }
+              ' "$cache_root"
+            fi
+
+            mv config/app.php "$work/app-disabled.php"
+            APP_CONFIG_CACHE_TYPE="$type" php -r '
+              require "vendor/autoload.php";
+              $config = (new Infocyph\Foundation\Config\ConfigLoader())->load([
+                  "base_path" => getcwd(),
+              ]);
+              if (!$config->isCompiled() || $config->get("app.name") !== "Infbyte") {
+                  throw new RuntimeException("Foundation did not boot from the native ArrayKit config cache.");
+              }
+            '
+            mv "$work/app-disabled.php" config/app.php
+          done
+

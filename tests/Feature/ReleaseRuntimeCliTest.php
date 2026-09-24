@@ -2,12 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\SystemController;
 use Composer\InstalledVersions;
-use Infocyph\Foundation\Foundation;
-use Infocyph\Foundation\Routing\RouteCachePath;
-use Infocyph\Webrick\Request\Request;
-use Infocyph\Webrick\Router\Matching\FusedMatcher;
 
 it('keeps the Infbyte CLI identity independent of the application display name', function (): void {
     $fixture = createInfbyteCliFixture();
@@ -28,71 +23,114 @@ it('keeps the Infbyte CLI identity independent of the application display name',
     }
 });
 
-it('builds, consumes, and clears route cache through the infbyte cli wrapper', function (): void {
+it('builds reports and clears one immutable Foundation release generation', function (): void {
     $fixture = createInfbyteCliFixture();
-    $cacheFile = $fixture . '/bootstrap/cache/routes/fused.php';
 
     try {
         [$buildExitCode, $buildOutput] = runInfbyteCommand([
             PHP_BINARY,
             $fixture . '/infbyte',
-            'route:cache',
-        ]);
+            'optimize',
+            '--json=1',
+        ], ['APP_ENV' => 'production']);
 
-        expect($buildExitCode)->toBe(0)
-            ->and($buildOutput)->toContain('Routes cached using fused matcher at ')
-            ->and($cacheFile)->toBeFile()
-            ->and(filesize($cacheFile))->toBeGreaterThan(0);
+        $build = json_decode($buildOutput, true, flags: JSON_THROW_ON_ERROR);
+        $manifest = $build['manifest'] ?? null;
 
-        $matcher = FusedMatcher::make()->enableCache($cacheFile);
-        [$cachedRoute] = $matcher->match('GET', 'localhost', '/json');
+        expect($buildExitCode)->toBe(0, $buildOutput)
+            ->and($build)->toHaveKeys([
+                'release_root',
+                'generation',
+                'manifest',
+                'manifest_sha256',
+                'active_pointer',
+            ])
+            ->and($build['release_root'])->toBe($fixture . '/storage/releases')
+            ->and($manifest)->toBeString()->toBeFile()
+            ->and(hash_file('sha256', $manifest))->toBe($build['manifest_sha256']);
 
-        expect($cachedRoute->getHandler())->toBe([SystemController::class, 'json']);
+        [$reportExitCode, $reportOutput] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'optimize:report',
+            '--json=1',
+        ], ['APP_ENV' => 'production']);
+        $report = json_decode($reportOutput, true, flags: JSON_THROW_ON_ERROR);
 
-        file_put_contents(
-            $fixture . '/routes/api.php',
-            "<?php\n\nthrow new RuntimeException('Cached dispatch loaded route source.');\n",
-        );
-
-        $app = Foundation::web([
-            'base_path' => $fixture,
-            '_config_cache' => false,
-            'router' => [
-                'cache' => true,
-                'files' => ['api.php'],
-                'matcher' => 'fused',
-            ],
-        ]);
-        $response = $app->handle(Request::fake(method: 'GET', uri: 'http://localhost/json'));
-        $payload = json_decode((string) $response->getBody(), true, flags: JSON_THROW_ON_ERROR);
-
-        expect($response->getStatusCode())->toBe(200)
-            ->and($payload)->toHaveKey('memory')
-            ->and($payload['memory'])->toBeInt()
-            ->and(get_included_files())->not->toContain($fixture . '/routes/api.php');
+        expect($reportExitCode)->toBe(0, $reportOutput)
+            ->and($report['ready'] ?? null)->toBeTrue()
+            ->and($report['generation'] ?? null)->toBe($build['generation'])
+            ->and($report['manifest_sha256'] ?? null)->toBe($build['manifest_sha256']);
 
         [$clearExitCode, $clearOutput] = runInfbyteCommand([
             PHP_BINARY,
             $fixture . '/infbyte',
-            'route:clear',
-        ]);
+            'optimize:clear',
+        ], ['APP_ENV' => 'production']);
 
-        expect($clearExitCode)->toBe(0)
-            ->and($clearOutput)->toContain('Route cache cleared.')
-            ->and($cacheFile)->not->toBeFile();
+        expect($clearExitCode)->toBe(0, $clearOutput)
+            ->and($clearOutput)->toContain('Foundation release generations cleared.');
+
+        [$emptyExitCode, $emptyOutput] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'optimize:report',
+            '--json=1',
+        ], ['APP_ENV' => 'production']);
+        $empty = json_decode($emptyOutput, true, flags: JSON_THROW_ON_ERROR);
+
+        expect($emptyExitCode)->toBe(0, $emptyOutput)
+            ->and($empty['ready'] ?? null)->toBeFalse();
     } finally {
         removeInfbyteTestDirectory($fixture);
     }
 });
 
-it('derives the dedicated routes cache path by default', function (): void {
-    $root = dirname(__DIR__, 2);
-    $app = Foundation::web([
-        'base_path' => $root,
-        '_config_cache' => false,
-    ]);
 
-    expect(RouteCachePath::for($app->config()))->toBe($root . '/bootstrap/cache/routes/fused.php');
+it('ignores retired Foundation 2.1 generated artifacts during release migration', function (): void {
+    $fixture = createInfbyteCliFixture();
+
+    try {
+        foreach ([
+            $fixture . '/bootstrap/cache/container',
+            $fixture . '/bootstrap/cache/routes',
+        ] as $directory) {
+            if (!mkdir($directory, 0775, true) && !is_dir($directory)) {
+                throw new RuntimeException(sprintf('Unable to create legacy cache directory "%s".', $directory));
+            }
+        }
+
+        file_put_contents(
+            $fixture . '/bootstrap/cache/container/web.php',
+            "<?php throw new RuntimeException('Legacy Foundation 2 container artifact was loaded.');\n",
+        );
+        file_put_contents(
+            $fixture . '/bootstrap/cache/routes/fused.php',
+            "<?php throw new RuntimeException('Legacy Foundation 2 route artifact was loaded.');\n",
+        );
+
+        [$exitCode, $output] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'optimize',
+            '--json=1',
+        ], [
+            'APP_ENV' => 'production',
+            'APP_CONTAINER_ALIAS' => 'legacy',
+            'APP_CONTAINER_COMPILED_ACTIVATION' => 'always',
+            'ROUTER_CACHE' => 'true',
+        ]);
+
+        $release = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+        $generation = $release['generation'] ?? null;
+
+        expect($exitCode)->toBe(0, $output)
+            ->and($generation)->toBeString()->not->toBe('')
+            ->and($fixture . '/storage/releases/generations/' . $generation . '/foundation.php')->toBeFile()
+            ->and($fixture . '/storage/releases/generations/' . $generation . '/config.php')->toBeFile();
+    } finally {
+        removeInfbyteTestDirectory($fixture);
+    }
 });
 
 it('builds and fully clears the default sharded config cache through the infbyte cli wrapper', function (): void {
@@ -156,34 +194,6 @@ it('can select and fully clear the single config cache through application confi
     }
 });
 
-it('uses optimized production defaults without benchmark-only environment overrides', function (): void {
-    $fixture = createInfbyteCliFixture();
-    $manifest = $fixture . '/bootstrap/cache/config/__manifest.php';
-
-    try {
-        [$exitCode, $output] = runInfbyteCommand([
-            PHP_BINARY,
-            $fixture . '/infbyte',
-            'optimize',
-        ], [
-            'APP_ENV' => 'production',
-            'APP_CONTAINER_COMPILED_ACTIVATION' => 'off',
-        ]);
-
-        expect($exitCode)->toBe(0, $output)
-            ->and($manifest)->toBeFile();
-
-        $compiled = require $manifest;
-
-        expect($compiled)->toBeArray()
-            ->and($compiled['_type'] ?? null)->toBe('single')
-            ->and($compiled['_data']['app']['config_cache']['type'] ?? null)->toBe('single')
-            ->and($compiled['_data']['app']['container']['compiled_activation'] ?? null)->toBe('off');
-    } finally {
-        removeInfbyteTestDirectory($fixture);
-    }
-});
-
 it('builds and clears compiled command metadata through the infbyte cli wrapper', function (): void {
     $fixture = createInfbyteCliFixture();
     $manifest = $fixture . '/bootstrap/cache/commands.php';
@@ -234,8 +244,8 @@ it('reports readiness and canonical module state through the infbyte cli', funct
         $readiness = json_decode($readinessOutput, true, flags: JSON_THROW_ON_ERROR);
         $moduleRows = json_decode($modulesOutput, true, flags: JSON_THROW_ON_ERROR);
 
-        expect($readinessExitCode)->toBe(1)
-            ->and($readiness['ready'])->toBeFalse()
+        expect($readinessExitCode)->toBe(0, $readinessOutput)
+            ->and($readiness['ready'])->toBeTrue()
             ->and($readiness)->toHaveKey('checks')
             ->and($modulesExitCode)->toBe(0)
             ->and($moduleRows)->toBeArray();
@@ -244,7 +254,6 @@ it('reports readiness and canonical module state through the infbyte cli', funct
 
         expect($modules)->toHaveKeys([
             'auth',
-            'cache',
             'communication',
             'database',
             'filesystem',
@@ -255,13 +264,68 @@ it('reports readiness and canonical module state through the infbyte cli', funct
             'security',
             'session',
             'validation',
-        ])->not->toHaveKey('db')
+        ])->not->toHaveKeys(['cache', 'cachelayer', 'db'])
             ->and($modules['database']['packages']['infocyph/dblayer']['installed'])->toBeFalse()
-            ->and($modules['database']['packages']['infocyph/dblayer']['constraint'])->toBe('^5.0');
+            ->and($modules['database']['packages']['infocyph/dblayer']['constraint'])->toBe('^5.1');
 
         foreach (['logging', 'operations', 'resources', 'session'] as $builtIn) {
             expect($modules[$builtIn]['installed'])->toBeTrue();
         }
+    } finally {
+        removeInfbyteTestDirectory($fixture);
+    }
+});
+
+
+it('keeps core cache outside module lifecycle and exposes its schema commands', function (): void {
+    $fixture = createInfbyteCliFixture();
+
+    try {
+        [$moduleExitCode, $moduleOutput] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'module:show',
+            'cache',
+            '--json=1',
+        ]);
+
+        [$schemaExitCode, $schemaOutput] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'cache:schema:status',
+            '--json=1',
+        ], ['APP_CAPABILITIES' => 'cache']);
+
+        $schema = json_decode($schemaOutput, true, flags: JSON_THROW_ON_ERROR);
+
+        expect($moduleExitCode)->not->toBe(0)
+            ->and($moduleOutput)->toContain('cache')
+            ->and($schemaExitCode)->toBe(0, $schemaOutput)
+            ->and($schema)->toHaveKey('schemas')
+            ->and($schema['schemas'])->toBeArray();
+    } finally {
+        removeInfbyteTestDirectory($fixture);
+    }
+});
+
+it('plans specialist installation against the released module catalog', function (): void {
+    $fixture = createInfbyteCliFixture();
+
+    try {
+        [$exitCode, $output] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'module:plan',
+            'database',
+            '--json=1',
+        ]);
+
+        $plan = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+
+        expect($exitCode)->toBe(0, $output)
+            ->and($plan['module'] ?? $plan['name'] ?? null)->toBe('database')
+            ->and($output)->toContain('infocyph/dblayer')
+            ->and($output)->toContain('^5.1');
     } finally {
         removeInfbyteTestDirectory($fixture);
     }
@@ -282,7 +346,7 @@ it('reports canonical database installation guidance through module schema metad
         $module = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
         $authSchema = $module['schema_status'][0] ?? null;
 
-        expect($exitCode)->toBe(0)
+        expect($exitCode)->toBe(0, $output)
             ->and($module['name'])->toBe('auth')
             ->and($authSchema)->toBeArray()
             ->and($authSchema['state'])->toBe('unavailable')
@@ -332,6 +396,7 @@ function createInfbyteCliFixture(): string
         $fixture . '/bootstrap/cache',
         $fixture . '/storage/cache',
         $fixture . '/storage/logs',
+        $fixture . '/storage/releases',
         $fixture . '/storage/sessions',
         $fixture . '/storage/uploads',
         $fixture . '/vendor',
@@ -343,6 +408,7 @@ function createInfbyteCliFixture(): string
 
     copy($root . '/infbyte', $fixture . '/infbyte');
     copy($root . '/composer.json', $fixture . '/composer.json');
+    copyInfbyteTestDirectory($root . '/app', $fixture . '/app');
     copyInfbyteTestDirectory($root . '/config', $fixture . '/config');
     copyInfbyteTestDirectory($root . '/routes', $fixture . '/routes');
     copy($root . '/bootstrap/providers.php', $fixture . '/bootstrap/providers.php');
