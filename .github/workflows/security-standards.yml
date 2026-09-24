@@ -1227,12 +1227,19 @@ jobs:
 
           test -f "$generation_root/web/router.php"
           test -f "$shard_root/__manifest.php"
-          test -f "$shard_root/__metadata.php"
-          test -f "$shard_root/__aliases.php"
+          test -L "$shard_root/__current"
 
-          shard_count="$(find "$shard_root" -type f -name '*.php' ! -name '__*.php' | wc -l | tr -d ' ')"
+          shard_generation="$(readlink "$shard_root/__current")"
+          test -n "$shard_generation"
+          shard_generation_root="$shard_root/$shard_generation"
+
+          test -d "$shard_generation_root"
+          test -f "$shard_generation_root/__metadata.php"
+          test -f "$shard_generation_root/__aliases.php"
+
+          shard_count="$(find "$shard_generation_root" -type f -name '*.php' ! -name '__*.php' | wc -l | tr -d ' ')"
           if [[ "$shard_count" -lt 3 ]]; then
-            find "$shard_root" -maxdepth 4 -type f -print >&2
+            find "$shard_generation_root" -maxdepth 4 -type f -print >&2
             printf 'Expected multiple physical route shards, got %s\n' "$shard_count" >&2
             exit 1
           fi
@@ -1279,7 +1286,7 @@ jobs:
           wait "$server_pid" 2>/dev/null || true
           server_pid=""
 
-          shard_to_tamper="$(find "$shard_root" -type f -name '*.php' ! -name '__*.php' -print -quit)"
+          shard_to_tamper="$(find "$shard_generation_root" -type f -name '*.php' ! -name '__*.php' -print -quit)"
           test -n "$shard_to_tamper"
           printf '\n// tampered\n' >> "$shard_to_tamper"
 
