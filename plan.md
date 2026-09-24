@@ -79,7 +79,7 @@ The normal Security & Standards workflow is expected to reject the pre-tag branc
 | **F** | Production release/runtime rehearsal | **DONE** | Trusted build/request, stale rejection, reload, drain-safe retention, rollback consumption, failed-build retention, and read-only source pass in run #103. |
 | **G** | 2.1 → 3.0 migration rehearsal | **DONE** | Representative 2.1 application upgrade, provider/route preservation, persisted-data boundary, session incompatibility handling, runtime build/readiness, and real request pass in run #103. |
 | **H** | Final CI/docs/publication evidence | **DONE** | Security & Standards run #114 is fully green on released Foundation 3.x, including the normal PHPForge matrix, create-project, consumers, module lifecycle, generation lifecycle, 2.1→3.0 migration, and production auth/session lifecycle. |
-| **I** | Native Webrick + InterMix cache ownership hardening | **IN PROGRESS** | Foundation #17 and InfByte #9 prove native fused/generated/sharded Webrick caches, native InterMix generated-container validation, and no CacheLayer wrapper on compiled DI. |
+| **I** | Native Webrick + InterMix cache ownership hardening | **DONE** | Foundation #17 run #1770 and InfByte #9 run #130 prove native fused/generated/sharded Webrick caches, native InterMix generated-container validation, and no CacheLayer wrapper on compiled DI. |
 
 ---
 
@@ -328,12 +328,24 @@ closing before PR #9 is considered final.
   InterMix generated graph and tampered InterMix native metadata still fails
   closed at the InterMix boundary.
 - [x] Document the native ownership boundary in Foundation and InfByte.
-- [ ] Final Foundation #17 and InfByte #9 Security & Standards runs are green on
+- [x] Final Foundation #17 and InfByte #9 Security & Standards runs are green on
   the exact post-hardening heads.
 
-**Acceptance:** pending the final two PR workflow runs. No PHPForge/PHPProbe
-bypass, threshold weakening, parallel cache engine, or host-layer container/
-route compiler is allowed.
+**Acceptance:** DONE.
+
+Final Batch I evidence:
+
+- Foundation #17 head: `e2fa2b809a0e17c278e6ddcb4fde9dfb391705f7`
+- Foundation Security & Standards: run #1770 (`36029820771`) — success
+- Foundation release evidence job: `107737227541` — success
+- InfByte #9 functional qualification head: `8de006bbdcd177ed1aaf19865d54b3a189c2cd68`
+- InfByte Security & Standards: run #130 (`36030156829`) — success
+- Native Webrick matcher-cache job: `107737050672` — success
+- Released generation lifecycle: `107737050494` — success
+- Production auth/session: `107737050657` — success
+- PHP 8.4/8.5 lowest/stable QA, analysis, benchmarks and clean install — success
+- No PHPForge/PHPProbe bypass, threshold weakening, parallel cache engine, or
+  host-layer container/route compiler was introduced.
 
 ---
 
