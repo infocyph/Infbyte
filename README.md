@@ -338,6 +338,32 @@ php infbyte log:tail --follow
 Runtime generation commands request graceful shutdown. Foundation does not
 replace Supervisor/systemd/Docker/Kubernetes process supervision.
 
+## Development / build configuration cache
+
+Foundation delegates both application config-cache layouts directly to ArrayKit:
+
+- `sharded` (the default outside production) writes native namespace cache files
+  plus ArrayKit's `__flat.php` exact-leaf index;
+- `single` writes one native ArrayKit compiled
+  `bootstrap/cache/config/config.php` artifact.
+
+Choose the layout with `APP_CONFIG_CACHE_TYPE=sharded|single` and build/clear it
+with:
+
+```bash
+php infbyte config:cache
+php infbyte config:clear
+```
+
+There is no separate `fused` configuration mode. ArrayKit's sharded strategy
+already carries fused scalar/null leaf acceleration through `__flat.php`.
+Foundation owns cache policy, manifest identity, provider compilation and atomic
+publication; it does not maintain another config serializer.
+
+This development/build cache is separate from the immutable production release
+generation. `optimize` always publishes its own generation-owned normalized
+`config.php` snapshot.
+
 ## Production
 
 Build and verify one immutable all-runtime Foundation generation before serving
