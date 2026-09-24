@@ -1321,7 +1321,7 @@ jobs:
 
           $count = 0;
           $source = preg_replace_callback(
-              "/('_hash'\\s*=>\\s*)'[^']+'/ ",
+              "/('_hash'\\s*=>\\s*)'[^']+'/",
               static fn(array $match): string => $match[1] . "'" . str_repeat('0', 32) . "'",
               $source,
               1,
@@ -1333,9 +1333,6 @@ jobs:
 
           file_put_contents($path, $source);
           PHP
-
-          # Remove the readability space in the regex literal above before execution.
-          sed -i "s/'\/ $/\/\'/" "$work/tamper-shard.php"
 
           tampered=0
           while IFS= read -r shard; do
