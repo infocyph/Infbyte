@@ -24,6 +24,75 @@ jobs:
       actions: read
       contents: read
 
+
+  release-candidate-create-project:
+    name: "Release-candidate create-project"
+    needs: phpforge
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pcntl, pdo_sqlite
+          tools: composer:v2
+          coverage: none
+
+      - name: Create project through Composer VCS resolution
+        shell: bash
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+
+          composer create-project \
+            --repository='{"type":"vcs","url":"https://github.com/infocyph/Infbyte.git"}' \
+            --no-dev \
+            --no-interaction \
+            --prefer-source \
+            infocyph/infbyte \
+            "$work/project" \
+            'dev-foundation-3/runtime-lifecycle'
+
+          cd "$work/project"
+
+          test -f .env
+          test ! -e plan.md
+          test ! -d .github
+
+          source_sha="$(git rev-parse HEAD)"
+          if [[ "$source_sha" != "$HEAD_SHA" ]]; then
+            printf 'create-project resolved %s instead of PR head %s\n' "$source_sha" "$HEAD_SHA" >&2
+            exit 1
+          fi
+
+          foundation_version="$(php -r 'require "vendor/autoload.php"; echo Composer\\InstalledVersions::getPrettyVersion("infocyph/foundation") ?? "";')"
+          if [[ "$foundation_version" != 3.* || "$foundation_version" == dev-* ]]; then
+            printf 'Expected stable Foundation 3.x, got %s\n' "$foundation_version" >&2
+            exit 1
+          fi
+
+          APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte config:validate --production
+          release="$(APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte optimize --json=1)"
+          APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte app:ready
+
+          printf '%s' "$release" | php -r '
+            $r = json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR);
+            if (!is_string($r["generation"] ?? null) || ($r["generation"] ?? "") === "") {
+                fwrite(STDERR, "create-project release generation is missing.\n");
+                exit(1);
+            }
+            if (!is_string($r["manifest_sha256"] ?? null)
+                || preg_match("/^[a-f0-9]{64}$/D", $r["manifest_sha256"]) !== 1
+            ) {
+                fwrite(STDERR, "create-project manifest digest is invalid.\n");
+                exit(1);
+            }
+          '
+
   released-consumer:
     name: "Released consumer - PHP ${{ matrix.php }}"
     needs: phpforge
