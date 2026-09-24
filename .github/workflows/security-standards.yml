@@ -510,7 +510,8 @@ jobs:
           export COMMUNICATION_WEBHOOK_REPLAY_STORE=auth-state
           export SESSION_DRIVER=database
           export SESSION_DB_CONNECTION=sqlite
-          export SESSION_LOCK_ENABLED=false
+          export SESSION_LOCK_ENABLED=true
+          export SESSION_LOCK_STORE=auth-state
 
           APP_ENV=local APP_CAPABILITIES=auth,database AUTH_STORAGE=database AUTH_MFA=simple \
             php infbyte module:install auth --feature=otp --connection=sqlite --json=1 | tee "$work/auth-install.json"
