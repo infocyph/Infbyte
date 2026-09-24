@@ -1134,3 +1134,166 @@ jobs:
           wait "$server_pid" 2>/dev/null || true
           server_pid=""
 
+  released-sharded-route-cache:
+    name: "Foundation candidate sharded route cache"
+    needs: phpforge
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pcntl, pdo_sqlite
+          tools: composer:v2
+          coverage: none
+
+      - name: Verify immutable physical route shards
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          work="$(mktemp -d)"
+          server_pid=""
+          cleanup() {
+            if [[ -n "$server_pid" ]]; then
+              kill "$server_pid" 2>/dev/null || true
+              wait "$server_pid" 2>/dev/null || true
+            fi
+            rm -rf "$work"
+          }
+          trap cleanup EXIT
+
+          composer archive --format=tar --dir="$work" --file=infbyte
+          mkdir "$work/project"
+          tar -xf "$work/infbyte.tar" -C "$work/project"
+          cd "$work/project"
+
+          composer install --no-interaction --prefer-dist --no-progress
+          composer config repositories.foundation-candidate vcs https://github.com/infocyph/Foundation.git
+          composer require 'infocyph/foundation:dev-foundation-3.0/notification-static-compile-fix as 3.0.1' \
+            --with-all-dependencies --no-interaction --prefer-dist --no-progress
+
+          foundation_reference="$(composer show infocyph/foundation --format=json | php -r '$p=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $p["source"]["reference"] ?? "";')"
+          test "$foundation_reference" = "c36ce84a036ab0a5ba19542a7328003e867b9c79"
+
+          php infbyte app:install
+
+          cat > routes/sharded.php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          use App\Http\Controllers\SystemController;
+          use Infocyph\Webrick\Router\Definition\Registrar;
+
+          /** @var Registrar $router */
+          $router->get('/alpha/one', SystemController::health(...));
+          $router->get('/beta/two', SystemController::health(...));
+          $router->get('/gamma/three', SystemController::health(...));
+          $router->get('/delta/four', SystemController::health(...));
+          PHP
+
+          php -r '
+            $path = "config/router.php";
+            $source = file_get_contents($path);
+            if (!is_string($source)) {
+                throw new RuntimeException("Unable to read router config.");
+            }
+            $source = str_replace(
+                "        \'api.php\',\n",
+                "        \'api.php\',\n        \'sharded.php\',\n",
+                $source,
+            );
+            file_put_contents($path, $source);
+          '
+
+          export APP_ENV=production
+          export APP_DEBUG=false
+          export APP_CAPABILITIES=
+          export ROUTER_MATCHER=sharded
+
+          php infbyte config:validate --production
+          release="$(php infbyte optimize --json=1)"
+          php infbyte app:ready
+
+          release_root="$(printf '%s' "$release" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["release_root"] ?? "";')"
+          generation="$(printf '%s' "$release" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["generation"] ?? "";')"
+          manifest_sha="$(printf '%s' "$release" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["manifest_sha256"] ?? "";')"
+
+          generation_root="$release_root/generations/$generation"
+          shard_root="$generation_root/web/router-shards"
+
+          test -f "$generation_root/web/router.php"
+          test -f "$shard_root/__manifest.php"
+          test -f "$shard_root/__metadata.php"
+          test -f "$shard_root/__aliases.php"
+
+          shard_count="$(find "$shard_root" -type f -name '*.php' ! -name '__*.php' | wc -l | tr -d ' ')"
+          if [[ "$shard_count" -lt 3 ]]; then
+            find "$shard_root" -maxdepth 4 -type f -print >&2
+            printf 'Expected multiple physical route shards, got %s\n' "$shard_count" >&2
+            exit 1
+          fi
+
+          php -r '
+            $manifest = require $argv[1];
+            if (($manifest["web"]["matcher_cache_path"] ?? null) !== "web/router-shards") {
+                throw new RuntimeException("Foundation manifest does not own the sharded route cache.");
+            }
+            $sha = $manifest["web"]["matcher_cache_sha256"] ?? "";
+            if (!is_string($sha) || preg_match("/^[a-f0-9]{64}$/D", $sha) !== 1) {
+                throw new RuntimeException("Foundation manifest is missing the sharded route tree trust identity.");
+            }
+          ' "$generation_root/foundation.php"
+
+          cat > routes/api.php <<'PHP'
+          <?php
+
+          throw new RuntimeException('Production rediscovered source routes instead of release shards.');
+          PHP
+
+          port=18082
+          INFOCYPH_FOUNDATION_RELEASE_ROOT="$release_root" \
+          INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256="$manifest_sha" \
+          APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= ROUTER_MATCHER=sharded \
+            php -S "127.0.0.1:$port" -t public public/index.php >"$work/sharded-server.log" 2>&1 &
+          server_pid=$!
+
+          response=""
+          for attempt in {1..40}; do
+            if response="$(curl --fail --silent "http://127.0.0.1:$port/alpha/one" 2>/dev/null)"; then
+              break
+            fi
+            sleep 0.25
+          done
+
+          if [[ "$response" != *'"status":"ok"'* ]]; then
+            cat "$work/sharded-server.log" >&2
+            printf 'Sharded route runtime request failed: %s\n' "$response" >&2
+            exit 1
+          fi
+
+          kill "$server_pid"
+          wait "$server_pid" 2>/dev/null || true
+          server_pid=""
+
+          shard_to_tamper="$(find "$shard_root" -type f -name '*.php' ! -name '__*.php' -print -quit)"
+          test -n "$shard_to_tamper"
+          printf '\n// tampered\n' >> "$shard_to_tamper"
+
+          set +e
+          INFOCYPH_FOUNDATION_RELEASE_ROOT="$release_root" \
+          INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256="$manifest_sha" \
+          APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= ROUTER_MATCHER=sharded \
+            php public/index.php >"$work/tampered-shard.log" 2>&1
+          tampered_status=$?
+          set -e
+
+          if [[ "$tampered_status" -eq 0 ]]; then
+            cat "$work/tampered-shard.log" >&2
+            echo "Tampered route shard unexpectedly passed Foundation trust validation." >&2
+            exit 1
+          fi
+
