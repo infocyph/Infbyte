@@ -509,7 +509,7 @@ jobs:
           export SESSION_DB_CONNECTION=sqlite
           export SESSION_LOCK_ENABLED=false
 
-          APP_CAPABILITIES= AUTH_MFA=simple \
+          APP_CAPABILITIES=database AUTH_STORAGE=database AUTH_MFA=simple \
             php infbyte module:install auth --feature=otp --json=1 | tee "$work/auth-install.json"
           composer show infocyph/dblayer --no-interaction >/dev/null
           composer show infocyph/epicrypt --no-interaction >/dev/null
