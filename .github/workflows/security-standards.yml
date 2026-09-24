@@ -700,6 +700,7 @@ jobs:
 
           declare(strict_types=1);
 
+          use Infocyph\Foundation\Application\RuntimeMode;
           use Infocyph\Foundation\Release\ActiveGeneration;
           use Infocyph\Foundation\Release\FoundationReleaseBootstrap;
           use Infocyph\Foundation\Release\FoundationReleaseCompiler;
