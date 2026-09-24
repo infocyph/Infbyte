@@ -44,11 +44,12 @@ return [
     | Token Signing Secret
     |--------------------------------------------------------------------------
     |
-    | app:install generates this value for a new application. Production must
-    | use unique high-entropy secret material and must never commit it.
+    | app:install generates AUTH_TOKEN_SECRET for a new application. Foundation
+    | resolves it by environment name so the raw secret never enters compiled
+    | application configuration. Override only the environment-variable name.
     |
     */
-    'token_secret' => env('AUTH_TOKEN_SECRET'),
+    'token_secret_environment' => env_string('AUTH_TOKEN_SECRET_ENVIRONMENT', 'AUTH_TOKEN_SECRET'),
 
     /*
     |--------------------------------------------------------------------------
