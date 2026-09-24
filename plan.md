@@ -3,7 +3,7 @@
 **Target:** InfByte release compatible with the published Foundation 3.0 package.  
 **Branch:** `foundation-3/runtime-lifecycle`.  
 **PR:** #9.  
-**Status:** Foundation 3.0 is released; stable-package cutover and native runtime-cache hardening are complete, with ArrayKit-native config-cache hardening in final certification.  
+**Status:** Foundation 3.0 is released; stable-package cutover and all post-release native runtime/cache hardening are complete.  
 **Updated:** 2026-09-24.
 
 This is the canonical continuation plan for the InfByte skeleton after Foundation 3 is released. It intentionally preserves the consumer-side work that was previously recorded in Foundation planning files so those Foundation plan files can be removed without losing the handoff.
@@ -80,7 +80,7 @@ The normal Security & Standards workflow is expected to reject the pre-tag branc
 | **G** | 2.1 → 3.0 migration rehearsal | **DONE** | Representative 2.1 application upgrade, provider/route preservation, persisted-data boundary, session incompatibility handling, runtime build/readiness, and real request pass in run #103. |
 | **H** | Final CI/docs/publication evidence | **DONE** | Security & Standards run #114 is fully green on released Foundation 3.x, including the normal PHPForge matrix, create-project, consumers, module lifecycle, generation lifecycle, 2.1→3.0 migration, and production auth/session lifecycle. |
 | **I** | Native Webrick + InterMix cache ownership hardening | **DONE** | Foundation #17 run #1770 and InfByte #9 run #130 prove native fused/generated/sharded Webrick caches, native InterMix generated-container validation, and no CacheLayer wrapper on compiled DI. |
-| **J** | ArrayKit-native configuration cache ownership | **IN PROGRESS** | Foundation #17 delegates single/sharded cache mechanics to ArrayKit; exact-head Foundation + InfByte certification remains. |
+| **J** | ArrayKit-native configuration cache ownership | **DONE** | Foundation #17 run #1787 and InfByte #9 run #138 prove ArrayKit-native single/sharded caches and exported-skeleton consumption. |
 
 ---
 
@@ -393,14 +393,24 @@ gap without changing the immutable release-generation contract.
   `exportCache()/loadCache()`.
 - [x] Document ownership in Foundation configuration/architecture/migration docs
   and the InfByte skeleton.
-- [ ] Exported InfByte skeleton proves both native config-cache layouts against
+- [x] Exported InfByte skeleton proves both native config-cache layouts against
   the exact Foundation #17 candidate.
-- [ ] Final Foundation #17 and InfByte #9 Security & Standards runs are green on
+- [x] Final Foundation #17 and InfByte #9 Security & Standards runs are green on
   the exact config-cache hardening heads.
 
-**Acceptance:** pending exact-head Foundation and downstream InfByte
-qualification. No parallel host-level config serializer, fake `fused` config
-mode, PHPForge bypass or weakened complexity threshold is allowed.
+**Acceptance:** DONE.
+
+Final Batch J evidence:
+
+- Foundation #17 head: `4560e91265be49ca815d8b113523c04efe1ff601`
+- Foundation Security & Standards: run #1787 (`36033750802`) — success
+- Foundation release evidence job: `107750535716` — success
+- InfByte #9 functional qualification head: `09f84d38835cb375c0b01718b85af586b23fa79c`
+- InfByte Security & Standards: run #138 (`36033778353`) — success
+- Native Webrick + ArrayKit runtime-cache job: `107749065342` — success
+- PHP 8.4/8.5 lowest/stable QA, analysis, benchmarks and clean install — success
+- No parallel host-level config serializer, fake `fused` config mode,
+  PHPForge/PHPProbe bypass or weakened complexity threshold was introduced.
 
 ---
 
