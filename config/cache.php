@@ -94,6 +94,15 @@ return [
             'driver' => 'local',
             'path' => 'storage/cache/auth',
         ],
+        'auth-state' => [
+            'driver' => 'redis',
+            'connection' => 'redis',
+            'fail_open' => false,
+            'serialization' => [
+                'allow_closure_payloads' => false,
+                'allow_object_payloads' => false,
+            ],
+        ],
         'file' => [
             'driver' => 'file',
             'path' => 'storage/cache/file',
