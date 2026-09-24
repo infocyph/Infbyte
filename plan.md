@@ -3,7 +3,7 @@
 **Target:** InfByte release compatible with the published Foundation 3.0 package.  
 **Branch:** `foundation-3/runtime-lifecycle`.  
 **PR:** #9.  
-**Status:** Foundation 3.0 is released; stable-package cutover is complete and post-release consumer/module/runtime certification is in progress.  
+**Status:** Foundation 3.0 is released; stable-package cutover is complete and post-release native runtime-cache hardening is in final certification.  
 **Updated:** 2026-09-24.
 
 This is the canonical continuation plan for the InfByte skeleton after Foundation 3 is released. It intentionally preserves the consumer-side work that was previously recorded in Foundation planning files so those Foundation plan files can be removed without losing the handoff.
@@ -79,6 +79,7 @@ The normal Security & Standards workflow is expected to reject the pre-tag branc
 | **F** | Production release/runtime rehearsal | **DONE** | Trusted build/request, stale rejection, reload, drain-safe retention, rollback consumption, failed-build retention, and read-only source pass in run #103. |
 | **G** | 2.1 → 3.0 migration rehearsal | **DONE** | Representative 2.1 application upgrade, provider/route preservation, persisted-data boundary, session incompatibility handling, runtime build/readiness, and real request pass in run #103. |
 | **H** | Final CI/docs/publication evidence | **DONE** | Security & Standards run #114 is fully green on released Foundation 3.x, including the normal PHPForge matrix, create-project, consumers, module lifecycle, generation lifecycle, 2.1→3.0 migration, and production auth/session lifecycle. |
+| **I** | Native Webrick + InterMix cache ownership hardening | **IN PROGRESS** | Foundation #17 and InfByte #9 prove native fused/generated/sharded Webrick caches, native InterMix generated-container validation, and no CacheLayer wrapper on compiled DI. |
 
 ---
 
@@ -291,7 +292,52 @@ The earlier production-auth compilation failure was traced to an incomplete expl
 
 ---
 
-## 11. Non-blocking application backlog preserved from Foundation review
+## 11. Batch I — native runtime-cache ownership hardening
+
+Foundation 3.0 post-release review found two performance/ownership gaps worth
+closing before PR #9 is considered final.
+
+### Webrick matcher caches
+
+- [x] Keep Foundation release generations as the outer deployment boundary.
+- [x] Persist `fused` through Webrick's native fused matcher cache file.
+- [x] Persist `generated` through Webrick's native generated matcher cache file.
+- [x] Persist `sharded` through Webrick's native `__current` +
+  immutable `generation-*` shard layout.
+- [x] Let Webrick own matcher-cache format, activation, loading, and native
+  per-cache/per-shard validation.
+- [x] Do not add a Foundation whole-tree route digest or pre-scan on process
+  boot.
+- [x] Require production matcher boot to use the selected native cache when one
+  was published instead of silently replaying source routes.
+
+### InterMix compiled containers and CacheLayer
+
+- [x] Keep generated InterMix PHP `ProductionContainer` artifacts as the native
+  production DI cache for web, CLI, worker, and scheduler.
+- [x] Keep CacheLayer as Foundation core application infrastructure without
+  automatically enabling InterMix PSR-6 definition caching.
+- [x] Preserve InterMix definition caching as an explicit optimization for
+  suitable dynamic graphs/safe scalar-null-array singleton values.
+- [x] Remove Foundation's duplicate read/validation of InterMix's native
+  `.meta.json` sidecar on trusted non-web boot.
+- [x] Let Foundation validate Foundation-owned release metadata and trusted
+  InterMix digest identity, then let InterMix validate its own artifact/manifest
+  exactly once.
+- [x] Add regressions proving active CacheLayer does not silently wrap the
+  InterMix generated graph and tampered InterMix native metadata still fails
+  closed at the InterMix boundary.
+- [x] Document the native ownership boundary in Foundation and InfByte.
+- [ ] Final Foundation #17 and InfByte #9 Security & Standards runs are green on
+  the exact post-hardening heads.
+
+**Acceptance:** pending the final two PR workflow runs. No PHPForge/PHPProbe
+bypass, threshold weakening, parallel cache engine, or host-layer container/
+route compiler is allowed.
+
+---
+
+## 12. Non-blocking application backlog preserved from Foundation review
 
 These are **not Foundation 3 / InfByte migration blockers**. Re-evaluate them only against concrete application needs after the stable handoff is complete:
 
@@ -309,7 +355,7 @@ Each item needs a separate small design, compatibility decision, tests and perfo
 
 ---
 
-## 12. Guardrails
+## 13. Guardrails
 
 - Do not edit Foundation merely to satisfy an InfByte preference unless the **released Foundation contract itself is objectively broken** and reproduced independently of the skeleton.
 - Do not restore Foundation 2 route-cache/container-resolver switches.
