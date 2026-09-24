@@ -1088,9 +1088,20 @@ jobs:
           }
           PHP
 
+          cat > .migration-phpunit.xml <<'XML'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <phpunit bootstrap="vendor/autoload.php" colors="true" cacheDirectory=".phpunit.cache">
+              <testsuites>
+                  <testsuite name="Infbyte migrated application">
+                      <directory>tests</directory>
+                  </testsuite>
+              </testsuites>
+          </phpunit>
+          XML
           vendor/bin/pest \
-            --configuration vendor/infocyph/phpforge/resources/pest.xml \
+            --configuration .migration-phpunit.xml \
             tests/Feature/ExampleTest.php tests/Unit/ExampleTest.php
+          rm .migration-phpunit.xml
           php infbyte module:doctor auth --json=1 >"$work/module-doctor.json"
 
           export APP_ENV=production
