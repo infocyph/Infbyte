@@ -73,12 +73,12 @@ The normal Security & Standards workflow is expected to reject the pre-tag branc
 | --- | --- | --- | --- |
 | **A** | Pre-tag migration implementation | **DONE** | PR #9 baseline above remains green under the temporary handoff workflow. |
 | **B** | Stable Foundation 3 package cutover | **DONE** | Stable `^3.0`, no temporary workflow, normal PHPForge release guard/clean install green in run #55. |
-| **C** | Final released-contract resync | **IN PROGRESS** | Released catalog/docs/config audited; contract regressions added and current-head CI pending. |
-| **D** | Fresh-install and capability scenarios | **IN PROGRESS** | Exported stable-consumer CI gate added; current-head execution pending. |
-| **E** | Module/config/schema lifecycle | **IN PROGRESS** | Released module lifecycle CI gate added; current-head execution pending. |
-| **F** | Production release/runtime rehearsal | **IN PROGRESS** | Trusted digest, real HTTP, generation replacement/failure retention/read-only source gate added; current-head execution pending. |
+| **C** | Final released-contract resync | **IN PROGRESS** | Released catalog/docs/config audited and stable consumer gates pass in #69; direct/transitive ownership-state coverage remains. |
+| **D** | Fresh-install and capability scenarios | **IN PROGRESS** | Exported lean consumer and development-auth/fail-closed production-auth gates pass in #69; full production auth/session feature scenario remains. |
+| **E** | Module/config/schema lifecycle | **IN PROGRESS** | Released database module plan/install/enable/show/doctor/repair/disable/remove passes in #69; schema lifecycle expansion remains. |
+| **F** | Production release/runtime rehearsal | **IN PROGRESS** | Trusted digest, real HTTP, generation replacement, deterministic failed-build retention and read-only source pass in #69; drain/reload/rollback-consumption evidence remains. |
 | **G** | 2.1 → 3.0 migration rehearsal | **IN PROGRESS** | Migration guide and legacy-artifact regression added; broader representative state migration remains. |
-| **H** | Final CI/docs/publication evidence | **IN PROGRESS** | Stable cutover matrix green in #55; exact final head must be green after post-release gates close. |
+| **H** | Final CI/docs/publication evidence | **IN PROGRESS** | Exact head `fb6d69b` is green in Security & Standards #69 including exported PHP 8.4/8.5 consumers and module lifecycle; remaining feature/migration evidence must close before finalization. |
 
 ---
 
@@ -108,7 +108,7 @@ PR #9 predates the final Foundation 3 release-closure work, so re-audit it again
 - [x] Compare every checked-in InfByte config template with the released Foundation defaults/public contract.
 - [x] Keep `config/cache.php` as a default application config, while keeping the cache capability cold when explicit topology omits `cache`.
 - [x] Verify `APP_CAPABILITIES=` still creates the intended lean skeleton.
-- [ ] Verify omitted topology is documented only as compatibility/development inference where Foundation supports it; production examples should prefer explicit topology.
+- [x] Verify omitted topology is documented only as compatibility/development inference where Foundation supports it; production examples should prefer explicit topology.
 - [x] Verify provider registration remains application-owned and does not duplicate lower-library mechanics.
 
 ### Module contract
@@ -138,18 +138,18 @@ Test the **published** package, not only the repository checkout.
 ### D1 — clean create-project
 
 - [ ] Create a fresh project through the normal published InfByte package/create-project flow.
-- [ ] Verify `app:install` provisions environment secrets without requiring optional Epicrypt.
-- [ ] Verify production `--no-dev` installation/autoload.
-- [ ] Verify shipped archive excludes repository-only tests/plans/tooling while retaining required writable-directory placeholders.
-- [ ] Verify `plan.md` remains excluded from distributed skeleton archives.
+- [x] Verify `app:install` provisions environment secrets without requiring optional Epicrypt.
+- [x] Verify production `--no-dev` installation/autoload.
+- [x] Verify shipped archive excludes repository-only tests/plans/tooling while retaining required writable-directory placeholders.
+- [x] Verify `plan.md` remains excluded from distributed skeleton archives.
 
 ### D2 — lean application
 
-- [ ] Keep explicit capability topology empty.
-- [ ] Run configuration validation and `app:ready`.
-- [ ] Build the production generation.
-- [ ] Prove optional database/auth/messaging/filesystem/security/validation/communication packages are not required merely to boot the lean skeleton.
-- [ ] Prove inactive auth/cache policy does not falsely block readiness.
+- [x] Keep explicit capability topology empty.
+- [x] Run configuration validation and `app:ready`.
+- [x] Build the production generation.
+- [x] Prove optional database/auth/messaging/filesystem/security/validation/communication packages are not required merely to boot the lean skeleton.
+- [x] Prove inactive auth/cache policy does not falsely block readiness.
 
 ### D3 — auth/session application
 
@@ -163,13 +163,13 @@ Test the **published** package, not only the repository checkout.
 
 Use at least one package-backed module such as `database` or `messaging`.
 
-- [ ] Run `module:plan` before mutation.
-- [ ] Install the module through the skeleton CLI.
-- [ ] Publish only applicable config.
+- [x] Run `module:plan` before mutation.
+- [x] Install the module through the skeleton CLI.
+- [x] Publish only applicable config.
 - [ ] Provision only applicable schemas.
-- [ ] Verify the selected capability becomes ready while unrelated modules remain cold.
+- [x] Verify the selected capability becomes ready while unrelated modules remain cold.
 
-**Acceptance:** both minimal and featureful published-package consumers work without development-package assumptions.
+**Acceptance:** lean published-Foundation consumer is green in #69. Featureful production auth/session certification remains before Batch D can close.
 
 ---
 
@@ -177,21 +177,21 @@ Use at least one package-backed module such as `database` or `messaging`.
 
 Exercise the public lifecycle exactly as an application operator would.
 
-- [ ] `module:list --json`
-- [ ] `module:show <module> --json`
-- [ ] `module:doctor <module> --json`
-- [ ] `module:plan <module> ...`
-- [ ] `module:install <module> ...`
-- [ ] module enable/disable semantics where applicable
-- [ ] module config publication without overwriting application-owned config unless explicitly forced
+- [x] `module:list --json`
+- [x] `module:show <module> --json`
+- [x] `module:doctor <module> --json`
+- [x] `module:plan <module> ...`
+- [x] `module:install <module> ...`
+- [x] module enable/disable semantics where applicable
+- [x] module config publication without overwriting application-owned config unless explicitly forced
 - [ ] `module:schema:status` / `module:schema:install` for applicable Foundation-owned module schemas
 - [ ] `cache:schema:status` / `cache:schema:install` for configured database-backed core cache stores
-- [ ] `module:repair` on a deliberately interrupted/partial install fixture
-- [ ] removal/dependency checks without deleting application config/data
+- [x] `module:repair` on a deliberately interrupted/partial install fixture
+- [x] removal/dependency checks without deleting application config/data
 - [ ] aggregate schema sync follows active capability topology and does not provision unrelated schemas
 - [ ] module/schema commands may inspect/use a connection when applicable without inventing a synthetic database-capability prerequisite before applicability is known
 
-**Acceptance:** CLI JSON, human output, configuration validity, schema status and `app:ready` agree on the same application graph.
+**Acceptance:** core module lifecycle is green in #69. Schema status/install/sync and database-backed core-cache schema coverage remain before Batch E can close.
 
 ---
 
@@ -199,32 +199,32 @@ Exercise the public lifecycle exactly as an application operator would.
 
 ### F1 — build and trust
 
-- [ ] Run `config:validate --production`.
-- [ ] Run `optimize` and capture generation, manifest and SHA-256.
-- [ ] Run `optimize:report`.
-- [ ] Run `app:ready`.
-- [ ] Start the production entrypoint with deployment-supplied trusted manifest identity.
-- [ ] Prove missing/wrong manifest identity fails closed.
+- [x] Run `config:validate --production`.
+- [x] Run `optimize` and capture generation, manifest and SHA-256.
+- [x] Run `optimize:report`.
+- [x] Run `app:ready`.
+- [x] Start the production entrypoint with deployment-supplied trusted manifest identity.
+- [x] Prove missing/wrong manifest identity fails closed.
 - [ ] Prove tampered/stale dependency-bound generations fail closed.
-- [ ] Prove source config/routes/providers are not rediscovered on steady production requests after compilation.
+- [x] Prove source config/routes/providers are not rediscovered on steady production requests after compilation.
 
 ### F2 — real HTTP request
 
-- [ ] Serve the released skeleton through the supported default Foundation/Webrick path.
-- [ ] Perform at least one real HTTP health/application request against the production generation.
-- [ ] Confirm Webrick performs the single response write; InfByte must not add a second emitter/kernel path.
+- [x] Serve the released skeleton through the supported default Foundation/Webrick path.
+- [x] Perform at least one real HTTP health/application request against the production generation.
+- [x] Confirm Webrick performs the single response write; InfByte must not add a second emitter/kernel path.
 
 ### F3 — generation lifecycle
 
-- [ ] Rebuild after a configuration/topology change and verify atomic activation.
-- [ ] Prove a failed/staged build leaves the previous valid generation active.
+- [x] Rebuild after a configuration/topology change and verify atomic activation.
+- [x] Prove a failed/staged build leaves the previous valid generation active.
 - [ ] Exercise process reload/replacement.
 - [ ] Exercise rollback to the previous compatible generation.
 - [ ] Verify draining processes retain the generation they need and pruning respects Foundation's generation lease/drain contract.
-- [ ] Verify read-only application source with separate writable storage/release directory.
-- [ ] Keep code rollback separate from schema/data rollback; document expand/contract expectations for mixed generations.
+- [x] Verify read-only application source with separate writable storage/release directory.
+- [x] Keep code rollback separate from schema/data rollback; document expand/contract expectations for mixed generations.
 
-**Acceptance:** operators can build, trust, serve, replace and roll back the skeleton without development fallback or unsafe generation deletion.
+**Acceptance:** build/trust/serve/replacement/failure-retention/read-only-source behavior is green in #69. Process drain/reload and deployment-owned rollback consumption remain before Batch F can close.
 
 ---
 
@@ -249,19 +249,19 @@ Use a representative InfByte/Foundation 2.1 application fixture rather than vali
 
 ## 10. Batch H — final release qualification
 
-- [ ] Run normal Security & Standards with no temporary handoff workflow or release-constraint exception.
-- [ ] PHP 8.4 / prefer-lowest QA passes.
-- [ ] PHP 8.4 / prefer-stable QA passes.
-- [ ] PHP 8.5 / prefer-lowest QA passes.
-- [ ] PHP 8.5 / prefer-stable QA passes.
-- [ ] PHP 8.4/8.5 analysis/audit passes.
-- [ ] Clean production install passes.
-- [ ] Applicable InfByte release benchmark/report jobs pass without weakening PHPForge thresholds/configuration.
+- [x] Run normal Security & Standards with no temporary handoff workflow or release-constraint exception.
+- [x] PHP 8.4 / prefer-lowest QA passes.
+- [x] PHP 8.4 / prefer-stable QA passes.
+- [x] PHP 8.5 / prefer-lowest QA passes.
+- [x] PHP 8.5 / prefer-stable QA passes.
+- [x] PHP 8.4/8.5 analysis/audit passes.
+- [x] Clean production install passes.
+- [x] Applicable InfByte release benchmark/report jobs pass without weakening PHPForge thresholds/configuration.
 - [ ] Fresh published-package create-project passes.
 - [ ] Lean + auth/session + specialist-module scenarios pass.
 - [ ] Production release/real-request/reload/rollback rehearsal passes.
 - [ ] 2.1 → 3.0 migration rehearsal passes.
-- [ ] README and examples use stable Foundation package/docs references, not development-branch URLs.
+- [x] README and examples use stable Foundation package/docs references, not development-branch URLs.
 - [ ] PR description is updated with final Foundation tag/SHA, InfByte head SHA and final CI run IDs.
 - [ ] Record final package/source/CI identities in a concise release evidence section or release notes.
 
