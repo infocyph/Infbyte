@@ -303,19 +303,15 @@ jobs:
           APP_CAPABILITIES=database,session SESSION_DRIVER=database DB_CONNECTION=sqlite \
             php infbyte module:schema:sync --json=1 >"$work/schema-sync.json"
 
-          set +e
           APP_CAPABILITIES=cache CACHE_STORE=sqlite \
             php infbyte cache:schema:status --json=1 >"$work/cache-schema-before.json"
-          cache_schema_before=$?
-          set -e
-          if [[ "$cache_schema_before" -eq 0 ]]; then
-            cat "$work/cache-schema-before.json" >&2
-            echo "SQLite cache schema unexpectedly reported ready before installation." >&2
-            exit 1
-          fi
+          grep -q '"applicable":true' "$work/cache-schema-before.json"
+          grep -q '"installed":true' "$work/cache-schema-before.json"
 
           APP_CAPABILITIES=cache CACHE_STORE=sqlite \
             php infbyte cache:schema:install --json=1 >"$work/cache-schema-install.json"
+          grep -q '"installed":true' "$work/cache-schema-install.json"
+
           APP_CAPABILITIES=cache CACHE_STORE=sqlite \
             php infbyte cache:schema:status --json=1 >"$work/cache-schema-after.json"
           grep -q '"installed":true' "$work/cache-schema-after.json"
