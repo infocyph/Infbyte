@@ -14,9 +14,10 @@ return [
     |
     | Optional choices map to purpose-level modules:
     |   storage=database             -> module:install database
-    |   cache=cache                  -> module:install cache
+    |   cache=cache                  -> enable the core cache capability
     |   passwords/tokens=security    -> module:install security
-    |   mfa=otp or passkey=webauthn  -> module:install auth
+    |   mfa=otp                      -> module:install auth --feature=otp
+    |   passkey=webauthn             -> module:install auth --feature=passkey
     |   notifications=talkingbytes   -> module:install communication
     |
     | Module installation also synchronizes database schemas required by the
@@ -24,8 +25,8 @@ return [
     | inspect or provision it explicitly with `module:schema:status auth` and
     | `module:schema:install auth` when preparing persistence ahead of activation.
     |
-    | OTP and WebAuthn remain independently selectable even though they share
-    | the same extended-auth module and installation bundle.
+    | OTP and WebAuthn remain independently selectable features of the auth
+    | module. Package installation follows the explicitly selected feature set.
     |
     */
     'drivers' => [
