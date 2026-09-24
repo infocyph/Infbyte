@@ -229,6 +229,61 @@ it('reports readiness and canonical module state through the infbyte cli', funct
     }
 });
 
+
+it('keeps core cache outside module lifecycle and exposes its schema commands', function (): void {
+    $fixture = createInfbyteCliFixture();
+
+    try {
+        [$moduleExitCode, $moduleOutput] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'module:show',
+            'cache',
+            '--json=1',
+        ]);
+
+        [$schemaExitCode, $schemaOutput] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'cache:schema:status',
+            '--json=1',
+        ], ['APP_CAPABILITIES' => 'cache']);
+
+        $schema = json_decode($schemaOutput, true, flags: JSON_THROW_ON_ERROR);
+
+        expect($moduleExitCode)->not->toBe(0)
+            ->and($moduleOutput)->toContain('cache')
+            ->and($schemaExitCode)->toBe(0, $schemaOutput)
+            ->and($schema)->toHaveKey('schemas')
+            ->and($schema['schemas'])->toBeArray();
+    } finally {
+        removeInfbyteTestDirectory($fixture);
+    }
+});
+
+it('plans specialist installation against the released module catalog', function (): void {
+    $fixture = createInfbyteCliFixture();
+
+    try {
+        [$exitCode, $output] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'module:plan',
+            'database',
+            '--json=1',
+        ]);
+
+        $plan = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+
+        expect($exitCode)->toBe(0, $output)
+            ->and($plan['module'] ?? $plan['name'] ?? null)->toBe('database')
+            ->and($output)->toContain('infocyph/dblayer')
+            ->and($output)->toContain('^5.1');
+    } finally {
+        removeInfbyteTestDirectory($fixture);
+    }
+});
+
 it('reports canonical database installation guidance through module schema metadata', function (): void {
     $fixture = createInfbyteCliFixture();
 
