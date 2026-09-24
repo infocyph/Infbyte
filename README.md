@@ -5,13 +5,12 @@ Infbyte is the minimal application skeleton for
 the reusable framework/runtime layer; Infbyte provides opinionated application
 configuration, routes, writable layout, and application code.
 
-This integration branch targets the Foundation 3 runtime architecture:
+Infbyte targets the stable Foundation 3 runtime architecture:
 
 ```json
-"infocyph/foundation": "dev-foundation-3/close-26.6 as 3.0.0"
+"infocyph/foundation": "^3.0"
 ```
 
-The development constraint is replaced by `^3.0` when Foundation 3 is tagged.
 Infbyte requires PHP 8.4+.
 
 ## Quick start
@@ -97,7 +96,7 @@ Common families include:
 | --- | --- |
 | Inspect | `about`, `env:show`, `config:show`, `config:validate`, `route:list` |
 | Local development | `serve`, `create:*` |
-| Modules | `module:list`, `module:show`, `module:install`, `module:remove`, `module:config:publish`, `module:schema:*` |
+| Modules | `module:list`, `module:show`, `module:doctor`, `module:plan`, `module:install`, `module:enable`, `module:disable`, `module:repair`, `module:remove`, `module:config:publish`, `module:schema:*` |
 | Database | `db:*`, `migrate*` |
 | Operations | `execution:*`, `maintenance:*`, `runtime:reload`, `log:tail` |
 | Background work | `schedule:*`, `worker:*`, `queue:*`, `messaging:list` |
@@ -144,8 +143,9 @@ they are needed:
 
 ```bash
 php infbyte module:list
+php infbyte module:plan database
 php infbyte module:install database
-php infbyte module:install cache
+php infbyte module:enable database
 php infbyte module:install communication
 php infbyte module:install messaging
 php infbyte module:config:publish operations
@@ -154,24 +154,25 @@ php infbyte module:config:publish operations
 Then add the capabilities the application actually uses to `APP_CAPABILITIES`
 (or directly to `app.capabilities`) before compiling a production generation.
 
-Canonical modules are:
+The seven package-backed specialist modules are:
 
 - `auth`
-- `cache`
 - `communication`
 - `database`
 - `filesystem`
-- `logging` (built in)
 - `messaging`
-- `operations` (built in)
-- `resources` (built in)
 - `security`
-- `session` (built in)
 - `validation`
 
-Aliases such as `db`, `crypto`, `otp`, `passkeys`, and `queue` remain accepted,
-but the application documentation uses purpose names. OTP and WebAuthn are
-implementations inside the `auth` module rather than standalone public modules.
+`logging`, `operations`, `resources`, and `session` are Foundation-native
+built-in catalog entries. CacheLayer is Foundation core infrastructure and is
+not a module; use the core `cache:*` command family instead of
+`module:install cache`.
+
+Aliases such as `db`, `crypto`, `otp`, `passkeys`, and `queue` remain
+accepted where unambiguous, but application documentation uses purpose names.
+OTP and WebAuthn are explicit features of the `auth` module rather than
+standalone public modules.
 
 Installing a module does not add global middleware, open connections, or start
 workers. Optional config is published only when requested/needed and remains
@@ -179,14 +180,17 @@ outside the lean checked-in skeleton by default.
 
 ## Module schema lifecycle
 
-Capability-owned schemas use one command family:
+Module-owned schemas use the module command family, while core cache schemas use
+their dedicated Foundation command family:
 
 ```bash
 php infbyte module:schema:status auth
 php infbyte module:schema:install auth
-php infbyte module:schema:status cache
 php infbyte module:schema:install session
 php infbyte module:schema:sync
+
+php infbyte cache:schema:status
+php infbyte cache:schema:install
 ```
 
 The `database` module owns DB/migration infrastructure; it does not own arbitrary
@@ -205,6 +209,7 @@ bootstrap/
 config/
   app.php
   auth.php
+  cache.php
   router.php
 public/
 routes/
@@ -219,10 +224,10 @@ composer.json
 infbyte
 ```
 
-Only application-default config is checked in. Cache/database/filesystem/
-messaging/operations/security/session/validation/communication config belongs
-to optional module publication rather than being bulk-copied into every new
-project.
+Only application-default config is checked in. `cache.php` is included because
+CacheLayer is Foundation core infrastructure. Database/filesystem/messaging/
+operations/security/session/validation/communication configuration is published
+only when the application chooses those specialist or built-in surfaces.
 
 ## Database
 
@@ -340,8 +345,8 @@ performance matrix is performed in its dedicated release-verification phase.
 
 ## Documentation
 
-- [Foundation documentation](https://github.com/infocyph/Foundation/tree/foundation-3/close-26.6/docs)
-- [Foundation 3 migration guide](https://github.com/infocyph/Foundation/blob/foundation-3/close-26.6/docs/foundation-3-migration.md)
+- [Foundation 3.0 documentation](https://github.com/infocyph/Foundation/tree/3.0/docs)
+- [Foundation 3 migration guide](https://github.com/infocyph/Foundation/blob/3.0/docs/foundation-3-migration.md)
 - [Omnibus](https://github.com/infocyph/Omnibus)
 - [Webrick](https://github.com/infocyph/Webrick)
 
