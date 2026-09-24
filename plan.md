@@ -74,11 +74,11 @@ The normal Security & Standards workflow is expected to reject the pre-tag branc
 | **A** | Pre-tag migration implementation | **DONE** | PR #9 baseline above remains green under the temporary handoff workflow. |
 | **B** | Stable Foundation 3 package cutover | **DONE** | Stable `^3.0`, no temporary workflow, normal PHPForge release guard/clean install green in run #55. |
 | **C** | Final released-contract resync | **DONE** | Released catalog/docs/config audited; direct/transitive/ownership-unknown package reporting and stable consumer gates are proven in run #103. |
-| **D** | Fresh-install and capability scenarios | **IN PROGRESS** | Exported lean consumer and development-auth/fail-closed production-auth gates pass in #69; full production auth/session feature scenario remains. |
+| **D** | Fresh-install and capability scenarios | **DONE** | Lean, specialist-module, and full production auth/session scenarios pass against released Foundation 3.x in Security & Standards run #114. |
 | **E** | Module/config/schema lifecycle | **DONE** | Released module/config/schema lifecycle, cache schema lifecycle, repair/removal, aggregate sync, and connection/applicability checks pass in run #103. |
 | **F** | Production release/runtime rehearsal | **DONE** | Trusted build/request, stale rejection, reload, drain-safe retention, rollback consumption, failed-build retention, and read-only source pass in run #103. |
 | **G** | 2.1 → 3.0 migration rehearsal | **DONE** | Representative 2.1 application upgrade, provider/route preservation, persisted-data boundary, session incompatibility handling, runtime build/readiness, and real request pass in run #103. |
-| **H** | Final CI/docs/publication evidence | **IN PROGRESS** | Run #103 is green for the full PHPForge matrix, create-project, consumers, module lifecycle, generation lifecycle, and 2.1→3.0 migration. Production auth/session is the only remaining qualification gate. |
+| **H** | Final CI/docs/publication evidence | **DONE** | Security & Standards run #114 is fully green on released Foundation 3.x, including the normal PHPForge matrix, create-project, consumers, module lifecycle, generation lifecycle, 2.1→3.0 migration, and production auth/session lifecycle. |
 
 ---
 
@@ -156,7 +156,7 @@ Test the **published** package, not only the repository checkout.
 - [x] Enable the required auth/session topology explicitly.
 - [x] Install/configure the selected auth feature(s), including OTP/passkey only when selected.
 - [x] Provision applicable schemas.
-- [ ] Exercise login/session issuance, rotation/invalidation, logout and one negative/stale-session path through the skeleton.
+- [x] Exercise login/session issuance, rotation/invalidation, logout and one negative/stale-session path through the skeleton.
 - [x] Verify secrets/tokens/cookies are not exposed by public errors/readiness output.
 
 ### D4 — representative specialist application
@@ -169,7 +169,7 @@ Use at least one package-backed module such as `database` or `messaging`.
 - [x] Provision only applicable schemas.
 - [x] Verify the selected capability becomes ready while unrelated modules remain cold.
 
-**Acceptance:** lean published-Foundation consumer is green in #69. Featureful production auth/session certification remains before Batch D can close.
+**Acceptance:** DONE. Run #114 proves the released Foundation 3.x lean, specialist-module, and production auth/session scenarios, including login/session issuance, session-ID rotation, stale-session rejection, invalidation, and logout.
 
 ---
 
@@ -247,9 +247,9 @@ Use a representative InfByte/Foundation 2.1 application fixture rather than vali
 
 ---
 
-### Current external release blocker
+### Stable Foundation 3 qualification result
 
-Foundation 3.0 production auth with `talkingbytes` notifications exposes a released static-compilation defect during `optimize`. The minimal Foundation fix is tracked in draft PR #17 (`foundation-3.0/notification-static-compile-fix`). InfByte keeps `infocyph/foundation:^3.0`; CI may pin the patch candidate only inside the dedicated auth certification fixture until a stable Foundation patch containing the fix is published.
+The earlier production-auth compilation failure was traced to an incomplete explicit capability topology in the certification fixture: TalkingBytes-backed auth requires both `communication` and Foundation's native `notifications` capability. With that topology declared, released Foundation 3.0 compiles and runs the full production auth/session lifecycle without a development-branch or patch-package override. InfByte remains on `infocyph/foundation:^3.0`.
 
 ## 10. Batch H — final release qualification
 
@@ -262,14 +262,32 @@ Foundation 3.0 production auth with `talkingbytes` notifications exposes a relea
 - [x] Clean production install passes.
 - [x] Applicable InfByte release benchmark/report jobs pass without weakening PHPForge thresholds/configuration.
 - [x] Fresh published-package create-project passes.
-- [ ] Lean + auth/session + specialist-module scenarios pass.
+- [x] Lean + auth/session + specialist-module scenarios pass.
 - [x] Production release/real-request/reload/rollback rehearsal passes.
 - [x] 2.1 → 3.0 migration rehearsal passes.
 - [x] README and examples use stable Foundation package/docs references, not development-branch URLs.
-- [ ] PR description is updated with final Foundation tag/SHA, InfByte head SHA and final CI run IDs.
-- [ ] Record final package/source/CI identities in a concise release evidence section or release notes.
+- [x] PR description is updated with final Foundation tag/SHA, InfByte head SHA and final CI run IDs.
+- [x] Record final package/source/CI identities in a concise release evidence section or release notes.
 
 **Completion definition:** InfByte is a clean, stable Foundation 3 consumer whose published skeleton can be created normally, configured explicitly, extended through the supported module lifecycle, compiled into a trusted production generation, served through the released runtime contract, upgraded from a representative 2.1 application, and validated by the normal PHPForge release gates.
+
+### Final release evidence
+
+- Foundation package constraint: `infocyph/foundation:^3.0`
+- Foundation release tag: `3.0`
+- Foundation tag object: `d4d73bf9e2e6650e1665577387e2457c43ef07ca`
+- Foundation 3.0 source commit: `441ccd713233036d927df98f402a0b36cd4d91da`
+- InfByte release-qualified implementation head: `a105a687817c2a8f3918017500c4745fcffa0f9d`
+- Final implementation qualification: Security & Standards run #114 (`36017258288`)
+- Production auth/session job: `107693287053` — success
+- Released generation lifecycle job: `107693286851` — success
+- Released module lifecycle job: `107693286874` — success
+- Foundation 2.1 → 3.0 migration job: `107693286899` — success
+- Release-candidate create-project job: `107693286932` — success
+- Released PHP 8.4 consumer job: `107693286987` — success
+- Released PHP 8.5 consumer job: `107693287013` — success
+- Normal PHPForge PHP 8.4/8.5 lowest/stable QA, analysis, clean-install, and benchmark rows: success
+- No PHPForge/PHPProbe bypass, threshold weakening, temporary handoff workflow, or Foundation development-branch dependency is required.
 
 ---
 
