@@ -628,7 +628,6 @@ jobs:
 
           declare(strict_types=1);
 
-          use Infocyph\Foundation\Application\RuntimeMode;
           use Infocyph\Foundation\Release\ActiveGeneration;
           use Infocyph\Foundation\Release\FoundationReleaseBootstrap;
           use Infocyph\Foundation\Release\FoundationReleaseCompiler;
@@ -675,10 +674,32 @@ jobs:
               throw new RuntimeException('Unable to hash rollback generation manifest.');
           }
 
-          $rollback = new FoundationReleaseBootstrap($root, $g1Sha);
-          $rollbackApp = $rollback->nonWeb(['base_path' => getcwd()], RuntimeMode::Cli);
-          if ($rollbackApp->config()->get('app.name') !== 'GenerationOne') {
-              throw new RuntimeException('Rollback bootstrap did not consume the retained generation.');
+          $rollbackCode = <<<'ROLLBACK'
+          require 'vendor/autoload.php';
+
+          $bootstrap = new \Infocyph\Foundation\Release\FoundationReleaseBootstrap(
+              (string) getenv('RELEASE_ROOT'),
+              (string) getenv('ROLLBACK_SHA'),
+          );
+          $app = $bootstrap->nonWeb(
+              ['base_path' => getcwd()],
+              \Infocyph\Foundation\Application\RuntimeMode::Cli,
+          );
+          if ($app->config()->get('app.name') !== 'GenerationOne') {
+              fwrite(STDERR, "Rollback bootstrap did not consume the retained generation.\n");
+              exit(1);
+          }
+          ROLLBACK;
+          putenv('ROLLBACK_SHA=' . $g1Sha);
+          $rollbackOutput = [];
+          $rollbackStatus = 0;
+          exec(
+              escapeshellarg(PHP_BINARY) . ' -r ' . escapeshellarg($rollbackCode),
+              $rollbackOutput,
+              $rollbackStatus,
+          );
+          if ($rollbackStatus !== 0) {
+              throw new RuntimeException('Rollback generation subprocess failed.');
           }
 
           $originalManifest = file_get_contents($g1Manifest);
