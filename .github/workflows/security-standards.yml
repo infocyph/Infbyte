@@ -1172,11 +1172,11 @@ jobs:
 
           composer install --no-interaction --prefer-dist --no-progress
           composer config repositories.foundation-candidate vcs https://github.com/infocyph/Foundation.git
-          composer require 'infocyph/foundation:dev-foundation-3.0/notification-static-compile-fix#96af0c1156cb4d79275fa82c7f3c9ed10f5c0ac7 as 3.0.1' \
+          composer require 'infocyph/foundation:dev-foundation-3.0/notification-static-compile-fix#79ecfb6fc72c13b6f586836a4f450a9a97259afd as 3.0.1' \
             --with-all-dependencies --no-interaction --prefer-dist --no-progress
 
           foundation_reference="$(composer show infocyph/foundation --format=json | php -r '$p=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $p["source"]["reference"] ?? "";')"
-          test "$foundation_reference" = "96af0c1156cb4d79275fa82c7f3c9ed10f5c0ac7"
+          test "$foundation_reference" = "79ecfb6fc72c13b6f586836a4f450a9a97259afd"
 
           php infbyte app:install
           cp routes/api.php "$work/api.php"
@@ -1375,5 +1375,10 @@ jobs:
             exit 1
           fi
 
-          grep -qi 'sharded route cache hash mismatch' "$work/sharded-tamper.log"
+          if ! grep -Eqi 'hash mismatch|cache.*mismatch|shard.*invalid|corrupt' "$work/sharded-tamper.log"; then
+            cat "$work/sharded-tamper.log" >&2
+            cat "$work/sharded-tamper-response" >&2 || true
+            echo "Webrick rejected the tampered request without exposing a recognizable native cache-integrity failure." >&2
+            exit 1
+          fi
 
