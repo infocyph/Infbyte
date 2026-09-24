@@ -151,14 +151,17 @@ jobs:
           test -d "$release_root/generations/$first_generation"
           [[ "$manifest_sha" =~ ^[a-f0-9]{64}$ ]]
 
+          cp routes/api.php "$work/api.php"
+          printf '%s\n' '<?php throw new RuntimeException("Deliberate release-build failure.");' > routes/api.php
           set +e
-          ROUTER_MATCHER=invalid APP_NAME=BrokenRelease APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= \
+          APP_NAME=BrokenRelease APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= \
             php infbyte optimize --json=1 >"$work/failed-build.log" 2>&1
           failed_build_status=$?
           set -e
+          mv "$work/api.php" routes/api.php
           if [[ "$failed_build_status" -eq 0 ]]; then
             cat "$work/failed-build.log" >&2
-            echo "Invalid release build unexpectedly succeeded." >&2
+            echo "Deliberately broken release build unexpectedly succeeded." >&2
             exit 1
           fi
 
