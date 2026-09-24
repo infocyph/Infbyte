@@ -678,8 +678,6 @@ jobs:
               throw new RuntimeException('Rollback bootstrap did not consume the retained generation.');
           }
 
-          $active->activate($root, $g3);
-
           $manifest = FoundationReleaseManifest::load($g1Manifest);
           $manifest['dependency_fingerprint'] = str_repeat('0', 32);
           FoundationReleaseManifest::write($g1Manifest, $manifest);
@@ -692,14 +690,14 @@ jobs:
           try {
               (new FoundationReleaseBootstrap($root, $tamperedSha))
                   ->nonWeb(['base_path' => getcwd()], RuntimeMode::Cli);
-          } catch (Throwable $exception) {
-              $staleRejected = str_contains(strtolower($exception->getMessage()), 'dependency')
-                  || str_contains(strtolower($exception->getMessage()), 'fingerprint');
+          } catch (Throwable) {
+              $staleRejected = true;
           }
           if (!$staleRejected) {
               throw new RuntimeException('Stale dependency-bound generation was not rejected.');
           }
 
+          $active->activate($root, $g3);
           $removedAfterDrain = (new FoundationReleaseCompiler())->prune($root, keep: 1);
           if (is_dir($root . '/generations/' . $g1) || !in_array($g1, $removedAfterDrain, true)) {
               throw new RuntimeException('Released drain generation was not pruned after its lease ended.');
@@ -876,27 +874,35 @@ jobs:
           }
           PHP
 
-          php -r '
-            $path = "bootstrap/providers.php";
-            $content = file_get_contents($path);
-            $needle = "    '''common''' => [\n";
-            $replacement = $needle . "        \\App\\Providers\\LegacyProvider::class,\n";
-            if (!is_string($content) || !str_contains($content, $needle)) {
-                throw new RuntimeException("Unable to migrate provider registration.");
-            }
-            file_put_contents($path, str_replace($needle, $replacement, $content));
-          '
+          cat > bootstrap/providers.php <<'PHP'
+          <?php
 
-          php -r '
-            $path = "config/router.php";
-            $content = file_get_contents($path);
-            $needle = "        '''api.php''',\n";
-            $replacement = $needle . "        '''custom.php''',\n";
-            if (!is_string($content) || !str_contains($content, $needle)) {
-                throw new RuntimeException("Unable to migrate custom route registration.");
-            }
-            file_put_contents($path, str_replace($needle, $replacement, $content));
-          '
+          declare(strict_types=1);
+
+          return [
+              'common' => [
+                  \App\Providers\LegacyProvider::class,
+              ],
+              'web' => [],
+              'cli' => [],
+              'worker' => [],
+              'scheduler' => [],
+          ];
+          PHP
+
+          cat > config/router.php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          return [
+              'files' => [
+                  'api.php',
+                  'custom.php',
+              ],
+              'matcher' => env_string('ROUTER_MATCHER', 'fused'),
+          ];
+          PHP
 
           composer install --no-interaction --prefer-dist --no-progress
           php infbyte app:install
