@@ -557,9 +557,7 @@ jobs:
           use Infocyph\Foundation\Auth\AuthServices;
           use Infocyph\Foundation\Auth\Authentication\Login\LoginRequest;
           use Infocyph\Foundation\Foundation;
-          use Infocyph\Foundation\Session\BrowserSession;
-          use Infocyph\Foundation\Session\SessionConfig;
-          use Infocyph\Foundation\Session\SessionStoreFactory;
+          use Infocyph\Foundation\Session\SessionManager;
 
           require 'vendor/autoload.php';
 
@@ -600,14 +598,8 @@ jobs:
               exit(1);
           }
 
-          $sessionConfig = $app->make(SessionConfig::class);
-          $storeFactory = $app->make(SessionStoreFactory::class);
-          $browser = static fn(?string $candidateId): BrowserSession => new BrowserSession(
-              $candidateId,
-              fn() => $storeFactory->make(),
-              static fn() => null,
-              $sessionConfig,
-          );
+          $sessionManager = $app->make(SessionManager::class);
+          $browser = static fn(?string $candidateId) => $sessionManager->open($candidateId);
 
           $initial = $browser(null);
           $initial->put('account_id', $created->account->id());
