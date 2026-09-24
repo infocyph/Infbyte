@@ -245,6 +245,61 @@ php infbyte db:monitor --section=status
 Application migrations are registered explicitly under
 `database.migrations.classes`; Foundation does not scan migration directories.
 
+## Production authentication
+
+The checked-in auth defaults are deliberately dependency-light for local
+development. Production authentication must opt into durable state and the
+specialist packages it actually uses. A minimal OTP-backed production graph is:
+
+```bash
+php infbyte module:install database
+php infbyte module:install security
+php infbyte module:install communication
+php infbyte module:install auth --feature=otp
+php infbyte module:config:publish session
+
+php infbyte module:schema:install auth --connection=sqlite
+php infbyte module:schema:install session --connection=sqlite
+```
+
+Then configure the production topology explicitly, for example:
+
+```text
+APP_CAPABILITIES=auth,cache,database,security,communication,session
+
+AUTH_STORAGE=database
+AUTH_CACHE=cache
+AUTH_TOKENS=security
+AUTH_MFA=otp
+AUTH_NOTIFICATIONS=talkingbytes
+AUTH_PASSKEY=disabled
+
+CACHE_STORE=auth-state
+CACHE_COUNTER=redis
+CACHE_REDIS_DSN=redis://127.0.0.1:6379
+CACHE_INTEGRITY_KEY=<deployment secret>
+
+AUTH_OTP_RECOVERY_HMAC_KEY=<deployment secret>
+AUTH_OTP_SECRET_PROTECTION_KEYS=[{"id":"primary","environment":"AUTH_OTP_MFA_KEY","status":"active"}]
+AUTH_OTP_MFA_KEY=<Base64URL key material>
+
+NOTIFICATIONS_AUTH_TRANSPORT=log
+SESSION_DRIVER=database
+SESSION_DB_CONNECTION=sqlite
+```
+
+`auth-state` and the Redis/Valkey counters are inactive named CacheLayer
+resources until selected; the lean skeleton still defaults to the local cache.
+Use a real production email transport instead of `log` when authentication
+notifications must be delivered. OTP-only installation does not require the
+passkey-only WebAuthn package; select `--feature=passkey` only when the
+application enables WebAuthn.
+
+Always run `config:validate --production`, provision the applicable schemas,
+then require `app:ready` before building the release generation. Keep token,
+cache-integrity, MFA-protection, recovery-code and transport credentials in
+deployment secret storage rather than source control.
+
 ## Messaging and workers
 
 Omnibus-backed messaging is optional:
@@ -365,6 +420,15 @@ Foundation 2 generated caches. For a representative 2.1 application:
 10. rehearse persisted auth/session/schema/queue data changes before rollout.
     Code rollback does not automatically roll back database rows, queue payloads,
     or key formats written by a newer generation.
+
+Do not assume Foundation 2.1 authentication/browser-session wire formats are
+valid Foundation 3 state. For each deployed application, explicitly decide
+whether existing credentials/tokens are retained, migrated, or revoked; force
+browser re-authentication when no verified session migration exists. OAuth and
+passkey state need the same explicit review when those features are in use.
+Apply database/schema changes additively first and use expand-contract rollout
+while old/new generations can coexist. Durable queue/message payloads likewise
+need version-compatible consumers before incompatible cleanup.
 
 See the
 [Foundation 2.x → 3.0 migration guide](https://github.com/infocyph/Foundation/blob/3.0/docs/foundation-3-migration.md)
