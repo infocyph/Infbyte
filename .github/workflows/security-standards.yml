@@ -1135,7 +1135,7 @@ jobs:
           server_pid=""
 
   released-native-route-caches:
-    name: "Foundation candidate native route caches"
+    name: "Foundation candidate native runtime caches"
     needs: phpforge
     runs-on: ubuntu-latest
     steps:
@@ -1172,11 +1172,11 @@ jobs:
 
           composer install --no-interaction --prefer-dist --no-progress
           composer config repositories.foundation-candidate vcs https://github.com/infocyph/Foundation.git
-          composer require 'infocyph/foundation:dev-foundation-3.0/notification-static-compile-fix#e2fa2b809a0e17c278e6ddcb4fde9dfb391705f7 as 3.0.1' \
+          composer require 'infocyph/foundation:dev-foundation-3.0/notification-static-compile-fix#6655a61d01bd87cc122dd038ebf26154b41e4237 as 3.0.1' \
             --with-all-dependencies --no-interaction --prefer-dist --no-progress
 
           foundation_reference="$(composer show infocyph/foundation --format=json | php -r '$p=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $p["source"]["reference"] ?? "";')"
-          test "$foundation_reference" = "e2fa2b809a0e17c278e6ddcb4fde9dfb391705f7"
+          test "$foundation_reference" = "6655a61d01bd87cc122dd038ebf26154b41e4237"
 
           php infbyte app:install
           cp routes/api.php "$work/api.php"
@@ -1380,4 +1380,81 @@ jobs:
           PHP
 
           php "$work/assert-native-shard-validation.php" "$PWD" "$shard_root"
+
+      - name: Verify native ArrayKit configuration caches
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          work="$(mktemp -d)"
+          cleanup() {
+            rm -rf "$work"
+          }
+          trap cleanup EXIT
+
+          composer archive --format=tar --dir="$work" --file=infbyte
+          mkdir "$work/project"
+          tar -xf "$work/infbyte.tar" -C "$work/project"
+          cd "$work/project"
+
+          composer install --no-interaction --prefer-dist --no-progress
+          composer config repositories.foundation-candidate vcs https://github.com/infocyph/Foundation.git
+          composer require 'infocyph/foundation:dev-foundation-3.0/notification-static-compile-fix#6655a61d01bd87cc122dd038ebf26154b41e4237 as 3.0.1' \
+            --with-all-dependencies --no-interaction --prefer-dist --no-progress
+
+          foundation_reference="$(composer show infocyph/foundation --format=json | php -r '$p=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $p["source"]["reference"] ?? "";')"
+          test "$foundation_reference" = "6655a61d01bd87cc122dd038ebf26154b41e4237"
+
+          php infbyte app:install
+          cp config/app.php "$work/app.php"
+
+          for type in single sharded; do
+            cp "$work/app.php" config/app.php
+            php infbyte config:clear
+            APP_CONFIG_CACHE_TYPE="$type" php infbyte config:cache
+
+            cache_root="$PWD/bootstrap/cache/config"
+            test -f "$cache_root/__manifest.php"
+
+            if [[ "$type" == "single" ]]; then
+              test -f "$cache_root/config.php"
+              test ! -f "$cache_root/app.php"
+              test ! -f "$cache_root/__flat.php"
+
+              php -r '
+                require "vendor/autoload.php";
+                $config = new Infocyph\ArrayKit\Config\Config();
+                if (!$config->loadCache($argv[1]) || $config->get("app.name") !== "Infbyte") {
+                    throw new RuntimeException("ArrayKit native single config cache failed.");
+                }
+              ' "$cache_root/config.php"
+            else
+              test ! -f "$cache_root/config.php"
+              test -f "$cache_root/app.php"
+              test -f "$cache_root/__flat.php"
+
+              php -r '
+                require "vendor/autoload.php";
+                $config = new Infocyph\ArrayKit\Config\LazyFileConfig(
+                    $argv[1],
+                    namespaceCacheDirectory: $argv[1],
+                );
+                if ($config->get("app.name") !== "Infbyte") {
+                    throw new RuntimeException("ArrayKit native sharded config cache failed.");
+                }
+              ' "$cache_root"
+            fi
+
+            mv config/app.php "$work/app-disabled.php"
+            APP_CONFIG_CACHE_TYPE="$type" php -r '
+              require "vendor/autoload.php";
+              $config = (new Infocyph\Foundation\Config\ConfigLoader())->load([
+                  "base_path" => getcwd(),
+              ]);
+              if (!$config->isCompiled() || $config->get("app.name") !== "Infbyte") {
+                  throw new RuntimeException("Foundation did not boot from the native ArrayKit config cache.");
+              }
+            '
+            mv "$work/app-disabled.php" config/app.php
+          done
 
