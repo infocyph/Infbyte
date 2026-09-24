@@ -383,7 +383,10 @@ php infbyte optimize:clear
 Release generations are deployment-owned and ignored by the skeleton repository.
 Production requests consume the generation-owned normalized config and compiled
 Webrick/InterMix artifacts; they do not rediscover project config, providers, or
-route files.
+route files. Webrick matcher caches remain Webrick-native for fused, generated,
+and sharded strategies, while InterMix generated PHP remains the native DI
+production cache. CacheLayer is core application infrastructure, not a wrapper
+around either compiled routing or compiled DI artifacts.
 
 Before deployment:
 
