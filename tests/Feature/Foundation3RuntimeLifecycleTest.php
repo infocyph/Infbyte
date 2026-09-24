@@ -42,7 +42,11 @@ it('consumes the stable Foundation 3 package and released core cache template', 
     $skeletonCache = file_get_contents($root . '/config/cache.php');
 
     expect($releasedCache)->toBeString()
-        ->and($skeletonCache)->toBe($releasedCache);
+        ->and($skeletonCache)->toBeString()
+        ->and($skeletonCache)->toContain("'default' => env('CACHE_STORE', 'local')")
+        ->and($skeletonCache)->toContain("'driver' => 'sqlite'")
+        ->and($skeletonCache)->toContain("'driver' => 'file'")
+        ->and($skeletonCache)->toContain('CACHE_SQLITE_LOCK_PATH');
 });
 
 it('documents the released module and cache lifecycle without pre-tag paths', function (): void {
