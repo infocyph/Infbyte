@@ -412,9 +412,9 @@ jobs:
           composer install --no-interaction --prefer-dist --no-progress
           php infbyte app:install
 
-          APP_CAPABILITIES= php infbyte module:install database --json=1 >"$work/database-install.json"
-          APP_CAPABILITIES= php infbyte module:install security --json=1 >"$work/security-install.json"
-          APP_CAPABILITIES= php infbyte module:install communication --json=1 >"$work/communication-install.json"
+          APP_CAPABILITIES= php infbyte module:install database --json=1 | tee "$work/database-install.json"
+          APP_CAPABILITIES= php infbyte module:install security --json=1 | tee "$work/security-install.json"
+          APP_CAPABILITIES= php infbyte module:install communication --json=1 | tee "$work/communication-install.json"
 
           mkdir -p database
           touch database/database.sqlite
@@ -445,6 +445,7 @@ jobs:
           export SESSION_LOCK_ENABLED=false
 
           php infbyte module:install auth --feature=otp --json=1 | tee "$work/auth-install.json"
+          composer show infocyph/dblayer infocyph/epicrypt infocyph/talkingbytes infocyph/otp --no-interaction
           php infbyte module:config:publish session --json=1 | tee "$work/session-config.json"
 
           php infbyte module:schema:install auth --connection=sqlite --json=1 | tee "$work/auth-schema.json"
