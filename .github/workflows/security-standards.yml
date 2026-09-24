@@ -1364,6 +1364,8 @@ jobs:
               throw new RuntimeException('Webrick native sharded cache is not bootable after publication.');
           }
 
+          $matcher->finalize();
+
           try {
               $matcher->matchCompiled('GET', '127.0.0.1', '/alpha/one');
           } catch (RuntimeException $exception) {
