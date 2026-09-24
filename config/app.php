@@ -40,12 +40,14 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Configuration Cache
+    | Development / Build Configuration Cache
     |--------------------------------------------------------------------------
     |
-    | Production uses one precomputed artifact to minimize process bootstrap.
-    | Other environments keep namespaces lazy with sharded configuration.
-    | Build the selected artifact during deployment. Allowed: sharded|single.
+    | Foundation delegates both layouts to ArrayKit: "single" is one native
+    | compiled config.php artifact, while "sharded" keeps native namespace
+    | files plus ArrayKit's __flat.php exact-leaf index. The immutable
+    | production release generation owns its own normalized config.php snapshot.
+    | Allowed: sharded|single.
     |
     */
     'config_cache' => [
