@@ -253,12 +253,20 @@ jobs:
           composer install --no-interaction --prefer-dist --no-progress
           php infbyte app:install
 
+          php infbyte module:list --json=1 >"$work/modules.json"
+          grep -q '"database"' "$work/modules.json"
+          grep -q '"session"' "$work/modules.json"
+
           php infbyte module:plan database --json=1 >"$work/plan.json"
           grep -q '"infocyph/dblayer"' "$work/plan.json"
 
           php infbyte module:install database --json=1 >"$work/install.json"
           composer show infocyph/dblayer --no-interaction >/dev/null
           test -f config/database.php
+
+          printf '\n// infbyte-owned-config-marker\n' >> config/database.php
+          php infbyte module:config:publish database --json=1 >"$work/publish-existing.json"
+          grep -q 'infbyte-owned-config-marker' config/database.php
 
           rm config/database.php
           php infbyte module:repair database --json=1 >"$work/repair.json"
@@ -271,6 +279,46 @@ jobs:
           php infbyte module:show database --json=1 >"$work/show.json"
           grep -q '"direct":true' "$work/show.json"
           php infbyte module:doctor database --json=1 >"$work/doctor.json"
+
+          php infbyte module:config:publish session --json=1 >"$work/session-config.json"
+          test -f config/session.php
+
+          set +e
+          APP_CAPABILITIES=database,session SESSION_DRIVER=database DB_CONNECTION=sqlite \
+            php infbyte module:schema:status session --json=1 >"$work/session-schema-before.json"
+          session_schema_before=$?
+          set -e
+          if [[ "$session_schema_before" -eq 0 ]]; then
+            cat "$work/session-schema-before.json" >&2
+            echo "Database session schema unexpectedly reported ready before installation." >&2
+            exit 1
+          fi
+
+          APP_CAPABILITIES=database,session SESSION_DRIVER=database DB_CONNECTION=sqlite \
+            php infbyte module:schema:install session --json=1 >"$work/session-schema-install.json"
+          APP_CAPABILITIES=database,session SESSION_DRIVER=database DB_CONNECTION=sqlite \
+            php infbyte module:schema:status session --json=1 >"$work/session-schema-after.json"
+          grep -q '"installed":true' "$work/session-schema-after.json"
+
+          APP_CAPABILITIES=database,session SESSION_DRIVER=database DB_CONNECTION=sqlite \
+            php infbyte module:schema:sync --json=1 >"$work/schema-sync.json"
+
+          set +e
+          APP_CAPABILITIES=cache CACHE_STORE=sqlite \
+            php infbyte cache:schema:status --json=1 >"$work/cache-schema-before.json"
+          cache_schema_before=$?
+          set -e
+          if [[ "$cache_schema_before" -eq 0 ]]; then
+            cat "$work/cache-schema-before.json" >&2
+            echo "SQLite cache schema unexpectedly reported ready before installation." >&2
+            exit 1
+          fi
+
+          APP_CAPABILITIES=cache CACHE_STORE=sqlite \
+            php infbyte cache:schema:install --json=1 >"$work/cache-schema-install.json"
+          APP_CAPABILITIES=cache CACHE_STORE=sqlite \
+            php infbyte cache:schema:status --json=1 >"$work/cache-schema-after.json"
+          grep -q '"installed":true' "$work/cache-schema-after.json"
 
           php infbyte module:disable database --json=1 >"$work/disable.json"
           php infbyte module:remove database --dry-run --json=1 >"$work/remove-plan.json"
