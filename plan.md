@@ -3,7 +3,7 @@
 **Target:** InfByte release compatible with the published Foundation 3.0 package.  
 **Branch:** `foundation-3/runtime-lifecycle`.  
 **PR:** #9.  
-**Status:** Foundation 3.0 is released; stable-package cutover is complete and post-release native runtime-cache hardening is in final certification.  
+**Status:** Foundation 3.0 is released; stable-package cutover and post-release native runtime-cache hardening are complete.  
 **Updated:** 2026-09-24.
 
 This is the canonical continuation plan for the InfByte skeleton after Foundation 3 is released. It intentionally preserves the consumer-side work that was previously recorded in Foundation planning files so those Foundation plan files can be removed without losing the handoff.
