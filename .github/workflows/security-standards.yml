@@ -567,3 +567,147 @@ jobs:
           $revoked->release();
           PHP
 
+  released-generation-lifecycle:
+    name: "Released generation lifecycle"
+    needs: phpforge
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pcntl, pdo_sqlite
+          tools: composer:v2
+          coverage: none
+
+      - name: Verify release replacement, drain, rollback and stale rejection
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+
+          composer archive --format=tar --dir="$work" --file=infbyte
+          mkdir "$work/project"
+          tar -xf "$work/infbyte.tar" -C "$work/project"
+          cd "$work/project"
+
+          composer install --no-dev --no-interaction --prefer-dist --no-progress --classmap-authoritative
+          php infbyte app:install
+
+          export APP_ENV=production
+          export APP_DEBUG=false
+          export APP_CAPABILITIES=
+
+          one="$(APP_NAME=GenerationOne php infbyte optimize --json=1)"
+          two="$(APP_NAME=GenerationTwo php infbyte optimize --json=1)"
+          three="$(APP_NAME=GenerationThree php infbyte optimize --json=1)"
+
+          export RELEASE_ROOT="$(printf '%s' "$three" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["release_root"] ?? "";')"
+          export G1="$(printf '%s' "$one" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["generation"] ?? "";')"
+          export G2="$(printf '%s' "$two" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["generation"] ?? "";')"
+          export G3="$(printf '%s' "$three" | php -r '$r=json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); echo $r["generation"] ?? "";')"
+
+          test -n "$RELEASE_ROOT"
+          test -n "$G1"
+          test -n "$G2"
+          test -n "$G3"
+
+          php infbyte runtime:reload --json=1 >"$work/runtime-reload.json"
+          grep -q '"scope":"runtime"' "$work/runtime-reload.json"
+          grep -q '"token":"' "$work/runtime-reload.json"
+
+          php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          use Infocyph\Foundation\Application\RuntimeMode;
+          use Infocyph\Foundation\Release\ActiveGeneration;
+          use Infocyph\Foundation\Release\FoundationReleaseBootstrap;
+          use Infocyph\Foundation\Release\FoundationReleaseCompiler;
+          use Infocyph\Foundation\Release\FoundationReleaseManifest;
+          use Infocyph\Foundation\Runtime\ReleaseGenerationLease;
+
+          require 'vendor/autoload.php';
+
+          $root = (string) getenv('RELEASE_ROOT');
+          $g1 = (string) getenv('G1');
+          $g2 = (string) getenv('G2');
+          $g3 = (string) getenv('G3');
+
+          foreach ([$root, $g1, $g2, $g3] as $value) {
+              if ($value === '') {
+                  throw new RuntimeException('Release lifecycle environment is incomplete.');
+              }
+          }
+
+          touch($root . '/generations/' . $g1, 100);
+          touch($root . '/generations/' . $g2, 200);
+          touch($root . '/generations/' . $g3, 300);
+
+          $lease = ReleaseGenerationLease::acquireShared($root, $g1);
+          $removedWhileDraining = (new FoundationReleaseCompiler())->prune($root, keep: 1);
+
+          if (!is_dir($root . '/generations/' . $g1)) {
+              throw new RuntimeException('Draining generation was pruned while its shared lease was held.');
+          }
+          if (is_dir($root . '/generations/' . $g2)) {
+              throw new RuntimeException('Unleased obsolete generation was not pruned.');
+          }
+          if (in_array($g1, $removedWhileDraining, true)) {
+              throw new RuntimeException('Drain-protected generation was reported as removed.');
+          }
+
+          $lease->release();
+
+          $active = new ActiveGeneration();
+          $active->activate($root, $g1);
+          $g1Manifest = $root . '/generations/' . $g1 . '/foundation.php';
+          $g1Sha = hash_file('sha256', $g1Manifest);
+          if (!is_string($g1Sha)) {
+              throw new RuntimeException('Unable to hash rollback generation manifest.');
+          }
+
+          $rollback = new FoundationReleaseBootstrap($root, $g1Sha);
+          $rollbackApp = $rollback->nonWeb(['base_path' => getcwd()], RuntimeMode::Cli);
+          if ($rollbackApp->config()->get('app.name') !== 'GenerationOne') {
+              throw new RuntimeException('Rollback bootstrap did not consume the retained generation.');
+          }
+
+          $active->activate($root, $g3);
+
+          $manifest = FoundationReleaseManifest::load($g1Manifest);
+          $manifest['dependency_fingerprint'] = str_repeat('0', 32);
+          FoundationReleaseManifest::write($g1Manifest, $manifest);
+          $tamperedSha = hash_file('sha256', $g1Manifest);
+          if (!is_string($tamperedSha)) {
+              throw new RuntimeException('Unable to hash stale generation manifest.');
+          }
+
+          $staleRejected = false;
+          try {
+              (new FoundationReleaseBootstrap($root, $tamperedSha))
+                  ->nonWeb(['base_path' => getcwd()], RuntimeMode::Cli);
+          } catch (Throwable $exception) {
+              $staleRejected = str_contains(strtolower($exception->getMessage()), 'dependency')
+                  || str_contains(strtolower($exception->getMessage()), 'fingerprint');
+          }
+          if (!$staleRejected) {
+              throw new RuntimeException('Stale dependency-bound generation was not rejected.');
+          }
+
+          $removedAfterDrain = (new FoundationReleaseCompiler())->prune($root, keep: 1);
+          if (is_dir($root . '/generations/' . $g1) || !in_array($g1, $removedAfterDrain, true)) {
+              throw new RuntimeException('Released drain generation was not pruned after its lease ended.');
+          }
+
+          $current = $active->current($root);
+          if (($current['generation'] ?? null) !== $g3) {
+              throw new RuntimeException('Active generation changed unexpectedly after rollback rehearsal.');
+          }
+          PHP
+
