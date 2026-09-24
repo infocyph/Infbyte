@@ -1195,19 +1195,19 @@ jobs:
           $router->get('/delta/four', SystemController::health(...));
           PHP
 
-          php -r '
-            $path = "config/router.php";
-            $source = file_get_contents($path);
-            if (!is_string($source)) {
-                throw new RuntimeException("Unable to read router config.");
-            }
-            $source = str_replace(
-                "        \'api.php\',\n",
-                "        \'api.php\',\n        \'sharded.php\',\n",
-                $source,
-            );
-            file_put_contents($path, $source);
-          '
+          cat > config/router.php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          return [
+              'files' => [
+                  'api.php',
+                  'sharded.php',
+              ],
+              'matcher' => env_string('ROUTER_MATCHER', 'fused'),
+          ];
+          PHP
 
           export APP_ENV=production
           export APP_DEBUG=false
