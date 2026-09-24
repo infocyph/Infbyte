@@ -3,7 +3,7 @@
 **Target:** InfByte release compatible with the published Foundation 3.0 package.  
 **Branch:** `foundation-3/runtime-lifecycle`.  
 **PR:** #9.  
-**Status:** Foundation 3.0 is released; stable-package cutover and post-release native runtime-cache hardening are complete.  
+**Status:** Foundation 3.0 is released; stable-package cutover and native runtime-cache hardening are complete, with ArrayKit-native config-cache hardening in final certification.  
 **Updated:** 2026-09-24.
 
 This is the canonical continuation plan for the InfByte skeleton after Foundation 3 is released. It intentionally preserves the consumer-side work that was previously recorded in Foundation planning files so those Foundation plan files can be removed without losing the handoff.
@@ -80,6 +80,7 @@ The normal Security & Standards workflow is expected to reject the pre-tag branc
 | **G** | 2.1 → 3.0 migration rehearsal | **DONE** | Representative 2.1 application upgrade, provider/route preservation, persisted-data boundary, session incompatibility handling, runtime build/readiness, and real request pass in run #103. |
 | **H** | Final CI/docs/publication evidence | **DONE** | Security & Standards run #114 is fully green on released Foundation 3.x, including the normal PHPForge matrix, create-project, consumers, module lifecycle, generation lifecycle, 2.1→3.0 migration, and production auth/session lifecycle. |
 | **I** | Native Webrick + InterMix cache ownership hardening | **DONE** | Foundation #17 run #1770 and InfByte #9 run #130 prove native fused/generated/sharded Webrick caches, native InterMix generated-container validation, and no CacheLayer wrapper on compiled DI. |
+| **J** | ArrayKit-native configuration cache ownership | **IN PROGRESS** | Foundation #17 delegates single/sharded cache mechanics to ArrayKit; exact-head Foundation + InfByte certification remains. |
 
 ---
 
@@ -349,7 +350,61 @@ Final Batch I evidence:
 
 ---
 
-## 12. Non-blocking application backlog preserved from Foundation review
+## 12. Batch J — ArrayKit-native configuration cache ownership
+
+The post-release cache review found that sharded configuration was already using
+ArrayKit's native lazy namespace cache, while Foundation's `single` mode still
+embedded a complete config copy inside its own manifest. Close that ownership
+gap without changing the immutable release-generation contract.
+
+### Native cache layouts
+
+- [x] Keep `sharded` on ArrayKit `LazyFileConfig::warmNamespaceCache()`.
+- [x] Keep ArrayKit's native `__flat.php` exact-leaf index; do not invent a
+  separate routing-style `fused` config mode.
+- [x] Move `single` to ArrayKit `Config::exportCache()/loadCache()`.
+- [x] Store the native whole-config artifact at
+  `bootstrap/cache/config/config.php`.
+- [x] Reduce Foundation's `__manifest.php` to policy/identity metadata rather
+  than embedding a second complete config payload.
+- [x] Remove stale native files when switching `single ↔ sharded`.
+- [x] Treat corrupt native single-cache files as cache misses and fall back to
+  authoritative source configuration.
+
+### Materialization and policy
+
+- [x] Let ArrayKit materialize `Environment::ref()` values and closures through
+  its native cache writers.
+- [x] Validate the generated concrete PHP data after ArrayKit materialization so
+  arbitrary runtime objects/resources remain invalid.
+- [x] Keep strict export validation on immutable production release config.
+- [x] Keep environment hydration before development/build cache-path selection
+  because `APP_CONFIG_CACHE` may itself come from `.env`.
+- [x] Keep the development/build config cache separate from the production
+  generation-owned normalized `config.php` snapshot.
+
+### Structure, tests and docs
+
+- [x] Extract native ArrayKit file mechanics from `ConfigLoader` so PHPForge
+  complexity limits remain satisfied.
+- [x] Cover ArrayKit-native single load/write, sharded `__flat.php`, delayed
+  value materialization, corrupt-cache fallback and mode-switch cleanup.
+- [x] Align Foundation benchmark coverage with ArrayKit native
+  `exportCache()/loadCache()`.
+- [x] Document ownership in Foundation configuration/architecture/migration docs
+  and the InfByte skeleton.
+- [ ] Exported InfByte skeleton proves both native config-cache layouts against
+  the exact Foundation #17 candidate.
+- [ ] Final Foundation #17 and InfByte #9 Security & Standards runs are green on
+  the exact config-cache hardening heads.
+
+**Acceptance:** pending exact-head Foundation and downstream InfByte
+qualification. No parallel host-level config serializer, fake `fused` config
+mode, PHPForge bypass or weakened complexity threshold is allowed.
+
+---
+
+## 13. Non-blocking application backlog preserved from Foundation review
 
 These are **not Foundation 3 / InfByte migration blockers**. Re-evaluate them only against concrete application needs after the stable handoff is complete:
 
@@ -367,7 +422,7 @@ Each item needs a separate small design, compatibility decision, tests and perfo
 
 ---
 
-## 13. Guardrails
+## 14. Guardrails
 
 - Do not edit Foundation merely to satisfy an InfByte preference unless the **released Foundation contract itself is objectively broken** and reproduced independently of the skeleton.
 - Do not restore Foundation 2 route-cache/container-resolver switches.
