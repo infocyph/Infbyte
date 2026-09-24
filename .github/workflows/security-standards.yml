@@ -55,22 +55,13 @@ jobs:
             --prefer-dist \
             infocyph/infbyte \
             "$work/project" \
-            'dev-foundation-3/runtime-lifecycle'
+            "dev-foundation-3/runtime-lifecycle#$HEAD_SHA"
 
           cd "$work/project"
 
           test -f .env
           test ! -e plan.md
           test ! -d .github
-
-          source_sha="$(composer show --self --format=json | php -r '
-            $package = json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR);
-            echo $package["source"]["reference"] ?? "";
-          ')"
-          if [[ "$source_sha" != "$HEAD_SHA" ]]; then
-            printf 'create-project resolved %s instead of PR head %s\n' "$source_sha" "$HEAD_SHA" >&2
-            exit 1
-          fi
 
           foundation_version="$(php -r 'require "vendor/autoload.php"; echo Composer\\InstalledVersions::getPrettyVersion("infocyph/foundation") ?? "";')"
           if [[ "$foundation_version" != 3.* || "$foundation_version" == dev-* ]]; then
@@ -501,6 +492,8 @@ jobs:
           export AUTH_CACHE=cache
           export AUTH_PASSWORDS=native
           export AUTH_TOKENS=security
+          export SECURITY_JWT_ISSUER=https://infbyte.example.test
+          export SECURITY_JWT_AUDIENCE=infbyte-clients
           export AUTH_MFA=otp
           export AUTH_NOTIFICATIONS=talkingbytes
           export AUTH_PASSKEY=disabled
