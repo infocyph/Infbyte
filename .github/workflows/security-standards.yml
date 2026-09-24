@@ -126,7 +126,7 @@ jobs:
             exit 1
           fi
 
-          foundation_version="$(php -r 'require "vendor/autoload.php"; echo Composer\\InstalledVersions::getPrettyVersion("infocyph/foundation") ?? "";')"
+          foundation_version="$(php -r 'require "vendor/autoload.php"; echo Composer\InstalledVersions::getPrettyVersion("infocyph/foundation") ?? "";')"
           if [[ -z "$foundation_version" || "$foundation_version" == dev-* ]]; then
             printf 'Expected stable Foundation 3, got: %s\n' "$foundation_version" >&2
             exit 1
