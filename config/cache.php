@@ -116,7 +116,10 @@ return [
             'driver' => 'sqlite',
             'path' => env_string('CACHE_SQLITE_PATH', 'storage/cache/cachelayer.sqlite'),
             'lock' => [
-                'driver' => 'pdo',
+                // Local SQLite cache stays machine-local; use the matching local
+                // lock primitive instead of requiring a separate PDO DSN.
+                'driver' => 'file',
+                'path' => env_string('CACHE_SQLITE_LOCK_PATH', 'storage/cache/locks/sqlite'),
                 'prefix' => env_string('CACHE_LOCK_PREFIX', 'foundation:cache:lock:'),
             ],
         ],
