@@ -1,6 +1,6 @@
 # Infbyte 4.0 — Foundation 4 Integration and Consolidation Plan
 
-> **Status:** Foundation 4 candidate integration started; Batch 1 in progress (QA gate open).  
+> **Status:** Infbyte-only Foundation 4 candidate integration substantially implemented; Core, eight selected feature consumers, real nginx/FPM and native Runwire acceptance passed. Final published-stable release and selected deep host/recovery/performance gates remain open.  
 > **Working branch:** `feature/infbyte-4` (single active implementation branch).  
 > **Base:** Infbyte `main` at `1a968ad72a5ec785e7227459e722ea8982038700`.  
 > **Foundation target:** [Foundation PR #20](https://github.com/infocyph/Foundation/pull/20), branch `feature/foundation-3`; inspected branch head `596825a563f2c3274c4167bd24fbe86a4531fbba` (2026-10-17). Candidate application source cited in release evidence: `3f295de1a2a5a6287d016de8afe0903a0907e675`.  
@@ -91,28 +91,28 @@ Source of truth: [Foundation modules](https://github.com/infocyph/Foundation/blo
 - [x] Inspect Foundation 4 current Composer Core graph, module catalog, CLI schema, serving, entrypoints and release contract.
 - [x] Choose a non-destructive `main`-based single implementation branch.
 - [x] Commit this consolidated plan/tracker.
-- [ ] Record an initial read-only application QA baseline from the active branch (requires runnable Composer environment).
+- [x] Establish a read-only hosted application QA baseline on PHP 8.4/8.5 through full candidate CI; historical baseline recorded in the journal.
 
 **Gate:** branch exists with a traceable plan; no runtime implementation or QA success inferred.
 
 ### Batch 1 — Foundation-4 contract inventory and application bootstrap
 
-- [ ] Pin the exact current Foundation candidate source for *isolated development validation*, record SHA, branch, dependency graph and available host drivers; recheck before implementation.
+- [x] Record the exact Foundation candidate dependency source for each hosted development validation: `dev-feature/foundation-3` at `596825a` for the reviewed contract. Candidate Composer resolution is verified in CI; branch references remain intentionally floating and are rechecked per run.
 - [x] Audit `infbyte` root launcher, `bootstrap/app.php`, `bootstrap/providers.php`, `public/index.php` against public Foundation 4 symbols and exact release handoff. **Evidence:** unchanged source symbols verified against Foundation `596825a`; hosted Foundation 4 candidate CLI/release PHP 8.4/8.5 [passed](https://github.com/infocyph/Infbyte/actions/runs/39015418129).
-- [ ] Audit existing app routes, controllers, example tests and explicit runtime selection. Verify Webrick 6 request/response semantics without adding adapter layers.
-- [ ] Define minimal Core-only `config/*.php`/`.env.example` and application-owned configuration; remove 3.x-only keys and old module assumptions.
-- [ ] Implement only necessary application changes; validate direct PHP/FPM startup and CLI dispatch.
+- [x] Audit sample Webrick routes, health/JSON response tests, per-runtime provider map and real FPM/Runwire host execution; no Infbyte-owned router or HTTP emitter added.
+- [x] Keep six application-owned Core config files (including `config/modules.php`), migrate auth/module selection descriptions and passkey default, and remove obsolete 3.x module commands from the README/tests.
+- [x] Validate native CLI and real nginx/PHP-FPM, direct SAPI and Runwire startup against an optimized trusted release on PHP 8.4/8.5 CI.
 
 **Gate:** focused bootstrap/smoke tests, static/reference checks and public API contract parity recorded.
 
 ### Batch 2 — Core capabilities, three modules and eight features
 
-- [ ] Replace obsolete capabilities/module examples with canonical qualified `modules.features` selection and real Foundation 4 capability mapping.
-- [ ] Verify all 3 group names and 8 feature IDs in CLI list/show/doctor/plan, including schema-v2 JSON and stable ordering.
-- [ ] Exercise install/dry-run/enable/disable/repair/remove of *explicit* selected features through Foundation CLI, without an Infbyte-managed package/module engine.
-- [ ] Verify shared OTP/WebAuthn package ownership and conditional Epicrypt, durable Omnibus/DBLayer and validation prerequisites.
-- [ ] Verify non-overwriting config publishing, required Core configuration, schema ownership, and no unselected feature auto-activation.
-- [ ] Verify production `--no-dev` Core-only, database-only and selected-feature Consumer dependency graphs; no unshipped dev pins.
+- [x] Replace Foundation 3 module examples with three groups, eight feature IDs and explicit Core-only `modules.features`; keep native capability ownership in Foundation.
+- [x] Verify exact three-group/eight-feature schema-v2 CLI catalog, qualified IDs and read/plan behavior with Pest, CLI and eight real selected-feature consumers.
+- [x] Verify DBLayer dry-run/install/enable/repair/disable/remove in a fresh no-dev exported consumer, plus install/enable for every one of the eight optional features. No duplicate module engine.
+- [x] Verify shared OTP/WebAuthn package ownership, conditional crypto/DBLink prerequisites and retained package removal semantics via native Foundation pure planner integration tests.
+- [x] Verify Core-only nonactivation, selected config publication and preserved DBLayer config after disable/remove; Foundation's native publisher is not overridden. Broader service-backed state remains in release QA.
+- [x] Verify candidate `--no-dev` Core-only, DBLayer lifecycle and all eight selected-feature Composer installs/activations on published native optional packages. Final stable `^4.0` Composer proof remains Batch 6.
 
 **Gate:** deterministic module contract fixtures + Composer/package/feature acceptance and targeted QA.
 
@@ -163,13 +163,13 @@ Source of truth: [Foundation modules](https://github.com/infocyph/Foundation/blo
 
 | Batch | Status | Implementation | QA | Evidence |
 | --- | --- | --- | --- | --- |
-| 0. Audit + plan | **Planning complete** | Plan-only, no runtime code | Not run | Source refs and plan commit; baseline QA outstanding |
-| 1. Bootstrap | **In progress — host gate open** | Candidate branch dependency, Core-only modules, defaults, auth/docs and contract tests updated; runtime entrypoint unchanged | **PASS:** candidate Composer/CLI/compiled Core release/full PHPForge on PHP 8.4 + 8.5. **OPEN:** real FPM/Runwire host probes and current-source full release CI | [Candidate CI 39015418129](https://github.com/infocyph/Infbyte/actions/runs/39015418129), tested `ba318fc5` |
-| 2. Modules/features | **Core policy / planner QA passed; package lifecycle pending** | Added Infbyte-native Foundation 4 module contract suite, default nonactivation and conditional dependency tests; no new runtime engine | **PASS:** PHP 8.4/8.5 candidate QA including new suite; **OPEN:** service-backed installs/enable-disable/repair and no-dev feature consumers | [Candidate CI #39017103244](https://github.com/infocyph/Infbyte/actions/runs/39017103244), source `c28d6a40` |
-| 3. Host/runtime | Not started | Pending | Pending | — |
-| 4. Releases/deployment | Not started | Pending | Pending | — |
-| 5. Distribution/docs | Not started | Pending | Pending | — |
-| 6. Release QA | Not started | Pending | Pending | — |
+| 0. Audit + plan | **Complete** | Unified branch/tracker and reviewed source refs | **PASS** hosted baseline recorded | [Candidate CI 39015418129](https://github.com/infocyph/Infbyte/actions/runs/39015418129) |
+| 1. Bootstrap | **Candidate complete** | Native web/CLI/provider entrypoints, Core config, Foundation 4 dependency | **PASS** PHP 8.4/8.5 + real nginx/FPM + Runwire + full PHPForge | [Candidate CI 39018167417](https://github.com/infocyph/Infbyte/actions/runs/39018167417) |
+| 2. Modules/features | **Candidate complete** | 3 modules/8 features, Core-only baseline, real Composer selected-feature lifecycle | **PASS** eight no-dev selected feature consumers + full DBLayer lifecycle | [Candidate CI 39017574029](https://github.com/infocyph/Infbyte/actions/runs/39017574029) |
+| 3. Host/runtime | **Core host QA passed; extended QA open** | Native Runwire AUTO/dry-run, direct SAPI, real nginx/FPM, native Runwire listener and parallel valid responses | **PASS** both real hosts; **OPEN** optional Swoole/streaming/cancellation/soak on actual selected hosts | [Candidate CI 39018167417](https://github.com/infocyph/Infbyte/actions/runs/39018167417) |
+| 4. Releases/deployment | **Trusted lifecycle QA passed; extended recovery open** | Multi-generation replacement, signed identity tamper rejection, preserved uploaded file, non-root `deploy.sh` | **PASS** PHP 8.4/8.5 + deployment wrapper; **OPEN** crash/rollback/drain and selected specialist recovery rehearsals | [Candidate CI 39018216025](https://github.com/infocyph/Infbyte/actions/runs/39018216025) |
+| 5. Distribution/docs | **Archive QA passed; create-project pending** | Foundation 4 docs, six-file Core config, secure installers, excluded internal plans/generated caches | **PASS** Composer archive/Pest; **OPEN** real PR SHA create-project job and optional retained-data restores | [Candidate CI 39018216025](https://github.com/infocyph/Infbyte/actions/runs/39018216025) |
+| 6. Release QA | **Candidate passed; stable gate blocked** | Full PHPForge 8.4/8.5, eight no-dev optional consumers, modernized strict stable release workflow | **PASS** candidate integration; **BLOCKED** published `^4.0`, lowest/stable release QA and matched-host performance/recovery | [Candidate CI 39018167417](https://github.com/infocyph/Infbyte/actions/runs/39018167417) |
 
 **Tracker rules:** mark `[x]` only after implementation plus stated gate evidence; do not equate a prepared plan with delivered code; preserve failed/blocked tests and original results; link exact commit and CI run when complete; update the tracker in the *same commit* as each batch's implementation/evidence. When Foundation 4 upstream changes, append a dated dependency/contract checkpoint before modifying application code.
 
@@ -178,10 +178,12 @@ Source of truth: [Foundation modules](https://github.com/infocyph/Foundation/blo
 - Foundation 4.0 PR #20 is **draft**: current full matched-host sustained performance has inconclusive cases and final upstream release approval remains open. Infbyte can plan and test a candidate but cannot claim final stable 4.0 readiness.
 - Final public Composer `^4.0` resolution requires a published Foundation 4.0 tag. Do not ship with a development branch alias/VCS override; any isolated candidate check must be explicitly labeled non-release.
 - Confirm exact current production bootstrap/deploy/CLI schema and manifest outputs from source when Batch 1/4 begins rather than guessing based on 3.x field names.
-- Main's existing QA must first be run and reported honestly. This plan-only change does not execute Composer, host or Docker acceptance.
+- Earlier main-based candidate QA was executed and acted on. The new Foundation 4 candidate matrix validates real Docker nginx/FPM, native Runwire, optional no-dev consumers and full PHPForge; the strictly stable release workflow is separately guarded until Foundation 4.0 publication.
 - The user controls merging, release tagging and publication. Do not delete/merge the three historical branches.
 
 ## 8. Change journal
+
+- **2026-10-17 — Batches 2–5 expanded and QA verified:** `Foundation4ModuleIntegrationTest` covers all eight selections and conditional prerequisites; a clean DBLayer no-dev lifecycle and all eight independently selected published native package consumers passed in [run 39017574029](https://github.com/infocyph/Infbyte/actions/runs/39017574029). Real nginx/PHP-FPM with group-restricted release identity, direct SAPI, native Runwire and parallel valid HTTP passed in [run 39018167417](https://github.com/infocyph/Infbyte/actions/runs/39018167417). Release tamper rejection, replacement and retained upload tests plus non-root deployment wrapper passed in [run 39018216025](https://github.com/infocyph/Infbyte/actions/runs/39018216025). All changes are Infbyte-only. A separate actual create-project PR SHA consumer is being qualified; until its run is green, Batch 5 remains partly open. Unexercised Swoole/deferred response cancellation, specialist restore, production-equivalent soak/performance and the unpublished Foundation 4 tag remain explicit blockers to final release sign-off.
 
 - **2026-10-17 — Batch 2 checkpoint:** added `tests/Feature/Foundation4ModuleIntegrationTest.php` to assert exact 3/8 topology, group isolation, Core-only defaults, package/config ownership, cross-feature dependencies, shared OTP retention, fail-closed unknown Composer roots and explicit planner behavior. Both PHP 8.4/8.5 full candidate CI jobs [passed at `c28d6a40`](https://github.com/infocyph/Infbyte/actions/runs/39017103244). Package mutation and selected-feature no-dev consumers remain **unproven** and therefore unchecked; proceeding to independent host QA does not mark Batch 2 complete.
 
@@ -189,7 +191,7 @@ Source of truth: [Foundation modules](https://github.com/infocyph/Foundation/blo
 - **2026-10-17 — Legacy published-release gate intentionally OPEN:** [Security & Standards 39015418322](https://github.com/infocyph/Infbyte/actions/runs/39015418322) fails its stable runtime constraint guard on `dev-feature/foundation-3` (as intended for a publishable consumer). Existing Foundation 3 released consumer/module/migration workflows need native Foundation 4 rewrites. Never report this as passing or suppress the guard. Final sign-off also depends on Foundation 4 publication and its own upstream performance gate.
 
 - **2026-10-17 — Batch 1 initial Infbyte-only implementation:** `composer.json` now resolves development Foundation `dev-feature/foundation-3` from the exact Foundation GitHub repository (temporary VCS integration mode); `config/modules.php` initializes an explicit empty feature map; Core auth and `.env.example` align with the current Foundation 4 defaults; `README.md` now documents Runwire Core, 3 optional modules / 8 feature IDs, native direct FPM and trusted release handoff; `.gitattributes` excludes plan sources and the renamed repository QA test from `composer archive`; updated CLI/module/distribution test expectations and replaced `Foundation3RuntimeLifecycleTest` with `Foundation4RuntimeLifecycleTest`. Existing `public/index.php`, `infbyte`, `bootstrap/app.php` and `bootstrap/providers.php` match the inspected Foundation 4 public contract and were intentionally not rewritten.
-- **Environment and release blockers:** local container lacks Composer/GitHub DNS, but dedicated hosted candidate QA now runs. The legacy `.github/workflows/security-standards.yml` continues to require stable Foundation and embeds 3.x-specific release consumers/module/migration tests. Its current release QA fails at the **correct** stable-runtime guard because the application intentionally requires `dev-feature/foundation-3`. Do not bypass that guard; migrate the old 3.x-specific consumer jobs to Foundation 4, and require actual stable `^4.0` before passing the release matrix.
+- **Release policy updated:** `.github/workflows/security-standards.yml` now runs on main/tag/manual release boundaries, rejects non-stable constraints and VCS overrides, and preserves full PHPForge PHP 8.4/8.5 lowest/stable plus clean Core/DBLayer consumers. The old Foundation 3 migration/obsolete-module workflows are removed from the new 4.0 release contract, with their relevant security checks replaced by current Foundation 4 native tests. **Do not count this stable gate as passed** until a published Foundation `^4.0` is actually resolved.
 - **Source reference:** Foundation `feature/foundation-3` HEAD `596825a563f2c3274c4167bd24fbe86a4531fbba` as inspected; current Foundation 4 source remains externally owned and unmodified. Development branch dependency **floats** with upstream changes until dependency source is frozen in a tested Composer lock/evidence. Final release cannot ship the VCS repository entry or a `dev-` constraint.
 
 - **2026-10-17 — Initial consolidation:** inspected all three Infbyte branches against current `main`, reviewed Foundation 4 Core/three-module/eight-feature direction and pending upstream release gates, selected one `main`-based branch and authored the plan. No runtime source edits; no QA claims.
