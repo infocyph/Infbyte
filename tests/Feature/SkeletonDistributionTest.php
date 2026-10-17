@@ -31,7 +31,7 @@ it('exports example tests while excluding repository verification tests', functi
         ->and($attributes)->toContain('/tests/Feature/ReleaseRuntimeCliTest.php export-ignore')
         ->and($attributes)->toContain('/tests/Feature/SkeletonDistributionTest.php export-ignore')
         ->and($attributes)->toContain('/bootstrap/cache/*.php export-ignore')
-        ->and($attributes)->toContain('/bootstrap/cache/config/* export-ignore')
+        ->and($attributes)->toContain('/bootstrap/cache/config/*.php export-ignore')
         ->and($attributes)->toContain('/bootstrap/cache/config/.gitignore -export-ignore')
         ->and($attributes)->not->toContain('/bootstrap/cache/container/')
         ->and($attributes)->not->toContain('/bootstrap/cache/routes/')
