@@ -366,6 +366,19 @@ it('delegates native HTTP host selection and protocol policy to Runwire', functi
             ->and($result['protocol_policy'] ?? null)->toBe('fixed')
             ->and($result['workers'] ?? null)->toBe(1);
 
+        [$autoExit, $autoOutput] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'serve',
+            '--dry-run',
+            '--json=1',
+        ]);
+        $auto = json_decode($autoOutput, true, flags: JSON_THROW_ON_ERROR);
+
+        expect($autoExit)->toBe(0, $autoOutput)
+            ->and($auto['requested_runtime'] ?? null)->toBe('auto')
+            ->and($auto['runtime'] ?? null)->toBeString();
+
         [$badDriver, $driverMessage] = runInfbyteCommand([
             PHP_BINARY,
             $fixture . '/infbyte',
