@@ -418,7 +418,8 @@ it('fails closed if a previously trusted Foundation generation manifest changes'
         );
 
         file_put_contents($manifest, "\n/* trust-digest tamper */\n", FILE_APPEND);
-        expect(fn() => $bootstrap->web(['base_path' => $fixture]))->toThrow(Throwable::class);
+        expect(fn() => $bootstrap->web(['base_path' => $fixture]))
+            ->toThrow(RuntimeException::class, 'Foundation generation manifest trust identity mismatch.');
     } finally {
         removeInfbyteTestDirectory($fixture);
     }
