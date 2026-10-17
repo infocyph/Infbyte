@@ -6,6 +6,7 @@
 /plan.md export-ignore
 /docs/plans export-ignore
 /SECURITY.md export-ignore
+/tests/ci export-ignore
 /tests/Feature/Foundation4RuntimeLifecycleTest.php export-ignore
 /tests/Feature/Foundation4ModuleIntegrationTest.php export-ignore
 /tests/Feature/FoundationReleaseEntrypointTest.php export-ignore
