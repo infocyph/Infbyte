@@ -224,7 +224,7 @@ it('builds and clears compiled command metadata through the infbyte cli wrapper'
     }
 });
 
-it('reports readiness and canonical module state through the infbyte cli', function (): void {
+it('reports readiness and Foundation 4 qualified feature groups through the infbyte cli', function (): void {
     $fixture = createInfbyteCliFixture();
 
     try {
@@ -250,27 +250,21 @@ it('reports readiness and canonical module state through the infbyte cli', funct
             ->and($modulesExitCode)->toBe(0)
             ->and($moduleRows)->toBeArray();
 
-        $modules = array_column($moduleRows, null, 'name');
+        $modules = array_column($moduleRows['modules'] ?? [], null, 'name');
 
-        expect($modules)->toHaveKeys([
-            'auth',
-            'communication',
-            'database',
-            'filesystem',
-            'logging',
-            'messaging',
-            'operations',
-            'resources',
-            'security',
-            'session',
-            'validation',
-        ])->not->toHaveKeys(['cache', 'cachelayer', 'db'])
-            ->and($modules['database']['packages']['infocyph/dblayer']['installed'])->toBeFalse()
-            ->and($modules['database']['packages']['infocyph/dblayer']['constraint'])->toBe('^5.1');
-
-        foreach (['logging', 'operations', 'resources', 'session'] as $builtIn) {
-            expect($modules[$builtIn]['installed'])->toBeTrue();
-        }
+        expect($moduleRows['schema_version'] ?? null)->toBe(2)
+            ->and(array_keys($modules))->toBe(['data', 'security', 'execution'])
+            ->and($modules['data']['features'])->toBe(['data.database', 'data.filesystem'])
+            ->and($modules['security']['features'])->toBe([
+                'security.crypto',
+                'security.validation',
+                'security.mfa',
+                'security.passkey',
+            ])
+            ->and($modules['execution']['features'])->toBe([
+                'execution.messaging',
+                'execution.communication',
+            ]);
     } finally {
         removeInfbyteTestDirectory($fixture);
     }
@@ -308,7 +302,7 @@ it('keeps core cache outside module lifecycle and exposes its schema commands', 
     }
 });
 
-it('plans specialist installation against the released module catalog', function (): void {
+it('plans explicit Foundation 4 database feature installation', function (): void {
     $fixture = createInfbyteCliFixture();
 
     try {
@@ -323,34 +317,29 @@ it('plans specialist installation against the released module catalog', function
         $plan = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
 
         expect($exitCode)->toBe(0, $output)
-            ->and($plan['module'] ?? $plan['name'] ?? null)->toBe('database')
+            ->and($plan['schema_version'] ?? null)->toBe(2)
+            ->and($plan['requested'] ?? null)->toContain('data.database')
             ->and($output)->toContain('infocyph/dblayer')
-            ->and($output)->toContain('^5.1');
+            ->and($output)->toContain('^6.1.1');
     } finally {
         removeInfbyteTestDirectory($fixture);
     }
 });
 
-it('reports canonical database installation guidance through module schema metadata', function (): void {
+it('rejects Foundation 3 module aliases instead of silently installing legacy capabilities', function (): void {
     $fixture = createInfbyteCliFixture();
 
     try {
         [$exitCode, $output] = runInfbyteCommand([
             PHP_BINARY,
             $fixture . '/infbyte',
-            'module:show',
-            'auth',
+            'module:plan',
+            'database',
             '--json=1',
         ]);
 
-        $module = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
-        $authSchema = $module['schema_status'][0] ?? null;
-
-        expect($exitCode)->toBe(0, $output)
-            ->and($module['name'])->toBe('auth')
-            ->and($authSchema)->toBeArray()
-            ->and($authSchema['state'])->toBe('unavailable')
-            ->and($authSchema['detail'])->toContain('php infbyte module:install database');
+        expect($exitCode)->not->toBe(0)
+            ->and(strtolower($output))->toContain('database');
     } finally {
         removeInfbyteTestDirectory($fixture);
     }
