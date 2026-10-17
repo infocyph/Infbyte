@@ -20,7 +20,7 @@ jobs:
       matrix:
         php: ["8.4", "8.5"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Set up PHP and Composer
         uses: shivammathur/setup-php@v2
         with:
@@ -210,7 +210,7 @@ jobs:
     name: "No-dev optional database feature lifecycle"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Set up PHP and Composer
         uses: shivammathur/setup-php@v2
         with:
@@ -285,7 +285,7 @@ jobs:
           - execution.messaging
           - execution.communication
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Set up PHP and Composer
         uses: shivammathur/setup-php@v2
         with:
@@ -330,7 +330,7 @@ jobs:
     name: "Composer create-project / exact Infbyte PR commit"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Set up PHP and Composer
         uses: shivammathur/setup-php@v2
         with:
