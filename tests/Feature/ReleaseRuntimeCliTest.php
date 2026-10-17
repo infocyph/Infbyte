@@ -391,6 +391,39 @@ it('delegates native HTTP host selection and protocol policy to Runwire', functi
     }
 });
 
+it('fails closed if a previously trusted Foundation generation manifest changes', function (): void {
+    $fixture = createInfbyteCliFixture();
+
+    try {
+        [$code, $output] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'optimize',
+            '--json=1',
+        ], ['APP_ENV' => 'production']);
+        $release = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+        $manifest = $release['manifest'] ?? null;
+        $digest = $release['manifest_sha256'] ?? null;
+
+        expect($code)->toBe(0, $output)
+            ->and($manifest)->toBeString()->toBeFile()
+            ->and($digest)->toBeString()->toMatch('/^[a-f0-9]{64}$/');
+
+        $bootstrap = new \Infocyph\Foundation\Release\FoundationReleaseBootstrap(
+            $fixture . '/storage/releases',
+            $digest,
+        );
+        expect($bootstrap->web(['base_path' => $fixture]))->toBeInstanceOf(
+            \Infocyph\Foundation\Routing\WebReleaseRuntime::class,
+        );
+
+        file_put_contents($manifest, "\n/* trust-digest tamper */\n", FILE_APPEND);
+        expect(fn() => $bootstrap->web(['base_path' => $fixture]))->toThrow(Throwable::class);
+    } finally {
+        removeInfbyteTestDirectory($fixture);
+    }
+});
+
 /**
  * @param list<string> $arguments
  * @param array<string, string> $environment
