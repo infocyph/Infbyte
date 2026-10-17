@@ -486,6 +486,97 @@ it('rotates trusted release generations without deleting application-owned state
     }
 });
 
+it('supports an explicitly trusted release rollback while preserving retained application data', function (): void {
+    $fixture = createInfbyteCliFixture();
+    $releaseRoot = $fixture . '/storage/releases';
+    $retained = $fixture . '/storage/sessions/existing-session';
+
+    try {
+        file_put_contents($retained, 'retained-session-state');
+
+        [$firstExit, $firstJson] = runInfbyteCommand([
+            PHP_BINARY, $fixture . '/infbyte', 'optimize', '--json=1',
+        ], ['APP_ENV' => 'production']);
+        $first = json_decode($firstJson, true, flags: JSON_THROW_ON_ERROR);
+
+        [$secondExit, $secondJson] = runInfbyteCommand([
+            PHP_BINARY, $fixture . '/infbyte', 'optimize', '--json=1',
+        ], ['APP_ENV' => 'production']);
+        $second = json_decode($secondJson, true, flags: JSON_THROW_ON_ERROR);
+
+        expect($firstExit)->toBe(0, $firstJson)
+            ->and($secondExit)->toBe(0, $secondJson)
+            ->and($first['generation'])->not->toBe($second['generation']);
+
+        $active = new \Infocyph\Foundation\Release\ActiveGeneration();
+        $pointer = $active->activate($releaseRoot, $first['generation']);
+        $previous = new \Infocyph\Foundation\Release\FoundationReleaseBootstrap(
+            $releaseRoot, $first['manifest_sha256'],
+        );
+
+        expect($pointer)->toBeFile()
+            ->and($previous->web(['base_path' => $fixture]))->toBeInstanceOf(
+                \Infocyph\Foundation\Routing\WebReleaseRuntime::class,
+            )
+            ->and(file_get_contents($retained))->toBe('retained-session-state');
+
+        $stale = new \Infocyph\Foundation\Release\FoundationReleaseBootstrap(
+            $releaseRoot, $second['manifest_sha256'],
+        );
+        expect(fn() => $stale->web(['base_path' => $fixture]))
+            ->toThrow(RuntimeException::class, 'Foundation generation manifest trust identity mismatch.');
+
+        [$reportExit, $reportJson] = runInfbyteCommand([
+            PHP_BINARY, $fixture . '/infbyte', 'optimize:report', '--json=1',
+        ], ['APP_ENV' => 'production']);
+        $report = json_decode($reportJson, true, flags: JSON_THROW_ON_ERROR);
+        expect($reportExit)->toBe(0, $reportJson)
+            ->and($report['generation'] ?? null)->toBe($first['generation'])
+            ->and($report['manifest_sha256'] ?? null)->toBe($first['manifest_sha256'])
+            ->and(file_get_contents($retained))->toBe('retained-session-state');
+    } finally {
+        removeInfbyteTestDirectory($fixture);
+    }
+});
+
+it('checks trusted CLI, worker and scheduler release sections using the same deployment identity', function (): void {
+    $fixture = createInfbyteCliFixture();
+
+    try {
+        [$code, $output] = runInfbyteCommand([
+            PHP_BINARY, $fixture . '/infbyte', 'optimize', '--json=1',
+        ], ['APP_ENV' => 'production']);
+        $release = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+
+        expect($code)->toBe(0, $output);
+        $bootstrap = new \Infocyph\Foundation\Release\FoundationReleaseBootstrap(
+            $release['release_root'], $release['manifest_sha256'],
+        );
+        foreach ([
+            \Infocyph\Foundation\Application\RuntimeMode::Cli,
+            \Infocyph\Foundation\Application\RuntimeMode::Worker,
+            \Infocyph\Foundation\Application\RuntimeMode::Scheduler,
+        ] as $runtime) {
+            expect($bootstrap->nonWeb(['base_path' => $fixture], $runtime))
+                ->toBeInstanceOf(\Infocyph\Foundation\Application\Application::class);
+        }
+
+        $invalid = new \Infocyph\Foundation\Release\FoundationReleaseBootstrap(
+            $release['release_root'], str_repeat('0', 64),
+        );
+        foreach ([
+            \Infocyph\Foundation\Application\RuntimeMode::Cli,
+            \Infocyph\Foundation\Application\RuntimeMode::Worker,
+            \Infocyph\Foundation\Application\RuntimeMode::Scheduler,
+        ] as $runtime) {
+            expect(fn() => $invalid->nonWeb(['base_path' => $fixture], $runtime))
+                ->toThrow(RuntimeException::class, 'Foundation generation manifest trust identity mismatch.');
+        }
+    } finally {
+        removeInfbyteTestDirectory($fixture);
+    }
+});
+
 /**
  * @param list<string> $arguments
  * @param array<string, string> $environment
