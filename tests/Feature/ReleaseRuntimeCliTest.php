@@ -514,17 +514,20 @@ it('supports an explicitly trusted release rollback while preserving retained ap
             $releaseRoot, $first['manifest_sha256'],
         );
 
+        $trusted = new \Infocyph\Foundation\Release\FoundationReleaseRuntime();
+        $current = $trusted->trustedActiveManifest($releaseRoot, $first['manifest_sha256']);
+
         expect($pointer)->toBeFile()
-            ->and($previous->web(['base_path' => $fixture]))->toBeInstanceOf(
-                \Infocyph\Foundation\Routing\WebReleaseRuntime::class,
-            )
+            ->and($current[0])->toBe($first['generation'])
+            ->and($current[3])->toBe($first['manifest'])
             ->and(file_get_contents($retained))->toBe('retained-session-state');
 
         $stale = new \Infocyph\Foundation\Release\FoundationReleaseBootstrap(
             $releaseRoot, $second['manifest_sha256'],
         );
-        expect(fn() => $stale->web(['base_path' => $fixture]))
-            ->toThrow(RuntimeException::class, 'Foundation generation manifest trust identity mismatch.');
+        expect(fn() => $trusted->trustedActiveManifest(
+            $stale->releaseRoot, $stale->trustedFoundationManifestSha256,
+        ))->toThrow(RuntimeException::class, 'Foundation generation manifest trust identity mismatch.');
 
         [$reportExit, $reportJson] = runInfbyteCommand([
             PHP_BINARY, $fixture . '/infbyte', 'optimize:report', '--json=1',
