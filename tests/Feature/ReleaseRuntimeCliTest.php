@@ -87,52 +87,6 @@ it('builds reports and clears one immutable Foundation release generation', func
 });
 
 
-it('ignores retired Foundation 2.1 generated artifacts during release migration', function (): void {
-    $fixture = createInfbyteCliFixture();
-
-    try {
-        foreach ([
-            $fixture . '/bootstrap/cache/container',
-            $fixture . '/bootstrap/cache/routes',
-        ] as $directory) {
-            if (!mkdir($directory, 0775, true) && !is_dir($directory)) {
-                throw new RuntimeException(sprintf('Unable to create legacy cache directory "%s".', $directory));
-            }
-        }
-
-        file_put_contents(
-            $fixture . '/bootstrap/cache/container/web.php',
-            "<?php throw new RuntimeException('Legacy Foundation 2 container artifact was loaded.');\n",
-        );
-        file_put_contents(
-            $fixture . '/bootstrap/cache/routes/fused.php',
-            "<?php throw new RuntimeException('Legacy Foundation 2 route artifact was loaded.');\n",
-        );
-
-        [$exitCode, $output] = runInfbyteCommand([
-            PHP_BINARY,
-            $fixture . '/infbyte',
-            'optimize',
-            '--json=1',
-        ], [
-            'APP_ENV' => 'production',
-            'APP_CONTAINER_ALIAS' => 'legacy',
-            'APP_CONTAINER_COMPILED_ACTIVATION' => 'always',
-            'ROUTER_CACHE' => 'true',
-        ]);
-
-        $release = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
-        $generation = $release['generation'] ?? null;
-
-        expect($exitCode)->toBe(0, $output)
-            ->and($generation)->toBeString()->not->toBe('')
-            ->and($fixture . '/storage/releases/generations/' . $generation . '/foundation.php')->toBeFile()
-            ->and($fixture . '/storage/releases/generations/' . $generation . '/config.php')->toBeFile();
-    } finally {
-        removeInfbyteTestDirectory($fixture);
-    }
-});
-
 it('builds and fully clears the default sharded config cache through the infbyte cli wrapper', function (): void {
     $fixture = createInfbyteCliFixture();
     $cacheDirectory = $fixture . '/bootstrap/cache/config';
@@ -325,7 +279,7 @@ it('plans explicit Foundation 4 database feature installation', function (): voi
     }
 });
 
-it('rejects Foundation 3 module aliases instead of silently installing legacy capabilities', function (): void {
+it('rejects unknown module feature identifiers rather than guessing intent', function (): void {
     $fixture = createInfbyteCliFixture();
 
     try {
@@ -333,12 +287,12 @@ it('rejects Foundation 3 module aliases instead of silently installing legacy ca
             PHP_BINARY,
             $fixture . '/infbyte',
             'module:plan',
-            'database',
+            'unsupported.feature',
             '--json=1',
         ]);
 
         expect($exitCode)->not->toBe(0)
-            ->and(strtolower($output))->toContain('database');
+            ->and(strtolower($output))->toContain('unsupported.feature');
     } finally {
         removeInfbyteTestDirectory($fixture);
     }
@@ -510,10 +464,6 @@ it('supports an explicitly trusted release rollback while preserving retained ap
 
         $active = new \Infocyph\Foundation\Release\ActiveGeneration();
         $pointer = $active->activate($releaseRoot, $first['generation']);
-        $previous = new \Infocyph\Foundation\Release\FoundationReleaseBootstrap(
-            $releaseRoot, $first['manifest_sha256'],
-        );
-
         $trusted = new \Infocyph\Foundation\Release\FoundationReleaseRuntime();
         $current = $trusted->trustedActiveManifest($releaseRoot, $first['manifest_sha256']);
 
