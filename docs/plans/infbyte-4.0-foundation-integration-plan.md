@@ -1,12 +1,12 @@
 # Infbyte 4.0 — Foundation 4 Integration and Consolidation Plan
 
-> **Status:** Planning baseline; implementation not started.  
+> **Status:** Foundation 4 candidate integration started; Batch 1 in progress (QA gate open).  
 > **Working branch:** `feature/infbyte-4` (single active implementation branch).  
 > **Base:** Infbyte `main` at `1a968ad72a5ec785e7227459e722ea8982038700`.  
 > **Foundation target:** [Foundation PR #20](https://github.com/infocyph/Foundation/pull/20), branch `feature/foundation-3`; inspected branch head `596825a563f2c3274c4167bd24fbe86a4531fbba` (2026-10-17). Candidate application source cited in release evidence: `3f295de1a2a5a6287d016de8afe0903a0907e675`.  
 > **Date:** 2026-10-17. **Release status:** Foundation 4.0 is not yet tagged/release-ready; its sustained paired-performance and final acceptance gates remain open.  
 > **Implementation cadence:** one complete batch → focused tests → full applicable QA → record source/CI evidence → update this tracker → next batch.  
-> **Owner boundary:** no merging, tagging, publishing, deleting old branches, or modifying Foundation itself in this plan-only phase.
+> **Owner boundary:** modify **Infbyte only**; Foundation `feature/foundation-3` is read-only reference. No merges, tags, publication, or deletion of historical branches.
 
 ## 1. Objective and source of truth
 
@@ -14,7 +14,7 @@ Build **one** clean, Foundation-4-native Infbyte application skeleton rather tha
 
 **Authoritative implementation order:** (1) the current Foundation 4 source and current documented public APIs (verify at time of each batch); (2) latest Infbyte `main`; (3) selectively applicable behavioral acceptance from the three old branches; (4) historic comments as research only. **No blind merge/cherry-pick** of Foundation-3 changes. Preserve the older branches unmodified for traceability. There are no backwards-compatibility obligations for the old major inside this new 4.0 skeleton, but do not delete still-valid security guarantees or useful app behavior.
 
-This initial commit is **documentation only**. Keep existing Infbyte `composer.json` (^3.0.1) and runnable application code unchanged until a deliberately verified Foundation-4 candidate integration is implemented. Do not claim Foundation 4 QA from the plan commit.
+The first commit was documentation-only. **Batch 1 has now started**: the working branch temporarily requires `dev-feature/foundation-3` from Foundation's VCS source, configures explicit Core-only `modules.features`, aligns application auth/module guidance, updates the README and relevant PHP tests, and keeps the original native web release bootstrap. This is an **unreleased development dependency**; the final skeleton must resolve stable `^4.0` through ordinary Composer without a VCS override. No actual Composer/host QA is claimed yet.
 
 ## 2. Verified branch inventory and disposition
 
@@ -164,7 +164,7 @@ Source of truth: [Foundation modules](https://github.com/infocyph/Foundation/blo
 | Batch | Status | Implementation | QA | Evidence |
 | --- | --- | --- | --- | --- |
 | 0. Audit + plan | **Planning complete** | Plan-only, no runtime code | Not run | Source refs and plan commit; baseline QA outstanding |
-| 1. Bootstrap | Not started | Pending | Pending | — |
+| 1. Bootstrap | **In progress / gate open** | Candidate branch dependency, Core-only modules, defaults, auth/docs and contract tests updated; runtime entrypoint unchanged | Composer, PHPForge, real host QA **not run** | Infbyte branch commits; see 2026-10-17 journal |
 | 2. Modules/features | Not started | Pending | Pending | — |
 | 3. Host/runtime | Not started | Pending | Pending | — |
 | 4. Releases/deployment | Not started | Pending | Pending | — |
@@ -182,5 +182,9 @@ Source of truth: [Foundation modules](https://github.com/infocyph/Foundation/blo
 - The user controls merging, release tagging and publication. Do not delete/merge the three historical branches.
 
 ## 8. Change journal
+
+- **2026-10-17 — Batch 1 initial Infbyte-only implementation:** `composer.json` now resolves development Foundation `dev-feature/foundation-3` from the exact Foundation GitHub repository (temporary VCS integration mode); `config/modules.php` initializes an explicit empty feature map; Core auth and `.env.example` align with the current Foundation 4 defaults; `README.md` now documents Runwire Core, 3 optional modules / 8 feature IDs, native direct FPM and trusted release handoff; `.gitattributes` excludes plan sources and the renamed repository QA test from `composer archive`; updated CLI/module/distribution test expectations and replaced `Foundation3RuntimeLifecycleTest` with `Foundation4RuntimeLifecycleTest`. Existing `public/index.php`, `infbyte`, `bootstrap/app.php` and `bootstrap/providers.php` match the inspected Foundation 4 public contract and were intentionally not rewritten.
+- **Known QA blockers:** no `composer` binary or GitHub DNS access in this execution container; PHP 8.4 is available but full repository dependencies are not mounted, so neither PHPForge nor integration/host QA could run here. The existing large `.github/workflows/security-standards.yml` still embeds Foundation 3 release, obsolete module aliases and stable 3.x consumer checks; this **must be migrated**, not skipped, before clean 4.0 acceptance. After opening a draft PR, record hosted results (including red gates) and revise this tracker accordingly.
+- **Source reference:** Foundation `feature/foundation-3` HEAD `596825a563f2c3274c4167bd24fbe86a4531fbba` as inspected; current Foundation 4 source remains externally owned and unmodified. Development branch dependency **floats** with upstream changes until dependency source is frozen in a tested Composer lock/evidence. Final release cannot ship the VCS repository entry or a `dev-` constraint.
 
 - **2026-10-17 — Initial consolidation:** inspected all three Infbyte branches against current `main`, reviewed Foundation 4 Core/three-module/eight-feature direction and pending upstream release gates, selected one `main`-based branch and authored the plan. No runtime source edits; no QA claims.
