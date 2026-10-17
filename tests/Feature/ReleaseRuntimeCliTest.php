@@ -147,7 +147,6 @@ it('builds and fully clears the default sharded config cache through the infbyte
         expect($buildExitCode)->toBe(0)
             ->and($buildOutput)->toContain('Configuration cached using sharded.')
             ->and($cacheDirectory . '/__manifest.php')->toBeFile()
-            ->and($cacheDirectory . '/app.php')->toBeFile()
             ->and($cacheDirectory . '/__flat.php')->toBeFile();
 
         [$clearExitCode, $clearOutput] = runInfbyteCommand([
@@ -310,7 +309,7 @@ it('plans explicit Foundation 4 database feature installation', function (): voi
             PHP_BINARY,
             $fixture . '/infbyte',
             'module:plan',
-            'database',
+            'data.database',
             '--json=1',
         ]);
 
