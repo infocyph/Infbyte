@@ -344,6 +344,53 @@ it('rejects Foundation 3 module aliases instead of silently installing legacy ca
     }
 });
 
+it('delegates native HTTP host selection and protocol policy to Runwire', function (): void {
+    $fixture = createInfbyteCliFixture();
+
+    try {
+        [$exitCode, $output] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'serve',
+            '--runtime=native',
+            '--workers=1',
+            '--protocol-policy=fixed',
+            '--dry-run',
+            '--json=1',
+        ]);
+        $result = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+
+        expect($exitCode)->toBe(0, $output)
+            ->and($result['requested_runtime'] ?? null)->toBe('native')
+            ->and($result['runtime'] ?? null)->toBe('native')
+            ->and($result['protocol_policy'] ?? null)->toBe('fixed')
+            ->and($result['workers'] ?? null)->toBe(1);
+
+        [$badDriver, $driverMessage] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'serve',
+            '--runtime=nonexistent',
+            '--dry-run',
+        ]);
+        [$badPolicy, $policyMessage] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'serve',
+            '--runtime=native',
+            '--protocol-policy=bogus',
+            '--dry-run',
+        ]);
+
+        expect($badDriver)->not->toBe(0)
+            ->and($driverMessage)->toContain('Invalid --runtime')
+            ->and($badPolicy)->not->toBe(0)
+            ->and($policyMessage)->toContain('Invalid --protocol-policy');
+    } finally {
+        removeInfbyteTestDirectory($fixture);
+    }
+});
+
 /**
  * @param list<string> $arguments
  * @param array<string, string> $environment
