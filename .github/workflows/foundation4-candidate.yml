@@ -262,6 +262,7 @@ jobs:
             $m=require "config/modules.php";
             if (($m["features"]["data.database"] ?? null)!==true) exit(1);
           '
+          mkdir -p storage/app
           # Application-owned SQLite data stays outside Composer-managed packages.
           # Verify state preservation through module lifecycle and recovery from
           # a deployment-maintained backup rather than deleting user data.
