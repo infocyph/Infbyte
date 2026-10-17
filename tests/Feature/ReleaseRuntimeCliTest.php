@@ -446,6 +446,7 @@ function createInfbyteCliFixture(): string
     copyInfbyteTestDirectory($root . '/app', $fixture . '/app');
     copyInfbyteTestDirectory($root . '/config', $fixture . '/config');
     copyInfbyteTestDirectory($root . '/routes', $fixture . '/routes');
+    copyInfbyteTestDirectory($root . '/public', $fixture . '/public');
     copy($root . '/bootstrap/providers.php', $fixture . '/bootstrap/providers.php');
     file_put_contents(
         $fixture . '/vendor/autoload.php',
