@@ -5,7 +5,7 @@
     "type": "project",
     "require": {
         "php": "^8.4",
-        "infocyph/foundation": "^3.0.1"
+        "infocyph/foundation": "dev-feature/foundation-3"
     },
     "require-dev": {
         "infocyph/phpforge": "dev-main@dev"
@@ -31,5 +31,11 @@
     },
     "scripts": {
         "post-create-project-cmd": "@php infbyte app:install"
-    }
+    },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/infocyph/Foundation"
+        }
+    ]
 }
