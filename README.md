@@ -1,483 +1,134 @@
 # Infbyte
 
-Infbyte is the minimal application skeleton for
-[Infocyph Foundation](https://github.com/infocyph/Foundation). Foundation owns
-the reusable framework/runtime layer; Infbyte provides opinionated application
-configuration, routes, writable layout, and application code.
+Infbyte is the minimal application skeleton for [Infocyph Foundation](https://github.com/infocyph/Foundation). It owns application routes, controllers, configuration, project structure and deployment decisions. Foundation and its native dependencies own the framework and runtime mechanisms.
 
-Infbyte targets the stable Foundation 3 runtime architecture:
+## Foundation 4 development integration
 
-```json
-"infocyph/foundation": "^3.0"
-```
+**This development branch follows Foundation `feature/foundation-3`, the Foundation 4.0 candidate.** Its `composer.json` temporarily requires `dev-feature/foundation-3` using the Foundation GitHub VCS source. That is an integration dependency, **not** a stable Foundation 4 publication or a production release instruction.
 
-Infbyte requires PHP 8.4+.
+- PHP 8.4+ (64-bit) and Composer 2.
+- [Foundation candidate source](https://github.com/infocyph/Foundation/tree/feature/foundation-3)
+- [Current Foundation 4 contract](https://github.com/infocyph/Foundation/blob/feature/foundation-3/docs/foundation-4-api-map.md)
+- [Infbyte integration tracker](docs/plans/infbyte-4.0-foundation-integration-plan.md)
 
-## Quick start
+After Foundation 4.0 is published and verified, the release-ready Infbyte manifest must use `"infocyph/foundation": "^4.0"`, remove the development VCS override, and pass clean normal Composer resolution.
+
+## Development
 
 ```bash
-composer create-project infocyph/infbyte my-app
-cd my-app
+composer install
+php infbyte --version
+php infbyte module:list
 php infbyte serve
 ```
 
-The built-in server defaults to `127.0.0.1:8000` and is for local development
-only:
+The `serve` command belongs to Foundation and delegates to **Core Runwire**. Runwire selects its available host (AUTO by default); a supported explicit native selection is `php infbyte serve --runtime=swoole`. Host extensions/capabilities must be installed before using their drivers. `serve` does not reimplement a PHP listener in the skeleton.
 
-```bash
-php infbyte serve --host=0.0.0.0 --port=8080
-```
+For regular nginx/Apache + PHP-FPM, configure the document root to `public/` and invoke `public/index.php` **without** `serve`. The entrypoint only loads an externally trusted Foundation release and hands native HTTP handling to Webrick. There is no Infbyte-owned request factory or response emitter.
 
-Foundation 3 compiles and activates one trusted release generation when `serve`
-starts, then passes its release root and manifest identity to the child server.
-Restart `serve` after changing route/configuration/graph topology that must be
-recompiled.
-
-Composer invokes Foundation's `app:install` post-create command. The application
-root executable remains `infbyte`; there is no separate Artisan/Console runtime.
-
-## Foundation runtime boundary
-
-Infbyte does not implement a framework runtime above Foundation.
-
-The production web entrypoint selects the externally trusted active Foundation
-generation and hands native request adaptation and response emission directly to
-Webrick through Foundation:
-
-```php
-use Infocyph\Foundation\Release\FoundationReleaseBootstrap;
-
-$config = ['base_path' => dirname(__DIR__)];
-$release = FoundationReleaseBootstrap::fromEnvironment($config)
-    ?? throw new RuntimeException('No trusted Foundation release generation is configured.');
-
-$release->web($config)->server->handle();
-```
-
-Infbyte therefore does not construct Webrick `Request` objects, create a second
-HTTP kernel, or call an emitter in production. Webrick's boot-selected runtime
-adapter owns the single native response write.
-
-`bootstrap/app.php` remains a small development/application façade convenience:
-
-```php
-use Infocyph\Foundation\Foundation;
-
-return Foundation::web([
-    'base_path' => dirname(__DIR__),
-]);
-```
-
-Foundation's `CommandDispatcher` selects CLI, Worker, and Scheduler runtimes for
-the root `infbyte` executable when commands require them.
-
-The four Foundation runtimes are:
-
-- Web
-- CLI
-- Worker
-- Scheduler
-
-Optional package providers are included only when the explicit application
-capability topology selects them. Set `APP_CAPABILITIES` to a comma-separated
-list such as `database,cache,messaging`; the lean skeleton defaults to none.
-
-## CLI
-
-List the current command surface with:
-
-```bash
-php infbyte list
-```
-
-Common families include:
-
-| Purpose | Commands |
-| --- | --- |
-| Inspect | `about`, `env:show`, `config:show`, `config:validate`, `route:list` |
-| Local development | `serve`, `create:*` |
-| Modules | `module:list`, `module:show`, `module:doctor`, `module:plan`, `module:install`, `module:enable`, `module:disable`, `module:repair`, `module:remove`, `module:config:publish`, `module:schema:*` |
-| Database | `db:*`, `migrate*` |
-| Operations | `execution:*`, `maintenance:*`, `runtime:reload`, `log:tail` |
-| Background work | `schedule:*`, `worker:*`, `queue:*`, `messaging:list` |
-| Storage/session/auth | `storage:*`, `session:prune`, `auth:prune` |
-| Environment protection | `env:encrypt`, `env:decrypt` |
-| Deployment | `optimize`, `optimize:clear`, `optimize:report`, `app:ready` |
-
-Global controls include `--json`, `-q|--quiet`, `--silent`, `-v|-vv|-vvv`,
-`--profile`, `--env`, and `-n|--no-interaction`.
-
-Application commands are registered explicitly in `routes/console.php`,
-schedules in `routes/schedule.php`, and non-message maintenance workers in
-`routes/workers.php`.
-
-## Application generators
-
-Foundation generators create application starting points without silently
-editing registration/configuration:
-
-```bash
-php infbyte create:controller Admin/User
-php infbyte create:command Reports/Daily
-php infbyte create:request StoreUser
-php infbyte create:rule ValidVatNumber
-php infbyte create:resource User
-php infbyte create:job GenerateReport
-php infbyte create:handler GenerateReport
-php infbyte create:job-middleware AuditJob
-php infbyte create:mail Welcome
-php infbyte create:notification PasswordChanged
-php infbyte create:notification-channel Sms
-php infbyte create:repository User
-php infbyte create:migration CreateUsers
-php infbyte create:seeder Production
-php infbyte create:worker Metrics
-```
-
-Existing files are preserved unless `--force` is supplied.
-
-## Purpose-first optional modules
-
-A new application keeps only the Foundation core runtime. Add capabilities as
-they are needed:
-
-```bash
-php infbyte module:list
-php infbyte module:plan database
-php infbyte module:install database
-php infbyte module:enable database
-php infbyte module:install communication
-php infbyte module:install messaging
-php infbyte module:config:publish operations
-```
-
-Then add the capabilities the application actually uses to `APP_CAPABILITIES`
-(or directly to `app.capabilities`) before compiling a production generation.
-
-The seven package-backed specialist modules are:
-
-- `auth`
-- `communication`
-- `database`
-- `filesystem`
-- `messaging`
-- `security`
-- `validation`
-
-`logging`, `operations`, `resources`, and `session` are Foundation-native
-built-in catalog entries. CacheLayer is Foundation core infrastructure and is
-not a module; use the core `cache:*` command family instead of
-`module:install cache`.
-
-Aliases such as `db`, `crypto`, `otp`, `passkeys`, and `queue` remain
-accepted where unambiguous, but application documentation uses purpose names.
-OTP and WebAuthn are explicit features of the `auth` module rather than
-standalone public modules.
-
-Installing a module does not add global middleware, open connections, or start
-workers. Optional config is published only when requested/needed and remains
-outside the lean checked-in skeleton by default.
-
-## Module schema lifecycle
-
-Module-owned schemas use the module command family, while core cache schemas use
-their dedicated Foundation command family:
-
-```bash
-php infbyte module:schema:status auth
-php infbyte module:schema:install auth
-php infbyte module:schema:install session
-php infbyte module:schema:sync
-
-php infbyte cache:schema:status
-php infbyte cache:schema:install
-```
-
-The `database` module owns DB/migration infrastructure; it does not own arbitrary
-application tables. Removing a module never drops schemas/application data.
+The `infbyte` root executable delegates to Foundation's `CommandDispatcher`. The available commands and parameters are those supported by the **installed Foundation source**, not a second application CLI implementation.
 
 ## Application structure
 
-The starter intentionally stays small:
-
 ```text
-app/
-bootstrap/
-  app.php
-  providers.php
-  cache/
-config/
-  app.php
-  auth.php
-  cache.php
-  notifications.php
-  router.php
-public/
-routes/
-  api.php
-  console.php
-  schedule.php
-  workers.php
-storage/
-  releases/
-tests/
-composer.json
-infbyte
+app/                      Application classes/controllers
+bootstrap/app.php         Explicit Foundation web bootstrap
+bootstrap/providers.php   Per-runtime service provider declarations
+config/app.php            Identity, capabilities and development settings
+config/auth.php           Core authentication application policy
+config/cache.php          Core CacheLayer resources
+config/modules.php        Explicit optional feature activation
+config/notifications.php  Core notification defaults
+config/router.php         Webrick route source and matcher policy
+public/index.php          Trusted direct PHP/FPM entrypoint
+routes/api.php            Application Webrick route registrations
+routes/console.php        Application CLI command declarations
+routes/workers.php        Application maintenance worker declarations
+routes/schedule.php       Application schedule
+storage/releases/         Generated immutable Foundation releases
+deploy.sh                 Project deployment preparation
 ```
 
-Only application-default config is checked in. `cache.php` is included because
-CacheLayer is Foundation core infrastructure, and `notifications.php` is included
-because notifications are a Foundation-native application surface independent
-of the optional communication module. Database/filesystem/messaging/operations/
-security/session/validation/communication configuration is published only when
-the application chooses those specialist or built-in surfaces.
+Foundation provides four distinct application modes: **web**, **cli**, **worker** and **scheduler**. The `bootstrap/providers.php` keys match those modes. Provider graph definitions and the runtime execution lifecycle are Foundation/InterMix concerns. Routing and response adaptation are Webrick concerns.
 
-## Database
+Production capability topology remains explicit through `app.capabilities` (the `APP_CAPABILITIES` environment value). It is separate from `modules.features`: enabling a feature does not imply adding every optional capability to the compiled application, and merely installing a package never activates it.
+
+## Core and optional features
+
+CacheLayer, InterMix, Runwire, Webrick, ArrayKit, UID and PSR Log are **Foundation Core** dependencies. Core auth, sessions, notifications, resources, logging and operations are **not installable modules**. PHPForge is development/QA tooling.
+
+Foundation 4 has exactly **three optional groups and eight independently selected features**:
+
+| Group | Feature | Owner |
+| --- | --- | --- |
+| data | `data.database` | DBLayer |
+| data | `data.filesystem` | Pathwise |
+| security | `security.crypto` | Epicrypt |
+| security | `security.validation` | ReqShield |
+| security | `security.mfa` | OTP |
+| security | `security.passkey` | OTP and WebAuthn |
+| execution | `execution.messaging` | Omnibus |
+| execution | `execution.communication` | TalkingBytes |
+
+A fresh skeleton ships `config/modules.php` with `features: []`: **Core-only by default**. Selection is explicit; no group-wide implicit installation or auto-enabling:
 
 ```bash
-php infbyte module:install database
-php infbyte migrate
-php infbyte migrate --pretend
-php infbyte migrate:status
-php infbyte db:monitor --section=status
+php infbyte module:list
+php infbyte module:show data
+php infbyte module:plan data.database
+php infbyte module:install data.database --dry-run
+php infbyte module:install data.database
+php infbyte module:enable data.database
+php infbyte module:config:publish data.database
+php infbyte module:doctor data.database
 ```
 
-Application migrations are registered explicitly under
-`database.migrations.classes`; Foundation does not scan migration directories.
+Module machine output is schema version 2. `module:install` reconciles the requested native package and missing config but never enables the feature. `module:enable` applies explicit selection to `config/modules.php`. Use `module:repair` after interrupted package work. Removing a feature requires disabling it first and does not delete application-owned data or schema.
 
-## Production authentication
+OTP-backed MFA requires an explicitly selected `security.crypto` when the OTP MFA driver is used; selecting passkeys does not enable MFA. Durable Omnibus messaging requires `data.database`. Native packages, migration schemas, and extension requirements are enforced by Foundation's planner.
 
-The checked-in auth defaults are deliberately dependency-light for local
-development. Production authentication must opt into durable state and the
-specialist packages it actually uses. A minimal OTP-backed production graph is:
+See the [Foundation module reference](https://github.com/infocyph/Foundation/blob/feature/foundation-3/docs/modules.md) and [configuration ownership reference](https://github.com/infocyph/Foundation/blob/feature/foundation-3/docs/configuration.md) for their current contracts.
+
+## Configuration and application safety
 
 ```bash
-php infbyte module:install database
-php infbyte module:install security
-php infbyte module:install communication
-php infbyte module:install auth --feature=otp
-php infbyte module:config:publish session
-
-php infbyte module:schema:install auth --connection=sqlite
-php infbyte module:schema:install session --connection=sqlite
-```
-
-Then configure the production topology explicitly, for example:
-
-```text
-APP_CAPABILITIES=auth,cache,database,security,communication,notifications,session
-
-AUTH_STORAGE=database
-AUTH_CACHE=cache
-AUTH_TOKENS=security
-SECURITY_JWT_ISSUER=https://example.com
-SECURITY_JWT_AUDIENCE=example-clients
-AUTH_MFA=otp
-AUTH_NOTIFICATIONS=talkingbytes
-AUTH_PASSKEY=disabled
-
-CACHE_STORE=auth-state
-CACHE_COUNTER=redis
-CACHE_REDIS_DSN=redis://127.0.0.1:6379
-CACHE_INTEGRITY_KEY=<deployment secret>
-
-AUTH_OTP_RECOVERY_HMAC_KEY=<deployment secret>
-AUTH_OTP_SECRET_PROTECTION_KEYS=[{"id":"primary","environment":"AUTH_OTP_MFA_KEY","status":"active"}]
-AUTH_OTP_MFA_KEY=<Base64URL key material>
-
-NOTIFICATIONS_AUTH_TRANSPORT=log
-SESSION_DRIVER=database
-SESSION_DB_CONNECTION=sqlite
-```
-
-`auth-state` and the Redis/Valkey counters are inactive named CacheLayer
-resources until selected; the lean skeleton still defaults to the local cache.
-Use a real production email transport instead of `log` when authentication
-notifications must be delivered. OTP-only installation does not require the
-passkey-only WebAuthn package; select `--feature=passkey` only when the
-application enables WebAuthn.
-
-Always run `config:validate --production`, provision the applicable schemas,
-then require `app:ready` before building the release generation. Keep token,
-cache-integrity, MFA-protection, recovery-code and transport credentials in
-deployment secret storage rather than source control.
-
-## Messaging and workers
-
-Omnibus-backed messaging is optional:
-
-```bash
-php infbyte module:install messaging
-php infbyte worker:list
-php infbyte worker:run reports
-php infbyte worker:status reports
-php infbyte queue:failed
-```
-
-Foundation does not expose a parallel messaging manager. Application services
-resolve native Omnibus `MessageBus`, `EventDispatcher`, and related APIs through
-DI.
-
-`routes/workers.php` is only for application maintenance workers; queue worker
-loops remain Omnibus-owned.
-
-## Runtime operations
-
-Useful production/runtime commands include:
-
-```bash
-php infbyte config:validate --production
-php infbyte maintenance:status
-php infbyte runtime:reload
-php infbyte worker:restart
-php infbyte schedule:interrupt
-php infbyte storage:status
-php infbyte log:tail --follow
-```
-
-Runtime generation commands request graceful shutdown. Foundation does not
-replace Supervisor/systemd/Docker/Kubernetes process supervision.
-
-## Development / build configuration cache
-
-Foundation delegates both application config-cache layouts directly to ArrayKit:
-
-- `sharded` (the default outside production) writes native namespace cache files
-  plus ArrayKit's `__flat.php` exact-leaf index;
-- `single` writes one native ArrayKit compiled
-  `bootstrap/cache/config/config.php` artifact.
-
-Choose the layout with `APP_CONFIG_CACHE_TYPE=sharded|single` and build/clear it
-with:
-
-```bash
+php infbyte config:validate
 php infbyte config:cache
 php infbyte config:clear
+php infbyte cache:schema:status
 ```
 
-There is no separate `fused` configuration mode. ArrayKit's sharded strategy
-already carries fused scalar/null leaf acceleration through `__flat.php`.
-Foundation owns cache policy, manifest identity, provider compilation and atomic
-publication; it does not maintain another config serializer.
+Only selected feature owners publish optional files. `config/cache.php` and `config/notifications.php` stay Core-owned application configuration. Build-time ArrayKit caches may be `sharded` or `single`; immutable production generations instead consume their own normalized `config.php` snapshot.
 
-This development/build cache is separate from the immutable production release
-generation. `optimize` always publishes its own generation-owned normalized
-`config.php` snapshot.
+Keep secrets (including `AUTH_TOKEN_SECRET`), signed manifest trust values and service credentials in the deployment environment, not committed configuration. Development auth defaults are not a substitute for durable production authentication/session policy. Do not retain request/principal/session state in long-lived application singletons or mutable static fields when using persistent workers.
 
-## Production
-
-Build and verify one immutable all-runtime Foundation generation before serving
-traffic:
+## Trusted deployment
 
 ```bash
 php infbyte config:validate --production
-php infbyte optimize
-php infbyte optimize:report
+php infbyte optimize --json=1
 php infbyte app:ready
+# Or run the project deployment wrapper:
+bash deploy.sh
 ```
 
-`optimize` compiles web, CLI, worker, and scheduler artifacts together and only
-activates the generation after all required artifacts and identities validate.
-The previous generation remains active if compilation/verification fails.
-
-The web process must receive trust metadata from deployment/service configuration
-outside the writable release directory:
+`deploy.sh` prepares writable runtime directories without root and expects Foundation to return the release root and trusted manifest SHA-256. Deploy the two external inputs to the host supervisor **outside the writable release directory**:
 
 ```text
-INFOCYPH_FOUNDATION_RELEASE_ROOT=/absolute/path/to/storage/releases
-INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256=<Manifest SHA-256 from optimize:report>
+INFOCYPH_FOUNDATION_RELEASE_ROOT
+INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256
 ```
 
-`INFOCYPH_FOUNDATION_RELEASE_ROOT` may be omitted when the default
-`storage/releases` location is used. The manifest SHA-256 is mandatory for the
-trusted production web bootstrap; do not derive it from the writable generation
-being validated.
+A trusted release comprises the compiled native Webrick 6 routing artifact, InterMix 11 ABI-3 application graphs, normalized configuration and generation identity for web/CLI/worker/scheduler. It must fail closed when metadata or artifacts are missing/mismatched; the production request path must not fall back to mutable source configuration.
 
-The included deployment helper performs the standard validation/build/readiness
-sequence:
+Do not use this Foundation 4 candidate branch for a final production release until Foundation itself is published and the Infbyte acceptance plan is complete. The [development plan](docs/plans/infbyte-4.0-foundation-integration-plan.md) tracks the remaining host, runtime, release and Composer QA gates.
+
+## QA
+
+Repository verification uses PHPForge's configured commands and the GitHub Security & Standards workflow. In a clean checkout with the Foundation candidate installed:
 
 ```bash
-./deploy.sh
+composer ic:ci
 ```
 
-Clear generated release generations with:
-
-```bash
-php infbyte optimize:clear
-```
-
-Release generations are deployment-owned and ignored by the skeleton repository.
-Production requests consume the generation-owned normalized config and compiled
-Webrick/InterMix artifacts; they do not rediscover project config, providers, or
-route files. Webrick matcher caches remain Webrick-native for fused, generated,
-and sharded strategies, while InterMix generated PHP remains the native DI
-production cache. CacheLayer is core application infrastructure, not a wrapper
-around either compiled routing or compiled DI artifacts.
-
-Before deployment:
-
-- set production environment/debug policy;
-- explicitly select only the capabilities the application uses;
-- run application migrations;
-- provision applicable module schemas;
-- require `config:validate --production` / `app:ready` to pass;
-- build/activate the release generation;
-- install its trusted manifest SHA-256 into the web/service process environment;
-- use a production web server and external process manager.
-
-
-## Upgrading an Infbyte 2.1 application
-
-Foundation 3 is a runtime-generation migration, not an in-place reuse of
-Foundation 2 generated caches. For a representative 2.1 application:
-
-1. change the Foundation runtime constraint from `^2.1.1` to `^3.0.1`;
-2. add an explicit `APP_CAPABILITIES` topology for production;
-3. remove `app.container.alias`, `app.container.compiled_activation`, and any
-   retired compiled-container path assumptions;
-4. remove any `router.cache` or `route:cache` deployment path assumptions;
-5. delete/ignore old `bootstrap/cache/container/*` and
-   `bootstrap/cache/routes/*` artifacts rather than trusting them after upgrade;
-6. add the core `config/cache.php` template, but do not install cache as a
-   module;
-7. update the production front controller to the trusted
-   `FoundationReleaseBootstrap` path and keep manifest trust in deployment
-   metadata outside the writable release directory;
-8. review specialist modules separately: installation does not enable a
-   capability, auth OTP/passkey features are explicit, and cache schemas use
-   `cache:schema:*`;
-9. rebuild with `php infbyte optimize`, install the returned manifest SHA-256
-   into the process environment, then run `php infbyte app:ready`;
-10. rehearse persisted auth/session/schema/queue data changes before rollout.
-    Code rollback does not automatically roll back database rows, queue payloads,
-    or key formats written by a newer generation.
-
-Do not assume Foundation 2.1 authentication/browser-session wire formats are
-valid Foundation 3 state. For each deployed application, explicitly decide
-whether existing credentials/tokens are retained, migrated, or revoked; force
-browser re-authentication when no verified session migration exists. OAuth and
-passkey state need the same explicit review when those features are in use.
-Apply database/schema changes additively first and use expand-contract rollout
-while old/new generations can coexist. Durable queue/message payloads likewise
-need version-compatible consumers before incompatible cleanup.
-
-See the
-[Foundation 2.x → 3.0 migration guide](https://github.com/infocyph/Foundation/blob/3.0.1/docs/foundation-3-migration.md)
-for provider API, persisted-state, lower-library, and rollout details.
-
-## Testing and release checks
-
-The current skeleton Composer file does not invent generic test/release script
-aliases. Run the tools/scripts actually installed by the application/release
-candidate. Foundation's full Composer/PHPForge/static/PHPUnit/integration and
-performance matrix is performed in its dedicated release-verification phase.
-
-## Documentation
-
-- [Foundation 3.0.1 documentation](https://github.com/infocyph/Foundation/tree/3.0.1/docs)
-- [Foundation 3 migration guide](https://github.com/infocyph/Foundation/blob/3.0.1/docs/foundation-3-migration.md)
-- [Omnibus](https://github.com/infocyph/Omnibus)
-- [Webrick](https://github.com/infocyph/Webrick)
-
-Infbyte keeps framework details in Foundation documentation rather than copying
-them into the application skeleton.
+Qualification of a final published Foundation 4 integration additionally requires PHP 8.4/8.5, lowest/stable dependency consumers, create-project archive, supported direct FPM and Runwire hosts, isolated/parallel requests, immutable releases and reproducible end-to-end performance. Historical Foundation 3 CI does not certify this branch.
