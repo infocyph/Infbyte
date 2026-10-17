@@ -163,6 +163,11 @@ jobs:
           fi
           seq 1 24 | xargs -P 6 -I '{}' bash -c \
             'response="$(curl --silent --fail --max-time 4 http://127.0.0.1:18781/api/health)" && [[ "$response" == '\''{"status":"ok"}'\'' ]]'
+          bash tests/ci/http-host-smoke.sh http://127.0.0.1:18781 240 12 | tee /tmp/infbyte-fpm-metrics.txt
+          {
+            echo '### nginx + PHP-FPM — shared runner diagnostic only'
+            cat /tmp/infbyte-fpm-metrics.txt
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Verify native Runwire HTTP serving
         shell: bash
         run: |
@@ -187,6 +192,14 @@ jobs:
           done
           seq 1 48 | xargs -P 8 -I '{}' bash -c \
             'response="$(curl --silent --fail --max-time 5 http://127.0.0.1:18780/api/health)" && [[ "$response" == '\''{"status":"ok"}'\'' ]]'
+          rss_before="$(ps -o rss= -p "$serve_pid" | tr -d ' ')"
+          bash tests/ci/http-host-smoke.sh http://127.0.0.1:18780 240 12 | tee /tmp/infbyte-runwire-metrics.txt
+          rss_after="$(ps -o rss= -p "$serve_pid" | tr -d ' ')"
+          {
+            echo '### Native Runwire — shared runner diagnostic only'
+            cat /tmp/infbyte-runwire-metrics.txt
+            printf 'Supervisor RSS before=%s KiB after=%s KiB\n' "$rss_before" "$rss_after"
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Exercise non-root application deployment wrapper
         if: matrix.php == '8.4'
         shell: bash
