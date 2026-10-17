@@ -207,3 +207,60 @@ jobs:
             $v=json_decode(file_get_contents($argv[1]),true,flags:JSON_THROW_ON_ERROR);
             if (($v["schema_version"] ?? null)!==2 || count($v["modules"] ?? [])!==3) exit(1);
           ' "$work/modules.json"
+
+  selected-features:
+    name: "No-dev selected feature / ${{ matrix.feature }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        feature:
+          - data.database
+          - data.filesystem
+          - security.crypto
+          - security.validation
+          - security.mfa
+          - security.passkey
+          - execution.messaging
+          - execution.communication
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up PHP and Composer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pcntl, pdo_sqlite, fileinfo, mbstring, ctype, sodium
+          tools: composer:v2
+          coverage: none
+      - name: Install only selected optional feature into clean production consumer
+        shell: bash
+        env:
+          FEATURE: ${{ matrix.feature }}
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          composer archive --format=tar --dir="$work" --file=infbyte
+          mkdir "$work/project"
+          tar -xf "$work/infbyte.tar" -C "$work/project"
+          cd "$work/project"
+          test ! -e composer.lock
+          test ! -d docs/plans
+          composer update --no-dev --no-interaction --prefer-dist --no-progress
+          php infbyte app:install
+          php infbyte module:install "$FEATURE" --json=1 > "$work/install.json"
+          php -r '
+            $v=json_decode(file_get_contents($argv[1]),true,flags:JSON_THROW_ON_ERROR);
+            if (($v["schema_version"] ?? null)!==2 || ($v["status"] ?? null)!=="complete") exit(1);
+          ' "$work/install.json"
+          php infbyte module:enable "$FEATURE" --json=1 > "$work/enable.json"
+          php -r '
+            $selection=require "config/modules.php";
+            if (($selection["features"][$argv[1]] ?? null)!==true) exit(1);
+          ' "$FEATURE"
+          composer check-platform-reqs --no-dev
+          php infbyte module:show "$FEATURE" --json=1 > "$work/feature.json"
+          php -r '
+            $v=json_decode(file_get_contents($argv[1]),true,flags:JSON_THROW_ON_ERROR);
+            if (($v["schema_version"] ?? null)!==2) exit(1);
+          ' "$work/feature.json"
