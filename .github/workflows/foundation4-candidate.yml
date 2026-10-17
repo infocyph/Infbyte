@@ -249,6 +249,15 @@ jobs:
             $m=require "config/modules.php";
             if (($m["features"]["data.database"] ?? null)!==true) exit(1);
           '
+          # Application-owned SQLite data stays outside Composer-managed packages.
+          # Verify state preservation through module lifecycle and recovery from
+          # a deployment-maintained backup rather than deleting user data.
+          php -r '
+            $db=new PDO("sqlite:storage/app/records.sqlite");
+            $db->exec("CREATE TABLE retained (id INTEGER PRIMARY KEY, content TEXT NOT NULL)");
+            $db->exec("INSERT INTO retained (content) VALUES (\x27before-module-change\x27)");
+          '
+          cp storage/app/records.sqlite "$work/records.sqlite.backup"
           php infbyte module:repair data.database --json=1 > "$work/repair.json"
           php infbyte module:disable data.database --json=1 > "$work/disable.json"
           php -r '
@@ -262,6 +271,18 @@ jobs:
             $v=json_decode(file_get_contents($argv[1]),true,flags:JSON_THROW_ON_ERROR);
             if (($v["status"] ?? null)!=="complete") exit(1);
           ' "$work/remove.json"
+          php -r '
+            $db=new PDO("sqlite:storage/app/records.sqlite");
+            $saved=$db->query("SELECT content FROM retained WHERE id=1")->fetchColumn();
+            if ($saved!=="before-module-change") exit(1);
+          '
+          mv storage/app/records.sqlite storage/app/records.sqlite.quarantined
+          cp "$work/records.sqlite.backup" storage/app/records.sqlite
+          php -r '
+            $db=new PDO("sqlite:storage/app/records.sqlite");
+            if ($db->query("SELECT content FROM retained")->fetchColumn()!=="before-module-change") exit(1);
+          '
+          test -f storage/app/records.sqlite.quarantined
           php infbyte module:list --json=1 > "$work/modules.json"
           php -r '
             $v=json_decode(file_get_contents($argv[1]),true,flags:JSON_THROW_ON_ERROR);
