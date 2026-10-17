@@ -9,7 +9,7 @@ Infbyte is the minimal application skeleton for [Infocyph Foundation](https://gi
 - PHP 8.4+ (64-bit) and Composer 2.
 - [Foundation candidate source](https://github.com/infocyph/Foundation/tree/feature/foundation-3)
 - [Current Foundation 4 contract](https://github.com/infocyph/Foundation/blob/feature/foundation-3/docs/foundation-4-api-map.md)
-- [Infbyte integration tracker](docs/plans/infbyte-4.0-foundation-integration-plan.md)
+- [Infbyte integration tracker](https://github.com/infocyph/Infbyte/blob/feature/infbyte-4/docs/plans/infbyte-4.0-foundation-integration-plan.md)
 
 After Foundation 4.0 is published and verified, the release-ready Infbyte manifest must use `"infocyph/foundation": "^4.0"`, remove the development VCS override, and pass clean normal Composer resolution.
 
@@ -121,7 +121,7 @@ INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256
 
 A trusted release comprises the compiled native Webrick 6 routing artifact, InterMix 11 ABI-3 application graphs, normalized configuration and generation identity for web/CLI/worker/scheduler. It must fail closed when metadata or artifacts are missing/mismatched; the production request path must not fall back to mutable source configuration.
 
-Do not use this Foundation 4 candidate branch for a final production release until Foundation itself is published and the Infbyte acceptance plan is complete. The [development plan](docs/plans/infbyte-4.0-foundation-integration-plan.md) tracks the remaining host, runtime, release and Composer QA gates.
+Do not use this Foundation 4 candidate branch for a final production release until Foundation itself is published and the Infbyte acceptance plan is complete. The [development plan](https://github.com/infocyph/Infbyte/blob/feature/infbyte-4/docs/plans/infbyte-4.0-foundation-integration-plan.md) tracks the remaining host, runtime, release and Composer QA gates.
 
 ## QA
 
