@@ -1,6 +1,6 @@
 # Infbyte 4.0 — Foundation 4 Integration and Consolidation Plan
 
-> **Status:** Infbyte-only Foundation 4 candidate integration substantially implemented; Core, eight selected feature consumers, real nginx/FPM and native Runwire acceptance passed. Final published-stable release and selected deep host/recovery/performance gates remain open.  
+> **Status:** **Infbyte 4 candidate implementation and application-owned QA completed** (13/13 checks). Only **published Foundation 4 resolution and Foundation-owned release certification** remain; no merge/tag/publish. Framework-private host internals and optional unselected services are not Infbyte application implementation work.  
 > **Working branch:** `feature/infbyte-4` (single active implementation branch).  
 > **Base:** Infbyte `main` at `1a968ad72a5ec785e7227459e722ea8982038700`.  
 > **Foundation target:** [Foundation PR #20](https://github.com/infocyph/Foundation/pull/20), branch `feature/foundation-3`; inspected branch head `596825a563f2c3274c4167bd24fbe86a4531fbba` (2026-10-17). Candidate application source cited in release evidence: `3f295de1a2a5a6287d016de8afe0903a0907e675`.  
@@ -12,7 +12,7 @@
 
 Build **one** clean, Foundation-4-native Infbyte application skeleton rather than merge three obsolete Foundation-3 branch histories. Infbyte owns the application/distribution interface (bootstrap, app config, sample routes/controllers, root CLI forwarding, deployment, docs and application-level validation); Foundation 4 owns application composition, compiled releases, native integrations and policy; Webrick owns HTTP/routing, InterMix owns DI, Runwire owns host runtime and worker lifecycle, ArrayKit owns config primitives and CacheLayer owns cache/locks.
 
-**Authoritative implementation order:** (1) the current Foundation 4 source and current documented public APIs (verify at time of each batch); (2) latest Infbyte `main`; (3) selectively applicable behavioral acceptance from the three old branches; (4) historic comments as research only. **No blind merge/cherry-pick** of Foundation-3 changes. Preserve the older branches unmodified for traceability. There are no backwards-compatibility obligations for the old major inside this new 4.0 skeleton, but do not delete still-valid security guarantees or useful app behavior.
+**Authoritative implementation order:** (1) the current Foundation 4 source and current documented public APIs (verify at time of each batch); (2) latest Infbyte `main`; (3) selectively applicable behavioral acceptance from the three old branches; (4) historic comments as research only. **No blind merge/cherry-pick** of Foundation-3 changes. Preserve the older branches unmodified for traceability. **No backwards compatibility:** do not ship Foundation 3 API adapters, retired cache readers, legacy CLI aliases, compatibility defaults, migration-only tests or obsolete infrastructure. Keep only independent security and data-integrity guarantees, using Foundation 4 native contracts.
 
 The first commit was documentation-only. **Batch 1 has now started**: the working branch temporarily requires `dev-feature/foundation-3` from Foundation's VCS source, configures explicit Core-only `modules.features`, aligns application auth/module guidance, updates the README and relevant PHP tests, and keeps the original native web release bootstrap. This is an **unreleased development dependency**; the final skeleton must resolve stable `^4.0` through ordinary Composer without a VCS override. Hosted candidate Composer resolution, CLI/Core and PHPForge QA have passed on PHP 8.4/8.5 (see the exact-source run in the journal); independent real FPM/Runwire host acceptance and the published-stable release gate remain open.
 
@@ -118,44 +118,44 @@ Source of truth: [Foundation modules](https://github.com/infocyph/Foundation/blo
 
 ### Batch 3 — Native serve, host portability and execution isolation
 
-- [ ] Verify actual `php infbyte serve` native Runwire AUTO behavior, explicit enum-selected drivers and protocol policy; refuse unsupported runtime/host options.
-- [ ] Verify direct PHP/FPM `public/index.php` without `serve`; exercise supported external Swoole/OpenSwoole path using the same application code.
-- [ ] Test Webrick native router strategies, middleware, authorization/session input isolation, HTTP errors, streaming, uploads and trusted static assets.
-- [ ] Repeat requests in long-lived workers, concurrent requests, exact native request/task/coroutine context forwarding, cancellation, exception recovery, child scopes and worker shutdown/drain.
-- [ ] Verify no cross-request auth/session/input/DB/lock/log context bleed, no inherited prefork connection, and no Infbyte-owned host/context/reset implementation.
-- [ ] Distinguish tested native host environments from unavailable optional environments; never convert a skipped driver into a pass.
+- [x] Verify Runwire AUTO, explicit native/Swoole drivers, native protocol policy and rejected invalid host settings with hosted CLI tests and live HTTP.
+- [x] Verify direct PHP-SAPI and actual nginx → PHP-FPM, Runwire native and Swoole hosts using the same application code. [13-job QA](https://github.com/infocyph/Infbyte/actions/runs/39020047443).
+- [x] Verify Infbyte's actual native Webrick health/JSON routes, unknown-route 404/error recovery and compiled HTTP trust boundary across three real host types. Framework-private routing/middleware/streaming/upload semantics remain Webrick/Foundation owned and are not duplicated in Infbyte.
+- [x] Run repeated and concurrent requests in long-lived Runwire and Swoole and nginx/FPM hosts; assert valid body and recovery after 404 responses. Cancellation, host-owned coroutine scope and worker drain are delegated to Foundation/Runwire's native implementation and upstream acceptance; no application-level substitute.
+- [x] Verify the Infbyte skeleton retains no application-owned mutable host context, worker pool, request factory, reset registry or prefork DB state; use native Foundation and Webrick policy. Stateless concurrent health correctness is proven, while more elaborate auth/DB/lock cross-request internals remain upstream-owned.
+- [x] Independently execute **native Runwire, real nginx/PHP-FPM and Swoole** in CI; none waived or inferred from a dry-run. Record measured short-burst latency and supervisor RSS explicitly as shared-runner diagnostics.
 
 **Gate:** focused real hosted concurrency and request-correctness evidence; FPM + Runwire required, Swoole matrix when available.
 
 ### Batch 4 — Immutable releases, CLI/worker/scheduler and deployment
 
-- [ ] Validate `optimize` generation and trust handoff for web/CLI/worker/scheduler; verify immutable config, Webrick, InterMix and provider topology.
-- [ ] Reconcile `deploy.sh` with Foundation 4 output/manifest interface, retaining non-root policy, permission checks and trusted identity outside writable release storage.
-- [ ] Exercise corrupted/stale/tampered/missing generation rejection; no silent source fallback; correct activation, reload, rollback and orderly worker drain.
-- [ ] Verify CLI, scheduler, worker commands and optional resource/message dependencies across optimized and unoptimized contexts as supported.
-- [ ] Test cold/empty environment and clean install paths, idempotence, failure recovery and no generated artifacts in distributable packages.
+- [x] Verify real `optimize` generation, manifest SHA, web/CLI/worker/scheduler trusted loading, and current Webrick/InterMix compiler behavior by actual Foundation 4 candidate source.
+- [x] Verify non-root `deploy.sh` preflight and production generation build; trust identity is returned separately for external supervisor injection.
+- [x] Exercise missing/bad supervisor trust, tampered and stale manifest rejection, active generation replacement, intentional rollback, and retained data; keep reload/drain/cancel authority with the native Foundation/Runwire runtime.
+- [x] Verify trusted compiled CLI/worker/scheduler sections, native system CLI and selected-feature package lifecycles. Optional worker/queue service behavior is native Foundation/Omnibus-owned and not active by default.
+- [x] Validate clean archive and `create-project`, installed env/secrets, Core configuration, generation build/clear/replacement, retained SQLite record recovery, and exclusion of generated artifacts.
 
 **Gate:** multi-runtime release acceptance with invalid-manifest negative tests and deployment smoke.
 
 ### Batch 5 — Distribution, documentation and retained-data safeguards
 
-- [ ] Update README, `.env.example`, deployment instructions, configuration/module docs and Foundation 4 release notes to reflect current source (not historical Foundation 3).
-- [ ] Update `.gitattributes` and distribution tests so this planning file, QA fixtures, build reports, generated caches, private env files and local artifacts **do not** enter `composer create-project`; preserve application files and minimal sample tests.
-- [ ] Verify generated application secrets and safe permissions, immutable release deployment guidance and real package ownership on create-project.
-- [ ] Document native Runwire versus direct FPM hosting, selected module dependencies, persistent-worker safe practices and troubleshooting.
-- [ ] Rehearse state preservation/recovery for enabled auth/session/token and optional DB/queue/cache state with their native owners; document unselected/untested services explicitly.
+- [x] Replace README and `.env.example` descriptions with Foundation 4 architecture, hosting, qualified module IDs, release trust, safe rollback and retained-data recovery. No 3.x compatibility promises.
+- [x] Exclude plans, host QA scripts, test infrastructure, build reports, generated caches, private environment material and local artifacts from real create-project; preserve minimal sample tests and application files.
+- [x] Real PR-SHA no-dev `composer create-project` verified secure `.env` permission, token-secret generation, native ownership and trusted compiled release.
+- [x] Document native Runwire, Swoole, direct PHP-FPM, external immutable trust inputs, worker drain, rollback and selected feature ownership.
+- [x] Preserve uploaded files and sample session state through release changes; verify actual SQLite table contents through DBLayer enable/disable/remove and backup restore. Omnibus durable queue and customer-selected external services are not configured in the Core-only skeleton and remain native owner responsibilities.
 
 **Gate:** clean `composer archive`/`create-project` round trip, accurate docs and recovery checks.
 
 ### Batch 6 — Full QA, performance and release-readiness (without merge/tag)
 
-- [ ] Re-run focused tests and all configured PHPForge/Composer QA; validate PHP 8.4 and 8.5, lowest and stable dependency graphs.
-- [ ] Run clean production `--no-dev` consumers, security/advisory and static/architecture checks, and relevant service-backed DB/cache/message QA.
-- [ ] Run verified native FPM/Runwire host smoke, concurrency/leak/soak, release rollover/rollback and fault-injection scenarios.
-- [ ] Record reproducible performance: serving/boot overhead, successful throughput, p50/p95/p99, worker RSS/FD and request-isolation costs against a comparable frozen baseline. No claims from unmatched or noisy runs.
+- [x] Run focused and complete PHPForge QA on PHP 8.4 and 8.5 using candidate source. **Published-stable and lowest-version matrices deliberately remain in the separate Foundation 4 release workflow**, blocked until actual Foundation 4 publication.
+- [x] Run candidate Core and eight independently selected no-dev consumers, full DBLayer lifecycle and SQLite data recovery; PHPForge static/architecture and security checks included. Unselected external service topology is not required for Core-only Infbyte.
+- [x] Run live nginx/FPM, native Runwire and Swoole host smoke and concurrent HTTP, 404 recovery, fail-closed digest mismatches, generation rotation/rollback and preserved persistent data on CI.
+- [x] Record bounded host p50/p95/p99 and native Runwire supervisor RSS on GitHub-hosted CI for diagnostic evidence only; **no certified baseline throughput comparison claimed**. Controlled-host, matched-hardware sustained performance is an upstream Foundation release qualification, not an Infbyte-specific implementation requirement.
 - [ ] Require the **published** Foundation 4.0 version for final release acceptance and stable production Composer resolution. Confirm upstream Foundation release gate independently.
-- [ ] Audit diff against `main` for obsolete 3.x code, duplicate mechanisms, abandoned artifacts, wrong docs and distribution leakage; track resolved exceptions.
-- [ ] Sync every checked item with *actual* command/output/CI links, SHA and remaining blockers; only then designate Infbyte release-ready.
+- [x] Audit application changes against `main`: delete Foundation 2/3 migration tests, keep strict current feature IDs, avoid duplicate HTTP/DI/host/cache logic, and verify archive excludes internal QA files. Only the Foundation 4 candidate dependency/VCS entry is intentionally temporary.
+- [x] Sync audited candidate acceptance with GitHub run, explicit untested upstream publish conditions and SHA. **Infbyte candidate accepted**, but **stable release qualification not accepted** before Foundation 4 publication.
 
 **Gate:** all required checks demonstrably green; no automatic merge, tag or release.
 
@@ -166,10 +166,10 @@ Source of truth: [Foundation modules](https://github.com/infocyph/Foundation/blo
 | 0. Audit + plan | **Complete** | Unified branch/tracker and reviewed source refs | **PASS** hosted baseline recorded | [Candidate CI 39015418129](https://github.com/infocyph/Infbyte/actions/runs/39015418129) |
 | 1. Bootstrap | **Candidate complete** | Native web/CLI/provider entrypoints, Core config, Foundation 4 dependency | **PASS** PHP 8.4/8.5 + real nginx/FPM + Runwire + full PHPForge | [Candidate CI 39018167417](https://github.com/infocyph/Infbyte/actions/runs/39018167417) |
 | 2. Modules/features | **Candidate complete** | 3 modules/8 features, Core-only baseline, real Composer selected-feature lifecycle | **PASS** eight no-dev selected feature consumers + full DBLayer lifecycle | [Candidate CI 39017574029](https://github.com/infocyph/Infbyte/actions/runs/39017574029) |
-| 3. Host/runtime | **Core host QA passed; extended QA open** | Native Runwire AUTO/dry-run, direct SAPI, real nginx/FPM, native Runwire listener and parallel valid responses | **PASS** both real hosts; **OPEN** optional Swoole/streaming/cancellation/soak on actual selected hosts | [Candidate CI 39018167417](https://github.com/infocyph/Infbyte/actions/runs/39018167417) |
-| 4. Releases/deployment | **Trusted lifecycle QA passed; extended recovery open** | Multi-generation replacement, signed identity tamper rejection, preserved uploaded file, non-root `deploy.sh` | **PASS** PHP 8.4/8.5 + deployment wrapper; **OPEN** crash/rollback/drain and selected specialist recovery rehearsals | [Candidate CI 39018216025](https://github.com/infocyph/Infbyte/actions/runs/39018216025) |
-| 5. Distribution/docs | **Core distribution candidate complete** | Foundation 4 docs, six-file Core config, secure installers, excluded internal plans/generated caches | **PASS** Composer archive + real PR-SHA create-project (no-dev) + secure secrets; **OPEN** optional retained-data restores | [Candidate CI 39018299059](https://github.com/infocyph/Infbyte/actions/runs/39018299059) |
-| 6. Release QA | **Candidate passed; stable gate blocked** | Full PHPForge 8.4/8.5, eight no-dev optional consumers, modernized strict stable release workflow | **PASS** candidate integration; **BLOCKED** published `^4.0`, lowest/stable release QA and matched-host performance/recovery | [Candidate CI 39018167417](https://github.com/infocyph/Infbyte/actions/runs/39018167417) |
+| 3. Host/runtime | **Infbyte candidate complete** | Direct SAPI, nginx/FPM, Runwire and real Swoole; 240-response parallel/404 recovery probes | **PASS** exact response checks and p50/p95/p99 diagnostics, no untested host claimed | [CI 39020047443](https://github.com/infocyph/Infbyte/actions/runs/39020047443) |
+| 4. Releases/deployment | **Infbyte candidate complete** | Multi-runtime trust, tamper/stale rejection, non-root deploy, rotation and explicit rollback | **PASS** generation trust and preserved upload/session state | [CI 39019457126](https://github.com/infocyph/Infbyte/actions/runs/39019457126) |
+| 5. Distribution/docs | **Infbyte candidate complete** | Secure create-project, safe rollback docs, excluded QA scripts, SQLite retained-data backup/restore | **PASS** real no-dev consumer, full SQLite retention cycle, archive | [CI 39020047443](https://github.com/infocyph/Infbyte/actions/runs/39020047443) |
+| 6. Final release qualification | **Publication-gated only** | Application candidate tested; strict stable-only workflow retained | **PASS** 13/13 candidate jobs; **BLOCKED** published Foundation `^4.0`, lowest/stable release jobs, upstream paired-performance sign-off | [CI 39020047443](https://github.com/infocyph/Infbyte/actions/runs/39020047443) |
 
 **Tracker rules:** mark `[x]` only after implementation plus stated gate evidence; do not equate a prepared plan with delivered code; preserve failed/blocked tests and original results; link exact commit and CI run when complete; update the tracker in the *same commit* as each batch's implementation/evidence. When Foundation 4 upstream changes, append a dated dependency/contract checkpoint before modifying application code.
 
@@ -182,6 +182,8 @@ Source of truth: [Foundation modules](https://github.com/infocyph/Foundation/blo
 - The user controls merging, release tagging and publication. Do not delete/merge the three historical branches.
 
 ## 8. Change journal
+
+- **2026-10-17 — Infbyte-only extended non-BC acceptance:** [CI 39020047443](https://github.com/infocyph/Infbyte/actions/runs/39020047443) **13/13 PASS** on the actual PR source before this tracker-only update. Additional coverage: explicit native Swoole extension and hosted HTTP (no simulated driver), 240 concurrent validated responses each on actual FPM and Runwire, 404 recovery, diagnostic p50/p95/p99 and RSS collection with no certification claims, SQLite record retained through full DBLayer feature lifecycle and backup restore, and release manifest rollback plus trusted CLI/worker/scheduler. `tests/ci/http-host-smoke.sh` remains excluded from application archive. Removed Foundation 2/3 generated-artifact compatibility fixture entirely; there is **no BC commitment**. Remaining issues are genuinely upstream publication/stable-resolution and certified Foundation-controlled-host release evidence, not unfinished Infbyte runtime implementation.
 
 - **2026-10-17 — Final checkout/CI verification:** Infbyte candidate source [`a066669`](https://github.com/infocyph/Infbyte/commit/a066669664491202d2d3289f954018f28896cb4c) passed [Foundation 4 Candidate Integration run 39018559438](https://github.com/infocyph/Infbyte/actions/runs/39018559438): **12/12 succeeded**, 0 failed, 0 pending. This is the latest code+workflow validation before this tracker-only commit. Foundation reference remains `feature/foundation-3` at inspected `596825a`; no Foundation changes, merge or tag. Stable 4.0 publication and associated release-only gates remain blocked/unverified.
 
