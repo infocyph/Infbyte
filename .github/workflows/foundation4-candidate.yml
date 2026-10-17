@@ -124,6 +124,45 @@ jobs:
             printf 'Untrusted generation returned a successful body.\n' >&2
             exit 1
           fi
+      - name: Verify real nginx and PHP-FPM host against trusted release
+        if: matrix.php == '8.4'
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_root="$(php -r '$v=json_decode(file_get_contents("/tmp/infbyte-release.json"),true,flags:JSON_THROW_ON_ERROR); echo $v["release_root"];')"
+          trusted="$(php -r '$v=json_decode(file_get_contents("/tmp/infbyte-release.json"),true,flags:JSON_THROW_ON_ERROR); echo $v["manifest_sha256"];')"
+          config="$(mktemp)"
+          cleanup() {
+            docker rm -f infbyte-4-nginx infbyte-4-fpm 2>/dev/null || true
+            docker network rm infbyte-4-qa 2>/dev/null || true
+            rm -f "$config"
+          }
+          trap cleanup EXIT
+          docker network create infbyte-4-qa
+          printf 'events {}\nhttp { server { listen 8080; server_name _; location / { include /etc/nginx/fastcgi_params; fastcgi_param SCRIPT_FILENAME %s/public/index.php; fastcgi_param SCRIPT_NAME /index.php; fastcgi_pass infbyte-4-fpm:9000; } } }\n' "$GITHUB_WORKSPACE" > "$config"
+          docker run -d --name infbyte-4-fpm --network infbyte-4-qa \
+            --user "$(id -u):$(id -g)" \
+            -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$GITHUB_WORKSPACE" \
+            -e "INFOCYPH_FOUNDATION_RELEASE_ROOT=$release_root" \
+            -e "INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256=$trusted" \
+            -e APP_ENV=production \
+            php:8.4-fpm -F
+          docker run -d --name infbyte-4-nginx --network infbyte-4-qa -p 18781:8080 \
+            -v "$config:/etc/nginx/nginx.conf:ro" nginx:alpine
+          response=""
+          for attempt in $(seq 1 35); do
+            response="$(curl --silent --fail --max-time 2 http://127.0.0.1:18781/api/health || true)"
+            if [[ "$response" == '{"status":"ok"}' ]]; then break; fi
+            sleep 1
+          done
+          if [[ "$response" != '{"status":"ok"}' ]]; then
+            docker logs infbyte-4-fpm >&2 || true
+            docker logs infbyte-4-nginx >&2 || true
+            printf 'Real nginx/FPM host failed its trusted application health: %s\n' "$response" >&2
+            exit 1
+          fi
+          seq 1 24 | xargs -P 6 -I '{}' bash -c \
+            'response="$(curl --silent --fail --max-time 4 http://127.0.0.1:18781/api/health)" && [[ "$response" == '\''{"status":"ok"}'\'' ]]'
       - name: Verify native Runwire HTTP serving
         shell: bash
         run: |
