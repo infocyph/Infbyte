@@ -28,16 +28,23 @@ jobs:
           extensions: pcntl, pdo_sqlite
           tools: composer:v2
           coverage: none
-      - name: Verify candidate Composer metadata and resolve Foundation branch
+      - name: Verify Composer metadata and resolve the declared Foundation 4 dependency
         run: |
           set -euo pipefail
           composer validate --strict
           composer update --no-interaction --prefer-dist --no-progress
           php -r '
             require "vendor/autoload.php";
+            $manifest = json_decode(file_get_contents("composer.json"), true, flags: JSON_THROW_ON_ERROR);
+            $constraint = $manifest["require"]["infocyph/foundation"] ?? "";
             $version = Composer\InstalledVersions::getPrettyVersion("infocyph/foundation") ?? "";
-            if (!str_starts_with($version, "dev-feature/foundation-3")) {
-                fwrite(STDERR, "Unexpected Foundation candidate: " . $version . PHP_EOL);
+            $normalized = Composer\InstalledVersions::getVersion("infocyph/foundation") ?? "";
+            $candidate = $constraint === "dev-feature/foundation-3" && $version === $constraint;
+            $stable = $constraint === "^4.0"
+                && !isset($manifest["repositories"])
+                && preg_match("/^4\\.[0-9]+\\.[0-9]+\\.[0-9]+$/D", $normalized) === 1;
+            if (!$candidate && !$stable) {
+                fwrite(STDERR, "Unexpected Foundation dependency: " . $constraint . " resolved to " . $version . PHP_EOL);
                 exit(1);
             }
           '

@@ -1,12 +1,12 @@
-name: "Security & Standards — Foundation 4 Stable Release"
+name: "Security & Standards"
 
 # This is the release boundary, not the PR candidate lane. Candidate checks
 # live in foundation4-candidate.yml and run on every PR. This workflow must
 # reject development branches or VCS overrides before any release qualification.
 on:
   push:
-    branches: ["main"]
-    tags: ["v*"]
+    branches: [ "main", "master" ]
+    tags: [ "v*", "[0-9]*" ]
   workflow_dispatch:
 
 permissions:
@@ -18,6 +18,14 @@ env:
   COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
 
 jobs:
+  release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    needs: [published-core, published-database]
+    uses: infocyph/phpforge/.github/workflows/release.yml@main
+    permissions:
+      contents: write
+    secrets:
+      COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
   stable-constraint:
     name: "Reject non-stable Foundation or VCS overrides"
     runs-on: ubuntu-latest
@@ -90,8 +98,8 @@ jobs:
           composer check-platform-reqs --no-dev
           php -r '
             require "vendor/autoload.php";
-            $version=Composer\InstalledVersions::getPrettyVersion("infocyph/foundation") ?? "";
-            if (!preg_match("/^4\\./", $version)) {
+            $version=Composer\InstalledVersions::getVersion("infocyph/foundation") ?? "";
+            if (preg_match("/^4\\.[0-9]+\\.[0-9]+\\.[0-9]+$/D", $version) !== 1) {
                 fwrite(STDERR, "A published Foundation 4 release was not installed: " . $version . PHP_EOL);
                 exit(1);
             }

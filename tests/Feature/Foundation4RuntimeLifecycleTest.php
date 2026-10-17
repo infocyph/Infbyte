@@ -22,7 +22,7 @@ it('keeps production release trust outside project configuration', function (): 
         ->and($example)->not->toContain('INFOCYPH_FOUNDATION_RELEASE_ROOT');
 });
 
-it('tracks the exact Foundation 4 candidate branch without activating optional modules', function (): void {
+it('resolves the declared Foundation 4 dependency without activating optional modules', function (): void {
     $root = dirname(__DIR__, 2);
     $composer = json_decode(
         (string) file_get_contents($root . '/composer.json'),
@@ -32,13 +32,20 @@ it('tracks the exact Foundation 4 candidate branch without activating optional m
 
     $version = InstalledVersions::getPrettyVersion('infocyph/foundation');
     $foundationPath = InstalledVersions::getInstallPath('infocyph/foundation');
+    $constraint = $composer['require']['infocyph/foundation'] ?? '';
 
-    expect($composer['require']['infocyph/foundation'] ?? null)->toBe('dev-feature/foundation-3')
-        ->and($composer['repositories'][0]['url'] ?? null)->toBe('https://github.com/infocyph/Foundation')
+    expect($constraint)->toBeIn(['dev-feature/foundation-3', '^4.0'])
         ->and($version)->toBeString()
-        ->and(str_starts_with($version, 'dev-'))->toBeTrue()
         ->and($foundationPath)->toBeString()
         ->and($root . '/config/modules.php')->toBeFile();
+
+    if ($constraint === '^4.0') {
+        expect($composer)->not->toHaveKey('repositories')
+            ->and(InstalledVersions::getVersion('infocyph/foundation'))->toMatch('/^4\.[0-9]+\.[0-9]+\.[0-9]+$/D');
+    } else {
+        expect($version)->toBe($constraint)
+            ->and($composer['repositories'][0]['url'] ?? null)->toBe('https://github.com/infocyph/Foundation');
+    }
 
     $modules = require $root . '/config/modules.php';
     expect($modules)->toBe(['features' => []]);
@@ -76,7 +83,7 @@ it('documents the Foundation 4 feature and Core cache lifecycle', function (): v
     $auth = file_get_contents(dirname(__DIR__, 2) . '/config/auth.php');
 
     expect($readme)->toBeString()
-        ->and($readme)->toContain('dev-feature/foundation-3')
+        ->and($readme)->toContain('^4.0')
         ->and($readme)->toContain('cache:schema:status')
         ->and($readme)->toContain('cache:schema:install')
         ->and($readme)->not->toContain('php infbyte module:install cache')

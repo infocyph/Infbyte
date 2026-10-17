@@ -127,6 +127,7 @@ it('builds a clean create-project archive and provisions a Foundation 4 release 
             ->and($project . '/tests/Unit/ExampleTest.php')->toBeFile()
             ->and($project . '/tests/Feature/FrameworkRuntimeTest.php')->not->toBeFile()
             ->and($project . '/tests/Feature/ReleaseRuntimeCliTest.php')->not->toBeFile()
+            ->and($project . '/tests/Feature/ReleaseWorkflowGuardTest.php')->not->toBeFile()
             ->and($project . '/tests/Feature/SkeletonDistributionTest.php')->not->toBeFile()
             ->and($project . '/vendor')->not->toBeDirectory()
             ->and($project . '/database')->not->toBeDirectory()
