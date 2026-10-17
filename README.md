@@ -96,6 +96,7 @@ php infbyte config:validate
 php infbyte config:cache
 php infbyte config:clear
 php infbyte cache:schema:status
+php infbyte cache:schema:install
 ```
 
 Only selected feature owners publish optional files. `config/cache.php` and `config/notifications.php` stay Core-owned application configuration. Build-time ArrayKit caches may be `sharded` or `single`; immutable production generations instead consume their own normalized `config.php` snapshot.
