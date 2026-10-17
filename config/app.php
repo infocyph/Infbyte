@@ -31,9 +31,10 @@ return [
     | Runtime Capabilities
     |--------------------------------------------------------------------------
     |
-    | Foundation 3 production generations require an explicit capability
+    | Foundation 4 production generations require an explicit capability
     | topology. Keep the default empty for the lean skeleton and enable optional
-    | integrations deliberately, for example: database,cache,messaging.
+    | integrations deliberately using Foundation capability names. Optional
+    | features additionally require explicit selection in config/modules.php.
     |
     */
     'capabilities' => $capabilities,
@@ -59,7 +60,7 @@ return [
     | InterMix Development Settings
     |--------------------------------------------------------------------------
     |
-    | Generated Foundation 3 production runtimes load immutable InterMix
+    | Generated Foundation 4 production runtimes load immutable InterMix
     | artifacts from the active release generation. These settings therefore
     | describe graph/development behavior only; there is no resolver-map path,
     | alias, or compiled-activation fallback switch.
