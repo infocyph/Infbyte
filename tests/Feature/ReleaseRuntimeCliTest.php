@@ -425,6 +425,54 @@ it('fails closed if a previously trusted Foundation generation manifest changes'
     }
 });
 
+it('rotates trusted release generations without deleting application-owned state', function (): void {
+    $fixture = createInfbyteCliFixture();
+    $retained = $fixture . '/storage/uploads/retained.txt';
+
+    try {
+        file_put_contents($retained, 'application-owned-file');
+
+        [$firstExit, $firstOutput] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'optimize',
+            '--json=1',
+        ], ['APP_ENV' => 'production']);
+        $first = json_decode($firstOutput, true, flags: JSON_THROW_ON_ERROR);
+
+        [$nextExit, $nextOutput] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'optimize',
+            '--json=1',
+        ], ['APP_ENV' => 'production']);
+        $next = json_decode($nextOutput, true, flags: JSON_THROW_ON_ERROR);
+
+        expect($firstExit)->toBe(0, $firstOutput)
+            ->and($nextExit)->toBe(0, $nextOutput)
+            ->and($first['generation'])->not->toBe($next['generation'])
+            ->and($next['manifest'])->toBeFile()
+            ->and($next['manifest_sha256'])->toBe(hash_file('sha256', $next['manifest']))
+            ->and($retained)->toBeFile()
+            ->and(file_get_contents($retained))->toBe('application-owned-file');
+
+        [$reportExit, $reportOutput] = runInfbyteCommand([
+            PHP_BINARY,
+            $fixture . '/infbyte',
+            'optimize:report',
+            '--json=1',
+        ], ['APP_ENV' => 'production']);
+        $report = json_decode($reportOutput, true, flags: JSON_THROW_ON_ERROR);
+
+        expect($reportExit)->toBe(0, $reportOutput)
+            ->and($report['ready'] ?? null)->toBeTrue()
+            ->and($report['generation'] ?? null)->toBe($next['generation'])
+            ->and($report['manifest_sha256'] ?? null)->toBe($next['manifest_sha256']);
+    } finally {
+        removeInfbyteTestDirectory($fixture);
+    }
+});
+
 /**
  * @param list<string> $arguments
  * @param array<string, string> $environment
