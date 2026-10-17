@@ -10,6 +10,12 @@
     "require-dev": {
         "infocyph/phpforge": "dev-main@dev"
     },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/infocyph/Foundation"
+        }
+    ],
     "autoload": {
         "psr-4": {
             "App\\": "app/"
@@ -31,11 +37,5 @@
     },
     "scripts": {
         "post-create-project-cmd": "@php infbyte app:install"
-    },
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://github.com/infocyph/Foundation"
-        }
-    ]
+    }
 }
