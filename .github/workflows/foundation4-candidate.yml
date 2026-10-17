@@ -75,5 +75,73 @@ jobs:
                 exit(1);
             }
           '
+      - name: Verify direct SAPI web host and fail-closed release trust
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_root="$(php -r '$r=json_decode(file_get_contents("/tmp/infbyte-release.json"),true,flags:JSON_THROW_ON_ERROR); echo $r["release_root"];')"
+          trusted="$(php -r '$r=json_decode(file_get_contents("/tmp/infbyte-release.json"),true,flags:JSON_THROW_ON_ERROR); echo $r["manifest_sha256"];')"
+          INFOCYPH_FOUNDATION_RELEASE_ROOT="$release_root" INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256="$trusted" \
+            php -S 127.0.0.1:18778 -t public public/index.php >/tmp/infbyte-direct-http.log 2>&1 &
+          host_pid=$!
+          trap 'kill "$host_pid" 2>/dev/null || true; wait "$host_pid" 2>/dev/null || true' EXIT
+          response=""
+          for attempt in $(seq 1 20); do
+            response="$(curl --silent --fail --max-time 2 http://127.0.0.1:18778/api/health || true)"
+            if [[ "$response" == '{"status":"ok"}' ]]; then break; fi
+            sleep 1
+          done
+          if [[ "$response" != '{"status":"ok"}' ]]; then
+            cat /tmp/infbyte-direct-http.log >&2
+            printf 'Trusted direct HTTP host did not return a valid health response. Got: %s\n' "$response" >&2
+            exit 1
+          fi
+          json="$(curl --silent --fail --max-time 2 http://127.0.0.1:18778/json)"
+          printf '%s' "$json" | php -r '$v=json_decode(stream_get_contents(STDIN),true,flags:JSON_THROW_ON_ERROR); if (!is_int($v["memory"] ?? null)) exit(1);'
+          kill "$host_pid"
+          wait "$host_pid" 2>/dev/null || true
+          trap - EXIT
+          wrong_trust="$(printf '%064d' 0)"
+          INFOCYPH_FOUNDATION_RELEASE_ROOT="$release_root" INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256="$wrong_trust" \
+            php -S 127.0.0.1:18779 -t public public/index.php >/tmp/infbyte-badtrust-http.log 2>&1 &
+          bad_pid=$!
+          trap 'kill "$bad_pid" 2>/dev/null || true; wait "$bad_pid" 2>/dev/null || true' EXIT
+          bad_status=""
+          for attempt in $(seq 1 20); do
+            bad_status="$(curl --silent --output /tmp/infbyte-badtrust-body --write-out '%{http_code}' --max-time 2 http://127.0.0.1:18779/api/health || true)"
+            if [[ "$bad_status" =~ ^[1-5][0-9][0-9]$ ]]; then break; fi
+            sleep 1
+          done
+          if [[ "$bad_status" != 500 ]]; then
+            cat /tmp/infbyte-badtrust-http.log >&2
+            printf 'Tampered manifest must fail closed with HTTP 500, got %s\n' "$bad_status" >&2
+            exit 1
+          fi
+          if grep -q '"status":"ok"' /tmp/infbyte-badtrust-body; then
+            printf 'Untrusted generation returned a successful body.\n' >&2
+            exit 1
+          fi
+      - name: Verify native Runwire HTTP serving
+        shell: bash
+        run: |
+          set -euo pipefail
+          php infbyte serve --runtime=native --workers=1 --host=127.0.0.1 --port=18780 > /tmp/infbyte-runwire-http.log 2>&1 &
+          serve_pid=$!
+          trap 'kill "$serve_pid" 2>/dev/null || true; wait "$serve_pid" 2>/dev/null || true' EXIT
+          response=""
+          for attempt in $(seq 1 20); do
+            response="$(curl --silent --fail --max-time 2 http://127.0.0.1:18780/api/health || true)"
+            if [[ "$response" == '{"status":"ok"}' ]]; then break; fi
+            sleep 1
+          done
+          if [[ "$response" != '{"status":"ok"}' ]]; then
+            cat /tmp/infbyte-runwire-http.log >&2
+            printf 'Native Runwire failed to serve application health. Got: %s\n' "$response" >&2
+            exit 1
+          fi
+          for request in $(seq 1 12); do
+            curl --silent --fail --max-time 3 http://127.0.0.1:18780/api/health | \
+              php -r '$v=json_decode(stream_get_contents(STDIN),true,flags:JSON_THROW_ON_ERROR); if (($v["status"] ?? null) !== "ok") exit(1);'
+          done
       - name: Run configured PHPForge CI (no suppressed failures)
         run: composer ic:ci
