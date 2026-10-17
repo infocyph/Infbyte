@@ -146,6 +146,8 @@ jobs:
             curl --silent --fail --max-time 3 http://127.0.0.1:18780/api/health | \
               php -r '$v=json_decode(stream_get_contents(STDIN),true,flags:JSON_THROW_ON_ERROR); if (($v["status"] ?? null) !== "ok") exit(1);'
           done
+          seq 1 48 | xargs -P 8 -I '{}' bash -c \
+            'response="$(curl --silent --fail --max-time 5 http://127.0.0.1:18780/api/health)" && [[ "$response" == '\''{"status":"ok"}'\'' ]]'
       - name: Run configured PHPForge CI (no suppressed failures)
         run: composer ic:ci
 
