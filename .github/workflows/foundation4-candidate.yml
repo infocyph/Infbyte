@@ -187,6 +187,22 @@ jobs:
           done
           seq 1 48 | xargs -P 8 -I '{}' bash -c \
             'response="$(curl --silent --fail --max-time 5 http://127.0.0.1:18780/api/health)" && [[ "$response" == '\''{"status":"ok"}'\'' ]]'
+      - name: Exercise non-root application deployment wrapper
+        if: matrix.php == '8.4'
+        shell: bash
+        env:
+          APP_ENV: production
+          APP_DEBUG: "false"
+          APP_CAPABILITIES: ""
+        run: |
+          set -euo pipefail
+          test "$(id -u)" -ne 0
+          bash deploy.sh --no-optimize > /tmp/infbyte-deploy-preflight.log
+          grep -q 'Runtime directories are writable' /tmp/infbyte-deploy-preflight.log
+          bash deploy.sh > /tmp/infbyte-deploy-build.log
+          grep -q 'Foundation 4 release generation is ready' /tmp/infbyte-deploy-build.log
+          grep -q '^export INFOCYPH_FOUNDATION_RELEASE_ROOT=' /tmp/infbyte-deploy-build.log
+          grep -q '^export INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256=' /tmp/infbyte-deploy-build.log
       - name: Run configured PHPForge CI (no suppressed failures)
         run: composer ic:ci
 
