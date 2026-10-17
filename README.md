@@ -124,6 +124,18 @@ A trusted release comprises the compiled native Webrick 6 routing artifact, Inte
 
 Do not use this Foundation 4 candidate branch for a final production release until Foundation itself is published and the Infbyte acceptance plan is complete. The [development plan](https://github.com/infocyph/Infbyte/blob/feature/infbyte-4/docs/plans/infbyte-4.0-foundation-integration-plan.md) tracks the remaining host, runtime, release and Composer QA gates.
 
+## Operating releases and restoring retained state
+
+Infbyte 4 is a clean major-version cutover: it ships **no Foundation 3 compatibility shims, obsolete module aliases, legacy route/container cache loaders or automatic upgrades**. Only Foundation 4's public contracts apply. Protect the application's live data when moving between versions.
+
+When activating a new immutable generation, deploy the new `INFOCYPH_FOUNDATION_RELEASE_ROOT` and `INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256` together as **external, supervisor-owned trust inputs**. The manifest digest is generation-specific. Changing the active release pointer alone cannot authorize a different generation. After activating a release, replace/drain persistent workers and reload FPM according to your host's lifecycle; do not continue serving stale trusted identities.
+
+For rollback, keep the previous compiled generation and its manifest SHA-256 in trusted deployment metadata. Drain affected workers, atomically reactivate the known-good previous generation using Foundation's native `ActiveGeneration` API, install its corresponding trusted SHA-256 in the host supervisor, and restart/load that runtime. A mismatched pointer/digest must fail closed; never fall back to source bootstrap or disable manifest checks to recover service. `optimize:clear` deletes generations and therefore **must not** be used as a rollback command. Foundation owns release generation leases, validation and pruning; Infbyte does not implement a second rollback engine.
+
+Back up and restore application-owned `storage/app`, `storage/uploads`, `storage/sessions`, database volumes, and any selected feature's durable queues with the appropriate native service tooling. Installing, disabling or removing a module must not delete application-owned database tables, uploaded files or retained messages. Validate restores on a separate environment before pointing live workers at the recovered state. When using a persistent host, keep request-specific data in Runwire/Webrick native request scopes, not mutable application singletons.
+
+The candidate CI verifies native Runwire, Swoole and nginx/PHP-FPM HTTP correctness, sustained short-burst request probes, a generation trust mismatch, an explicit rollback, and retained SQLite application records through feature removal/restore. **Shared GitHub runners are not a controlled performance laboratory:** their timings and RSS samples are diagnostics, not certified before/after throughput or memory-regression evidence.
+
 ## QA
 
 Repository verification uses PHPForge's configured commands and the GitHub Security & Standards workflow. In a clean checkout with the Foundation candidate installed:
