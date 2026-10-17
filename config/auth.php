@@ -56,8 +56,8 @@ return [
     | One-Time Passwords
     |--------------------------------------------------------------------------
     |
-    | OTP-backed MFA is provided by the auth module. Enable it with AUTH_MFA=otp
-    | after installing the module. Replay-safe production use also requires the
+    | OTP-backed MFA selects security.mfa plus security.crypto. Enable it
+    | explicitly before setting AUTH_MFA=otp. Replay-safe production use also requires the
     | configured shared cache/coordination capability.
     |
     */
@@ -88,8 +88,8 @@ return [
     | WebAuthn / Passkeys
     |--------------------------------------------------------------------------
     |
-    | WebAuthn is provided by the auth module. Enable it with
-    | AUTH_PASSKEY=webauthn after installing that module.
+    | WebAuthn requires security.passkey. Select and enable that feature
+    | explicitly before setting AUTH_PASSKEY=webauthn.
     |
     */
     'webauthn' => [
