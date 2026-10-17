@@ -8,6 +8,9 @@ on:
 permissions:
   contents: read
 
+env:
+  COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
+
 jobs:
   candidate-core:
     name: "Foundation 4 candidate / PHP ${{ matrix.php }}"
@@ -213,6 +216,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
         feature:
           - data.database
