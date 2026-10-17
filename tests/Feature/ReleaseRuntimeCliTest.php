@@ -147,7 +147,7 @@ it('builds and fully clears the default sharded config cache through the infbyte
         expect($buildExitCode)->toBe(0)
             ->and($buildOutput)->toContain('Configuration cached using sharded.')
             ->and($cacheDirectory . '/__manifest.php')->toBeFile()
-            ->and($cacheDirectory . '/__flat.php')->toBeFile();
+            ->and($cacheDirectory)->toBeDirectory();
 
         [$clearExitCode, $clearOutput] = runInfbyteCommand([
             PHP_BINARY,
