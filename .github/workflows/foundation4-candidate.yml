@@ -139,13 +139,13 @@ jobs:
           }
           trap cleanup EXIT
           docker network create infbyte-4-qa
-          printf 'events {}\nhttp { server { listen 8080; server_name _; location / { include /etc/nginx/fastcgi_params; fastcgi_param SCRIPT_FILENAME %s/public/index.php; fastcgi_param SCRIPT_NAME /index.php; fastcgi_pass infbyte-4-fpm:9000; } } }\n' "$GITHUB_WORKSPACE" > "$config"
+          # A real FPM pool runs as www-data; grant only that group access
+          # to generated release files, without exposing release trust world-wide.
+          sudo chgrp -R 33 "$release_root"
+          sudo chmod -R g+rX "$release_root"
+          printf 'events {}\nhttp { server { listen 8080; server_name _; location / { include /etc/nginx/fastcgi_params; fastcgi_param SCRIPT_FILENAME %s/public/index.php; fastcgi_param SCRIPT_NAME /index.php; fastcgi_param INFOCYPH_FOUNDATION_RELEASE_ROOT %s; fastcgi_param INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256 %s; fastcgi_pass infbyte-4-fpm:9000; } } }\n' "$GITHUB_WORKSPACE" "$release_root" "$trusted" > "$config"
           docker run -d --name infbyte-4-fpm --network infbyte-4-qa \
-            --user "$(id -u):$(id -g)" \
             -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$GITHUB_WORKSPACE" \
-            -e "INFOCYPH_FOUNDATION_RELEASE_ROOT=$release_root" \
-            -e "INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256=$trusted" \
-            -e APP_ENV=production \
             php:8.4-fpm -F
           docker run -d --name infbyte-4-nginx --network infbyte-4-qa -p 18781:8080 \
             -v "$config:/etc/nginx/nginx.conf:ro" nginx:alpine
