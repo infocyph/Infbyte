@@ -145,3 +145,65 @@ jobs:
           done
       - name: Run configured PHPForge CI (no suppressed failures)
         run: composer ic:ci
+
+  database-consumer:
+    name: "No-dev optional database feature lifecycle"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up PHP and Composer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pdo_sqlite, pcntl
+          tools: composer:v2
+          coverage: none
+      - name: Build clean production-like consumer from exported Infbyte
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          composer archive --format=tar --dir="$work" --file=infbyte
+          mkdir "$work/project"
+          tar -xf "$work/infbyte.tar" -C "$work/project"
+          cd "$work/project"
+          test ! -d .github
+          test ! -d docs/plans
+          composer update --no-dev --no-interaction --prefer-dist --no-progress
+          composer check-platform-reqs --no-dev
+          php infbyte app:install
+          php infbyte module:install data.database --dry-run --json=1 > "$work/dry-run.json"
+          php -r '
+            $v=json_decode(file_get_contents($argv[1]),true,flags:JSON_THROW_ON_ERROR);
+            if (($v["schema_version"] ?? null)!==2 || ($v["status"] ?? null)!=="planned") exit(1);
+          ' "$work/dry-run.json"
+          php infbyte module:install data.database --json=1 > "$work/install.json"
+          php -r '
+            $v=json_decode(file_get_contents($argv[1]),true,flags:JSON_THROW_ON_ERROR);
+            if (($v["status"] ?? null)!=="complete") exit(1);
+          ' "$work/install.json"
+          test -f config/database.php
+          php infbyte module:enable data.database --json=1 > "$work/enable.json"
+          php -r '
+            $m=require "config/modules.php";
+            if (($m["features"]["data.database"] ?? null)!==true) exit(1);
+          '
+          php infbyte module:repair data.database --json=1 > "$work/repair.json"
+          php infbyte module:disable data.database --json=1 > "$work/disable.json"
+          php -r '
+            $m=require "config/modules.php";
+            if (($m["features"]["data.database"] ?? null)!==false) exit(1);
+          '
+          php infbyte module:remove data.database --dry-run --json=1 > "$work/remove-plan.json"
+          php infbyte module:remove data.database --json=1 > "$work/remove.json"
+          test -f config/database.php
+          php -r '
+            $v=json_decode(file_get_contents($argv[1]),true,flags:JSON_THROW_ON_ERROR);
+            if (($v["status"] ?? null)!=="complete") exit(1);
+          ' "$work/remove.json"
+          php infbyte module:list --json=1 > "$work/modules.json"
+          php -r '
+            $v=json_decode(file_get_contents($argv[1]),true,flags:JSON_THROW_ON_ERROR);
+            if (($v["schema_version"] ?? null)!==2 || count($v["modules"] ?? [])!==3) exit(1);
+          ' "$work/modules.json"
