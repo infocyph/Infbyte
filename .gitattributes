@@ -4,8 +4,9 @@
 /CODE_OF_CONDUCT.md export-ignore
 /CONTRIBUTING.md export-ignore
 /plan.md export-ignore
+/docs/plans export-ignore
 /SECURITY.md export-ignore
-/tests/Feature/Foundation3RuntimeLifecycleTest.php export-ignore
+/tests/Feature/Foundation4RuntimeLifecycleTest.php export-ignore
 /tests/Feature/FoundationReleaseEntrypointTest.php export-ignore
 /tests/Feature/FrameworkRuntimeTest.php export-ignore
 /tests/Feature/ReleaseRuntimeCliTest.php export-ignore
