@@ -325,3 +325,52 @@ jobs:
             $v=json_decode(file_get_contents($argv[1]),true,flags:JSON_THROW_ON_ERROR);
             if (($v["schema_version"] ?? null)!==2) exit(1);
           ' "$work/feature.json"
+
+  create-project-consumer:
+    name: "Composer create-project / exact Infbyte PR commit"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up PHP and Composer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pcntl, pdo_sqlite
+          tools: composer:v2
+          coverage: none
+      - name: Bootstrap an independent no-dev application
+        shell: bash
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          composer create-project \
+            --repository='{"type":"vcs","url":"https://github.com/infocyph/Infbyte.git"}' \
+            --no-dev --prefer-dist --no-interaction --no-progress \
+            infocyph/infbyte "$work/project" "dev-feature/infbyte-4#$HEAD_SHA"
+          cd "$work/project"
+          test -f config/modules.php
+          test -f .env
+          test ! -d .github
+          test ! -d docs/plans
+          test ! -e composer.lock.example
+          php -r '
+            $mode=fileperms(".env") & 0777;
+            $env=file_get_contents(".env");
+            $modules=require "config/modules.php";
+            if ($mode!==0600 || ($modules["features"] ?? null)!==[]
+                || !preg_match("/^AUTH_TOKEN_SECRET=[a-f0-9]{64}$/m", $env)
+            ) exit(1);
+          '
+          APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte config:validate --production
+          APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte optimize --json=1 > "$work/release.json"
+          APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte app:ready
+          php -r '
+            $r=json_decode(file_get_contents($argv[1]),true,flags:JSON_THROW_ON_ERROR);
+            if (!is_string($r["generation"] ?? null)
+                || !is_string($r["manifest_sha256"] ?? null)
+                || !preg_match("/^[a-f0-9]{64}$/D", $r["manifest_sha256"])
+            ) exit(1);
+          ' "$work/release.json"
