@@ -409,3 +409,53 @@ jobs:
                 || !preg_match("/^[a-f0-9]{64}$/D", $r["manifest_sha256"])
             ) exit(1);
           ' "$work/release.json"
+
+  swoole-host:
+    name: "Explicit native Swoole host / PHP 8.4"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up PHP with native Swoole
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pcntl, pdo_sqlite, swoole
+          tools: composer:v2
+          coverage: none
+      - name: Exercise native Swoole host with compiled Foundation generation
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -r '
+            if (!extension_loaded("swoole")) {
+                fwrite(STDERR, "Swoole extension installation unavailable on this hosted runner." . PHP_EOL);
+                exit(1);
+            }
+          '
+          composer update --no-dev --no-interaction --prefer-dist --no-progress
+          php infbyte app:install
+          php infbyte serve --runtime=swoole --workers=1 --port=18783 --dry-run --json=1 > /tmp/infbyte-swoole-selection.json
+          php -r '
+            $v=json_decode(file_get_contents("/tmp/infbyte-swoole-selection.json"),true,flags:JSON_THROW_ON_ERROR);
+            if (($v["requested_runtime"] ?? null)!=="swoole"
+                || ($v["runtime"] ?? null)!=="swoole") exit(1);
+          '
+          php infbyte serve --runtime=swoole --workers=1 --host=127.0.0.1 --port=18783 > /tmp/infbyte-swoole-http.log 2>&1 &
+          host_pid=$!
+          trap 'kill "$host_pid" 2>/dev/null || true; wait "$host_pid" 2>/dev/null || true' EXIT
+          response=""
+          for attempt in $(seq 1 30); do
+            response="$(curl --silent --fail --max-time 2 http://127.0.0.1:18783/api/health || true)"
+            if [[ "$response" == '{"status":"ok"}' ]]; then break; fi
+            sleep 1
+          done
+          if [[ "$response" != '{"status":"ok"}' ]]; then
+            cat /tmp/infbyte-swoole-http.log >&2
+            printf 'Swoole host did not serve a valid application health response: %s\n' "$response" >&2
+            exit 1
+          fi
+          bash tests/ci/http-host-smoke.sh http://127.0.0.1:18783 120 8 | tee /tmp/infbyte-swoole-metrics.txt
+          {
+            echo '### Native Swoole — shared runner diagnostic only'
+            cat /tmp/infbyte-swoole-metrics.txt
+          } >> "$GITHUB_STEP_SUMMARY"
