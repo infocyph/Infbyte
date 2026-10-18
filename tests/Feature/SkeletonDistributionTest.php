@@ -14,6 +14,7 @@ it('ships only core application configuration before module installation', funct
         'app.php',
         'auth.php',
         'cache.php',
+        'modules.php',
         'notifications.php',
         'router.php',
     ]);
@@ -26,11 +27,13 @@ it('exports example tests while excluding repository verification tests', functi
         ->and($attributes)->toContain('/.gitattributes export-ignore')
         ->and($attributes)->not->toContain("/tests export-ignore\n")
         ->and($attributes)->toContain('/tests/Feature/FrameworkRuntimeTest.php export-ignore')
+        ->and($attributes)->toContain('/docs/plans export-ignore')
+        ->and($attributes)->toContain('/tests/ci export-ignore')
         ->and($attributes)->toContain('/tests/Feature/ReleaseRuntimeCliTest.php export-ignore')
         ->and($attributes)->toContain('/tests/Feature/SkeletonDistributionTest.php export-ignore')
         ->and($attributes)->toContain('/bootstrap/cache/*.php export-ignore')
-        ->and($attributes)->toContain('/bootstrap/cache/config/* export-ignore')
-        ->and($attributes)->toContain('/bootstrap/cache/config/.gitignore -export-ignore')
+        ->and($attributes)->toContain('/bootstrap/cache/config export-ignore')
+        ->and($attributes)->not->toContain('/bootstrap/cache/config/.gitignore -export-ignore')
         ->and($attributes)->not->toContain('/bootstrap/cache/container/')
         ->and($attributes)->not->toContain('/bootstrap/cache/routes/')
         ->and($attributes)->toContain('/storage/releases/* export-ignore')
@@ -47,7 +50,7 @@ it('uses the trusted Foundation runtime as the production web entrypoint', funct
         ->and($entrypoint)->not->toContain('AutoEmitter');
 });
 
-it('builds a clean create-project archive and provisions a Foundation 3 release generation', function (): void {
+it('builds a clean create-project archive and provisions a Foundation 4 release generation', function (): void {
     $root = dirname(__DIR__, 2);
     $fixture = sys_get_temp_dir() . '/infbyte-distribution-' . bin2hex(random_bytes(6));
     $archiveBase = $fixture . '/infbyte';
@@ -98,7 +101,7 @@ it('builds a clean create-project archive and provisions a Foundation 3 release 
         expect($project . '/composer.json')->toBeFile()
             ->and($project . '/bootstrap/install.php')->not->toBeFile()
             ->and($project . '/bootstrap/cache/.gitignore')->toBeFile()
-            ->and($project . '/bootstrap/cache/config/.gitignore')->toBeFile()
+            ->and($project . '/bootstrap/cache/config')->not->toBeDirectory()
             ->and($project . '/bootstrap/cache/container')->not->toBeDirectory()
             ->and($project . '/bootstrap/cache/routes')->not->toBeDirectory()
             ->and($project . '/storage/cache/.gitignore')->toBeFile()
@@ -109,6 +112,9 @@ it('builds a clean create-project archive and provisions a Foundation 3 release 
             ->and($project . '/.env.example')->toBeFile()
             ->and($project . '/.gitattributes')->not->toBeFile()
             ->and($project . '/.github')->not->toBeDirectory()
+            ->and($project . '/docs/plans')->not->toBeDirectory()
+            ->and($project . '/tests/ci')->not->toBeDirectory()
+            ->and($project . '/config/modules.php')->toBeFile()
             ->and($project . '/.phpforge-report')->not->toBeDirectory()
             ->and($project . '/captainhook.json')->not->toBeFile()
             ->and($project . '/composer.lock')->not->toBeFile()
@@ -121,6 +127,7 @@ it('builds a clean create-project archive and provisions a Foundation 3 release 
             ->and($project . '/tests/Unit/ExampleTest.php')->toBeFile()
             ->and($project . '/tests/Feature/FrameworkRuntimeTest.php')->not->toBeFile()
             ->and($project . '/tests/Feature/ReleaseRuntimeCliTest.php')->not->toBeFile()
+            ->and($project . '/tests/Feature/ReleaseWorkflowGuardTest.php')->not->toBeFile()
             ->and($project . '/tests/Feature/SkeletonDistributionTest.php')->not->toBeFile()
             ->and($project . '/vendor')->not->toBeDirectory()
             ->and($project . '/database')->not->toBeDirectory()

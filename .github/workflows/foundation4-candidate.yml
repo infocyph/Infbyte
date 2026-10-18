@@ -1,0 +1,468 @@
+name: "Foundation 4 Candidate Integration"
+
+on:
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
+
+jobs:
+  candidate-core:
+    name: "Foundation 4 candidate / PHP ${{ matrix.php }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ["8.4", "8.5"]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up PHP and Composer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pcntl, pdo_sqlite
+          tools: composer:v2
+          coverage: none
+      - name: Verify Composer metadata and resolve the declared Foundation 4 dependency
+        run: |
+          set -euo pipefail
+          composer validate --strict
+          composer update --no-interaction --prefer-dist --no-progress
+          php -r '
+            require "vendor/autoload.php";
+            $manifest = json_decode(file_get_contents("composer.json"), true, flags: JSON_THROW_ON_ERROR);
+            $constraint = $manifest["require"]["infocyph/foundation"] ?? "";
+            $version = Composer\InstalledVersions::getPrettyVersion("infocyph/foundation") ?? "";
+            $normalized = Composer\InstalledVersions::getVersion("infocyph/foundation") ?? "";
+            $candidate = $constraint === "dev-feature/foundation-3" && $version === $constraint;
+            $stable = $constraint === "^4.0"
+                && !isset($manifest["repositories"])
+                && preg_match("/^4\\.[0-9]+\\.[0-9]+\\.[0-9]+$/D", $normalized) === 1;
+            if (!$candidate && !$stable) {
+                fwrite(STDERR, "Unexpected Foundation dependency: " . $constraint . " resolved to " . $version . PHP_EOL);
+                exit(1);
+            }
+          '
+      - name: Verify Foundation 4 schema-v2 Core module inventory
+        run: |
+          set -euo pipefail
+          php infbyte module:list --json=1 | php -r '
+            $response = json_decode(stream_get_contents(STDIN), true, flags: JSON_THROW_ON_ERROR);
+            $modules = $response["modules"] ?? [];
+            $names = array_column($modules, "name");
+            $count = array_sum(array_map(static fn(array $group): int => count($group["features"] ?? []), $modules));
+            if (($response["schema_version"] ?? null) !== 2
+                || $names !== ["data", "security", "execution"]
+                || $count !== 8
+            ) {
+                fwrite(STDERR, "Foundation 4 module inventory is incompatible." . PHP_EOL);
+                exit(1);
+            }
+          '
+      - name: Prepare application and compile one trusted Core release
+        env:
+          APP_ENV: production
+          APP_DEBUG: "false"
+          APP_CAPABILITIES: ""
+        run: |
+          set -euo pipefail
+          php infbyte app:install
+          php infbyte config:validate --production
+          php infbyte optimize --json=1 > /tmp/infbyte-release.json
+          php infbyte app:ready
+          php -r '
+            $data = json_decode(file_get_contents("/tmp/infbyte-release.json"), true, flags: JSON_THROW_ON_ERROR);
+            $sha = $data["manifest_sha256"] ?? "";
+            if (!is_string($sha) || preg_match("/^[a-f0-9]{64}$/D", $sha) !== 1
+                || !is_string($data["generation"] ?? null)
+            ) {
+                fwrite(STDERR, "Trusted Foundation release metadata is incomplete." . PHP_EOL);
+                exit(1);
+            }
+          '
+      - name: Verify direct SAPI web host and fail-closed release trust
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_root="$(php -r '$r=json_decode(file_get_contents("/tmp/infbyte-release.json"),true,flags:JSON_THROW_ON_ERROR); echo $r["release_root"];')"
+          trusted="$(php -r '$r=json_decode(file_get_contents("/tmp/infbyte-release.json"),true,flags:JSON_THROW_ON_ERROR); echo $r["manifest_sha256"];')"
+          INFOCYPH_FOUNDATION_RELEASE_ROOT="$release_root" INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256="$trusted" \
+            php -S 127.0.0.1:18778 -t public public/index.php >/tmp/infbyte-direct-http.log 2>&1 &
+          host_pid=$!
+          trap 'kill "$host_pid" 2>/dev/null || true; wait "$host_pid" 2>/dev/null || true' EXIT
+          response=""
+          for attempt in $(seq 1 20); do
+            response="$(curl --silent --fail --max-time 2 http://127.0.0.1:18778/api/health || true)"
+            if [[ "$response" == '{"status":"ok"}' ]]; then break; fi
+            sleep 1
+          done
+          if [[ "$response" != '{"status":"ok"}' ]]; then
+            cat /tmp/infbyte-direct-http.log >&2
+            printf 'Trusted direct HTTP host did not return a valid health response. Got: %s\n' "$response" >&2
+            exit 1
+          fi
+          json="$(curl --silent --fail --max-time 2 http://127.0.0.1:18778/json)"
+          printf '%s' "$json" | php -r '$v=json_decode(stream_get_contents(STDIN),true,flags:JSON_THROW_ON_ERROR); if (!is_int($v["memory"] ?? null)) exit(1);'
+          kill "$host_pid"
+          wait "$host_pid" 2>/dev/null || true
+          trap - EXIT
+          wrong_trust="$(printf '%064d' 0)"
+          INFOCYPH_FOUNDATION_RELEASE_ROOT="$release_root" INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256="$wrong_trust" \
+            php -S 127.0.0.1:18779 -t public public/index.php >/tmp/infbyte-badtrust-http.log 2>&1 &
+          bad_pid=$!
+          trap 'kill "$bad_pid" 2>/dev/null || true; wait "$bad_pid" 2>/dev/null || true' EXIT
+          bad_status=""
+          for attempt in $(seq 1 20); do
+            bad_status="$(curl --silent --output /tmp/infbyte-badtrust-body --write-out '%{http_code}' --max-time 2 http://127.0.0.1:18779/api/health || true)"
+            if [[ "$bad_status" =~ ^[1-5][0-9][0-9]$ ]]; then break; fi
+            sleep 1
+          done
+          if [[ "$bad_status" != 500 ]]; then
+            cat /tmp/infbyte-badtrust-http.log >&2
+            printf 'Tampered manifest must fail closed with HTTP 500, got %s\n' "$bad_status" >&2
+            exit 1
+          fi
+          if grep -q '"status":"ok"' /tmp/infbyte-badtrust-body; then
+            printf 'Untrusted generation returned a successful body.\n' >&2
+            exit 1
+          fi
+      - name: Verify real nginx and PHP-FPM host against trusted release
+        if: matrix.php == '8.4'
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_root="$(php -r '$v=json_decode(file_get_contents("/tmp/infbyte-release.json"),true,flags:JSON_THROW_ON_ERROR); echo $v["release_root"];')"
+          trusted="$(php -r '$v=json_decode(file_get_contents("/tmp/infbyte-release.json"),true,flags:JSON_THROW_ON_ERROR); echo $v["manifest_sha256"];')"
+          config="$(mktemp)"
+          cleanup() {
+            docker rm -f infbyte-4-nginx infbyte-4-fpm 2>/dev/null || true
+            docker network rm infbyte-4-qa 2>/dev/null || true
+            rm -f "$config"
+          }
+          trap cleanup EXIT
+          docker network create infbyte-4-qa
+          # A real FPM pool runs as www-data; grant only that group access
+          # to generated release files, without exposing release trust world-wide.
+          sudo chgrp -R 33 "$release_root"
+          sudo chmod -R g+rX "$release_root"
+          printf 'events {}\nhttp { server { listen 8080; server_name _; location / { include /etc/nginx/fastcgi_params; fastcgi_param SCRIPT_FILENAME %s/public/index.php; fastcgi_param SCRIPT_NAME /index.php; fastcgi_param INFOCYPH_FOUNDATION_RELEASE_ROOT %s; fastcgi_param INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256 %s; fastcgi_pass infbyte-4-fpm:9000; } } }\n' "$GITHUB_WORKSPACE" "$release_root" "$trusted" > "$config"
+          docker run -d --name infbyte-4-fpm --network infbyte-4-qa \
+            -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$GITHUB_WORKSPACE" \
+            php:8.4-fpm -F
+          docker run -d --name infbyte-4-nginx --network infbyte-4-qa -p 18781:8080 \
+            -v "$config:/etc/nginx/nginx.conf:ro" nginx:alpine
+          response=""
+          for attempt in $(seq 1 35); do
+            response="$(curl --silent --fail --max-time 2 http://127.0.0.1:18781/api/health || true)"
+            if [[ "$response" == '{"status":"ok"}' ]]; then break; fi
+            sleep 1
+          done
+          if [[ "$response" != '{"status":"ok"}' ]]; then
+            docker logs infbyte-4-fpm >&2 || true
+            docker logs infbyte-4-nginx >&2 || true
+            printf 'Real nginx/FPM host failed its trusted application health: %s\n' "$response" >&2
+            exit 1
+          fi
+          seq 1 24 | xargs -P 6 -I '{}' bash -c \
+            'response="$(curl --silent --fail --max-time 4 http://127.0.0.1:18781/api/health)" && [[ "$response" == '\''{"status":"ok"}'\'' ]]'
+          bash tests/ci/http-host-smoke.sh http://127.0.0.1:18781 240 12 | tee /tmp/infbyte-fpm-metrics.txt
+          {
+            echo '### nginx + PHP-FPM — shared runner diagnostic only'
+            cat /tmp/infbyte-fpm-metrics.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify native Runwire HTTP serving
+        shell: bash
+        run: |
+          set -euo pipefail
+          php infbyte serve --runtime=native --workers=1 --host=127.0.0.1 --port=18780 > /tmp/infbyte-runwire-http.log 2>&1 &
+          serve_pid=$!
+          trap 'kill "$serve_pid" 2>/dev/null || true; wait "$serve_pid" 2>/dev/null || true' EXIT
+          response=""
+          for attempt in $(seq 1 20); do
+            response="$(curl --silent --fail --max-time 2 http://127.0.0.1:18780/api/health || true)"
+            if [[ "$response" == '{"status":"ok"}' ]]; then break; fi
+            sleep 1
+          done
+          if [[ "$response" != '{"status":"ok"}' ]]; then
+            cat /tmp/infbyte-runwire-http.log >&2
+            printf 'Native Runwire failed to serve application health. Got: %s\n' "$response" >&2
+            exit 1
+          fi
+          for request in $(seq 1 12); do
+            curl --silent --fail --max-time 3 http://127.0.0.1:18780/api/health | \
+              php -r '$v=json_decode(stream_get_contents(STDIN),true,flags:JSON_THROW_ON_ERROR); if (($v["status"] ?? null) !== "ok") exit(1);'
+          done
+          seq 1 48 | xargs -P 8 -I '{}' bash -c \
+            'response="$(curl --silent --fail --max-time 5 http://127.0.0.1:18780/api/health)" && [[ "$response" == '\''{"status":"ok"}'\'' ]]'
+          rss_before="$(ps -o rss= -p "$serve_pid" | tr -d ' ')"
+          bash tests/ci/http-host-smoke.sh http://127.0.0.1:18780 240 12 | tee /tmp/infbyte-runwire-metrics.txt
+          rss_after="$(ps -o rss= -p "$serve_pid" | tr -d ' ')"
+          {
+            echo '### Native Runwire — shared runner diagnostic only'
+            cat /tmp/infbyte-runwire-metrics.txt
+            printf 'Supervisor RSS before=%s KiB after=%s KiB\n' "$rss_before" "$rss_after"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Exercise non-root application deployment wrapper
+        if: matrix.php == '8.4'
+        shell: bash
+        env:
+          APP_ENV: production
+          APP_DEBUG: "false"
+          APP_CAPABILITIES: ""
+        run: |
+          set -euo pipefail
+          test "$(id -u)" -ne 0
+          bash deploy.sh --no-optimize > /tmp/infbyte-deploy-preflight.log
+          grep -q 'Runtime directories are writable' /tmp/infbyte-deploy-preflight.log
+          bash deploy.sh > /tmp/infbyte-deploy-build.log
+          grep -q 'Foundation 4 release generation is ready' /tmp/infbyte-deploy-build.log
+          grep -q '^export INFOCYPH_FOUNDATION_RELEASE_ROOT=' /tmp/infbyte-deploy-build.log
+          grep -q '^export INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256=' /tmp/infbyte-deploy-build.log
+      - name: Run configured PHPForge CI (no suppressed failures)
+        run: composer ic:ci
+
+  database-consumer:
+    name: "No-dev optional database feature lifecycle"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up PHP and Composer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pdo_sqlite, pcntl
+          tools: composer:v2
+          coverage: none
+      - name: Build clean production-like consumer from exported Infbyte
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          composer archive --format=tar --dir="$work" --file=infbyte
+          mkdir "$work/project"
+          tar -xf "$work/infbyte.tar" -C "$work/project"
+          cd "$work/project"
+          test ! -d .github
+          test ! -d docs/plans
+          composer update --no-dev --no-interaction --prefer-dist --no-progress
+          composer check-platform-reqs --no-dev
+          php infbyte app:install
+          php infbyte module:install data.database --dry-run --json=1 > "$work/dry-run.json"
+          php -r '
+            $v=json_decode(file_get_contents($argv[1]),true,flags:JSON_THROW_ON_ERROR);
+            if (($v["schema_version"] ?? null)!==2 || ($v["status"] ?? null)!=="planned") exit(1);
+          ' "$work/dry-run.json"
+          php infbyte module:install data.database --json=1 > "$work/install.json"
+          php -r '
+            $v=json_decode(file_get_contents($argv[1]),true,flags:JSON_THROW_ON_ERROR);
+            if (($v["status"] ?? null)!=="complete") exit(1);
+          ' "$work/install.json"
+          test -f config/database.php
+          php infbyte module:enable data.database --json=1 > "$work/enable.json"
+          php -r '
+            $m=require "config/modules.php";
+            if (($m["features"]["data.database"] ?? null)!==true) exit(1);
+          '
+          mkdir -p storage/app
+          # Application-owned SQLite data stays outside Composer-managed packages.
+          # Verify state preservation through module lifecycle and recovery from
+          # a deployment-maintained backup rather than deleting user data.
+          php -r '
+            $db=new PDO("sqlite:storage/app/records.sqlite");
+            $db->exec("CREATE TABLE retained (id INTEGER PRIMARY KEY, content TEXT NOT NULL)");
+            $db->exec("INSERT INTO retained (content) VALUES (\x27before-module-change\x27)");
+          '
+          cp storage/app/records.sqlite "$work/records.sqlite.backup"
+          php infbyte module:repair data.database --json=1 > "$work/repair.json"
+          php infbyte module:disable data.database --json=1 > "$work/disable.json"
+          php -r '
+            $m=require "config/modules.php";
+            if (($m["features"]["data.database"] ?? null)!==false) exit(1);
+          '
+          php infbyte module:remove data.database --dry-run --json=1 > "$work/remove-plan.json"
+          php infbyte module:remove data.database --json=1 > "$work/remove.json"
+          test -f config/database.php
+          php -r '
+            $v=json_decode(file_get_contents($argv[1]),true,flags:JSON_THROW_ON_ERROR);
+            if (($v["status"] ?? null)!=="complete") exit(1);
+          ' "$work/remove.json"
+          php -r '
+            $db=new PDO("sqlite:storage/app/records.sqlite");
+            $saved=$db->query("SELECT content FROM retained WHERE id=1")->fetchColumn();
+            if ($saved!=="before-module-change") exit(1);
+          '
+          mv storage/app/records.sqlite storage/app/records.sqlite.quarantined
+          cp "$work/records.sqlite.backup" storage/app/records.sqlite
+          php -r '
+            $db=new PDO("sqlite:storage/app/records.sqlite");
+            if ($db->query("SELECT content FROM retained")->fetchColumn()!=="before-module-change") exit(1);
+          '
+          test -f storage/app/records.sqlite.quarantined
+          php infbyte module:list --json=1 > "$work/modules.json"
+          php -r '
+            $v=json_decode(file_get_contents($argv[1]),true,flags:JSON_THROW_ON_ERROR);
+            if (($v["schema_version"] ?? null)!==2 || count($v["modules"] ?? [])!==3) exit(1);
+          ' "$work/modules.json"
+
+  selected-features:
+    name: "No-dev selected feature / ${{ matrix.feature }}"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        feature:
+          - data.database
+          - data.filesystem
+          - security.crypto
+          - security.validation
+          - security.mfa
+          - security.passkey
+          - execution.messaging
+          - execution.communication
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up PHP and Composer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pcntl, pdo_sqlite, fileinfo, mbstring, ctype, sodium
+          tools: composer:v2
+          coverage: none
+      - name: Install only selected optional feature into clean production consumer
+        shell: bash
+        env:
+          FEATURE: ${{ matrix.feature }}
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          composer archive --format=tar --dir="$work" --file=infbyte
+          mkdir "$work/project"
+          tar -xf "$work/infbyte.tar" -C "$work/project"
+          cd "$work/project"
+          test ! -e composer.lock
+          test ! -d docs/plans
+          composer update --no-dev --no-interaction --prefer-dist --no-progress
+          php infbyte app:install
+          php infbyte module:install "$FEATURE" --json=1 > "$work/install.json"
+          php -r '
+            $v=json_decode(file_get_contents($argv[1]),true,flags:JSON_THROW_ON_ERROR);
+            if (($v["schema_version"] ?? null)!==2 || ($v["status"] ?? null)!=="complete") exit(1);
+          ' "$work/install.json"
+          php infbyte module:enable "$FEATURE" --json=1 > "$work/enable.json"
+          php -r '
+            $selection=require "config/modules.php";
+            if (($selection["features"][$argv[1]] ?? null)!==true) exit(1);
+          ' "$FEATURE"
+          composer check-platform-reqs --no-dev
+          php infbyte module:show "$FEATURE" --json=1 > "$work/feature.json"
+          php -r '
+            $v=json_decode(file_get_contents($argv[1]),true,flags:JSON_THROW_ON_ERROR);
+            if (($v["schema_version"] ?? null)!==2) exit(1);
+          ' "$work/feature.json"
+
+  create-project-consumer:
+    name: "Composer create-project / exact Infbyte PR commit"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up PHP and Composer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pcntl, pdo_sqlite
+          tools: composer:v2
+          coverage: none
+      - name: Bootstrap an independent no-dev application
+        shell: bash
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          composer create-project \
+            --repository='{"type":"vcs","url":"https://github.com/infocyph/Infbyte.git"}' \
+            --no-dev --prefer-dist --no-interaction --no-progress \
+            infocyph/infbyte "$work/project" "dev-feature/infbyte-4#$HEAD_SHA"
+          cd "$work/project"
+          test -f config/modules.php
+          test -f .env
+          test ! -d .github
+          test ! -d docs/plans
+          test ! -e composer.lock.example
+          php -r '
+            $mode=fileperms(".env") & 0777;
+            $env=file_get_contents(".env");
+            $modules=require "config/modules.php";
+            if ($mode!==0600 || ($modules["features"] ?? null)!==[]
+                || !preg_match("/^AUTH_TOKEN_SECRET=[a-f0-9]{64}$/m", $env)
+            ) exit(1);
+          '
+          APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte config:validate --production
+          APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte optimize --json=1 > "$work/release.json"
+          APP_ENV=production APP_DEBUG=false APP_CAPABILITIES= php infbyte app:ready
+          php -r '
+            $r=json_decode(file_get_contents($argv[1]),true,flags:JSON_THROW_ON_ERROR);
+            if (!is_string($r["generation"] ?? null)
+                || !is_string($r["manifest_sha256"] ?? null)
+                || !preg_match("/^[a-f0-9]{64}$/D", $r["manifest_sha256"])
+            ) exit(1);
+          ' "$work/release.json"
+
+  swoole-host:
+    name: "Explicit native Swoole host / PHP 8.4"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up PHP with native Swoole
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pcntl, pdo_sqlite, swoole
+          tools: composer:v2
+          coverage: none
+      - name: Exercise native Swoole host with compiled Foundation generation
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -r '
+            if (!extension_loaded("swoole")) {
+                fwrite(STDERR, "Swoole extension installation unavailable on this hosted runner." . PHP_EOL);
+                exit(1);
+            }
+          '
+          composer update --no-dev --no-interaction --prefer-dist --no-progress
+          php infbyte app:install
+          php infbyte serve --runtime=swoole --workers=1 --port=18783 --dry-run --json=1 > /tmp/infbyte-swoole-selection.json
+          php -r '
+            $v=json_decode(file_get_contents("/tmp/infbyte-swoole-selection.json"),true,flags:JSON_THROW_ON_ERROR);
+            if (($v["requested_runtime"] ?? null)!=="swoole"
+                || ($v["runtime"] ?? null)!=="swoole") exit(1);
+          '
+          php infbyte serve --runtime=swoole --workers=1 --host=127.0.0.1 --port=18783 > /tmp/infbyte-swoole-http.log 2>&1 &
+          host_pid=$!
+          trap 'kill "$host_pid" 2>/dev/null || true; wait "$host_pid" 2>/dev/null || true' EXIT
+          response=""
+          for attempt in $(seq 1 30); do
+            response="$(curl --silent --fail --max-time 2 http://127.0.0.1:18783/api/health || true)"
+            if [[ "$response" == '{"status":"ok"}' ]]; then break; fi
+            sleep 1
+          done
+          if [[ "$response" != '{"status":"ok"}' ]]; then
+            cat /tmp/infbyte-swoole-http.log >&2
+            printf 'Swoole host did not serve a valid application health response: %s\n' "$response" >&2
+            exit 1
+          fi
+          bash tests/ci/http-host-smoke.sh http://127.0.0.1:18783 120 8 | tee /tmp/infbyte-swoole-metrics.txt
+          {
+            echo '### Native Swoole — shared runner diagnostic only'
+            cat /tmp/infbyte-swoole-metrics.txt
+          } >> "$GITHUB_STEP_SUMMARY"

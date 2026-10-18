@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use Composer\InstalledVersions;
 
-it('requires an explicit Foundation 3 capability topology', function (): void {
+it('requires an explicit Foundation 4 capability topology', function (): void {
     $appConfig = file_get_contents(dirname(__DIR__, 2) . '/config/app.php');
 
     expect($appConfig)->toBeString()
@@ -22,7 +22,7 @@ it('keeps production release trust outside project configuration', function (): 
         ->and($example)->not->toContain('INFOCYPH_FOUNDATION_RELEASE_ROOT');
 });
 
-it('consumes the stable Foundation 3 package and released core cache template', function (): void {
+it('resolves the declared Foundation 4 dependency without activating optional modules', function (): void {
     $root = dirname(__DIR__, 2);
     $composer = json_decode(
         (string) file_get_contents($root . '/composer.json'),
@@ -32,11 +32,23 @@ it('consumes the stable Foundation 3 package and released core cache template', 
 
     $version = InstalledVersions::getPrettyVersion('infocyph/foundation');
     $foundationPath = InstalledVersions::getInstallPath('infocyph/foundation');
+    $constraint = $composer['require']['infocyph/foundation'] ?? '';
 
-    expect($composer['require']['infocyph/foundation'] ?? null)->toBe('^3.0.1')
+    expect($constraint)->toBeIn(['dev-feature/foundation-3', '^4.0'])
         ->and($version)->toBeString()
-        ->and(str_starts_with($version, 'dev-'))->toBeFalse()
-        ->and($foundationPath)->toBeString();
+        ->and($foundationPath)->toBeString()
+        ->and($root . '/config/modules.php')->toBeFile();
+
+    if ($constraint === '^4.0') {
+        expect($composer)->not->toHaveKey('repositories')
+            ->and(InstalledVersions::getVersion('infocyph/foundation'))->toMatch('/^4\.[0-9]+\.[0-9]+\.[0-9]+$/D');
+    } else {
+        expect($version)->toBe($constraint)
+            ->and($composer['repositories'][0]['url'] ?? null)->toBe('https://github.com/infocyph/Foundation');
+    }
+
+    $modules = require $root . '/config/modules.php';
+    expect($modules)->toBe(['features' => []]);
 
     $releasedCache = file_get_contents($foundationPath . '/resources/config/cache.php');
     $skeletonCache = file_get_contents($root . '/config/cache.php');
@@ -66,18 +78,27 @@ it('keeps production auth secrets indirect and hardened cache resources opt in',
         ->and($cache)->toContain("'valkey' => [");
 });
 
-it('documents the released module and cache lifecycle without pre-tag paths', function (): void {
+it('documents the Foundation 4 feature and Core cache lifecycle', function (): void {
     $readme = file_get_contents(dirname(__DIR__, 2) . '/README.md');
     $auth = file_get_contents(dirname(__DIR__, 2) . '/config/auth.php');
 
     expect($readme)->toBeString()
-        ->and($readme)->toContain('"infocyph/foundation": "^3.0"')
+        ->and($readme)->toContain('^4.0')
         ->and($readme)->toContain('cache:schema:status')
         ->and($readme)->toContain('cache:schema:install')
         ->and($readme)->not->toContain('php infbyte module:install cache')
         ->and($readme)->not->toContain('foundation-3/close-26.6')
         ->and($auth)->toBeString()
         ->and($auth)->not->toContain('module:install cache')
-        ->and($auth)->toContain('module:install auth --feature=otp')
-        ->and($auth)->toContain('module:install auth --feature=passkey');
+        ->and($auth)->toContain('security.mfa + security.crypto')
+        ->and($auth)->toContain('security.passkey');
+});
+
+it('exposes Foundation 4 three-module eight-feature catalog as a read-only Core service', function (): void {
+    $inventory = new \Infocyph\Foundation\Module\ModuleFeatureCommandCatalog()->inventory();
+    $groups = $inventory['modules'];
+
+    expect($inventory['schema_version'])->toBe(2)
+        ->and(array_column($groups, 'name'))->toBe(['data', 'security', 'execution'])
+        ->and(array_sum(array_map(static fn(array $group): int => count($group['features']), $groups)))->toBe(8);
 });

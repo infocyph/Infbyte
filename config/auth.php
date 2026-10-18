@@ -12,21 +12,19 @@ return [
     | only replaceable authentication capabilities. The dependency-light
     | defaults work without optional modules.
     |
-    | Optional choices map to purpose-level modules:
-    |   storage=database             -> module:install database
-    |   cache=cache                  -> enable the core cache capability
-    |   passwords/tokens=security    -> module:install security
-    |   mfa=otp                      -> module:install auth --feature=otp
-    |   passkey=webauthn             -> module:install auth --feature=passkey
-    |   notifications=talkingbytes   -> module:install communication
+    | Foundation 4 groups optional capabilities into qualified features:
+    |   storage=database             -> data.database
+    |   passwords/tokens=security    -> security.crypto
+    |   mfa=otp                      -> security.mfa + security.crypto
+    |   passkey=webauthn             -> security.passkey
+    |   notifications=talkingbytes  -> execution.communication
     |
-    | Module installation also synchronizes database schemas required by the
-    | active configuration. Database-backed authentication uses the auth schema;
-    | inspect or provision it explicitly with `module:schema:status auth` and
-    | `module:schema:install auth` when preparing persistence ahead of activation.
-    |
-    | OTP and WebAuthn remain independently selectable features of the auth
-    | module. Package installation follows the explicitly selected feature set.
+    | CacheLayer is Foundation Core, never an optional module. Install each
+    | selected feature explicitly and enable it in config/modules.php.
+    | Installing a package does not implicitly enable that feature.
+    | Core auth/session schema is managed by Foundation, not by the
+    | optional module schema commands. Optional schema belongs to its
+    | selected specialist.
     |
     */
     'drivers' => [
@@ -36,7 +34,7 @@ return [
         'tokens' => env_string('AUTH_TOKENS', 'simple'),
         'mfa' => env_string('AUTH_MFA', 'simple'),
         'notifications' => env_string('AUTH_NOTIFICATIONS', 'collect'),
-        'passkey' => env_string('AUTH_PASSKEY', 'disabled'),
+        'passkey' => env_string('AUTH_PASSKEY', 'memory'),
     ],
 
     /*
@@ -56,8 +54,8 @@ return [
     | One-Time Passwords
     |--------------------------------------------------------------------------
     |
-    | OTP-backed MFA is provided by the auth module. Enable it with AUTH_MFA=otp
-    | after installing the module. Replay-safe production use also requires the
+    | OTP-backed MFA selects security.mfa plus security.crypto. Enable it
+    | explicitly before setting AUTH_MFA=otp. Replay-safe production use also requires the
     | configured shared cache/coordination capability.
     |
     */
@@ -88,8 +86,8 @@ return [
     | WebAuthn / Passkeys
     |--------------------------------------------------------------------------
     |
-    | WebAuthn is provided by the auth module. Enable it with
-    | AUTH_PASSKEY=webauthn after installing that module.
+    | WebAuthn requires security.passkey. Select and enable that feature
+    | explicitly before setting AUTH_PASSKEY=webauthn.
     |
     */
     'webauthn' => [

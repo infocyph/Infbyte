@@ -4,11 +4,15 @@
 /CODE_OF_CONDUCT.md export-ignore
 /CONTRIBUTING.md export-ignore
 /plan.md export-ignore
+/docs/plans export-ignore
 /SECURITY.md export-ignore
-/tests/Feature/Foundation3RuntimeLifecycleTest.php export-ignore
+/tests/ci export-ignore
+/tests/Feature/Foundation4RuntimeLifecycleTest.php export-ignore
+/tests/Feature/Foundation4ModuleIntegrationTest.php export-ignore
 /tests/Feature/FoundationReleaseEntrypointTest.php export-ignore
 /tests/Feature/FrameworkRuntimeTest.php export-ignore
 /tests/Feature/ReleaseRuntimeCliTest.php export-ignore
+/tests/Feature/ReleaseWorkflowGuardTest.php export-ignore
 /tests/Feature/SkeletonDistributionTest.php export-ignore
 /.agents export-ignore
 /.codex export-ignore
@@ -36,8 +40,7 @@
 /app/Support export-ignore
 /bin export-ignore
 /bootstrap/cache/*.php export-ignore
-/bootstrap/cache/config/* export-ignore
-/bootstrap/cache/config/.gitignore -export-ignore
+/bootstrap/cache/config export-ignore
 /database export-ignore
 /resources export-ignore
 /storage/app export-ignore
