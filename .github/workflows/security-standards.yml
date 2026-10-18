@@ -46,7 +46,6 @@ jobs:
           '
 
   phpforge:
-    name: "Published Foundation 4 full PHPForge release guard"
     needs: stable-constraint
     uses: infocyph/phpforge/.github/workflows/security-standards.yml@main
     with:
