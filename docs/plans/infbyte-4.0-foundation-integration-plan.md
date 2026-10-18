@@ -10,6 +10,18 @@
 
 ## 1. Objective and source of truth
 
+**Required PR check correction (2026-10-18):** The thirteen passing candidate
+jobs did not satisfy the repository ruleset's four original required PHPForge
+checks. Restore PR events in `Security & Standards` and run its unchanged
+`phpforge` reusable job without a stable-release dependency or custom job name.
+The PHP 8.4/8.5 analysis and prefer-stable QA contexts must actually run and
+pass on the current PR revision. Published Core/DBLayer consumers still depend
+on both PHPForge and the stable-constraint guard; that guard applies to
+main/tag/manual release events, preserving genuine published-package acceptance.
+Branch protection is not weakened or renamed. Earlier candidate-only green
+runs below are not proof that the required PR check set was satisfied.
+
+
 **Current verification (2026-10-18):** [candidate acceptance attempt 3](https://github.com/infocyph/Infbyte/actions/runs/39090393036/attempts/3)
 finishes **SUCCESS, 13/13 jobs**, at application source
 `a8e908cb677f95fe50de5e7f2dfd0c8843d331bf`. Its actual PHP 8.5 Composer log

@@ -4,6 +4,21 @@ declare(strict_types=1);
 
 use Symfony\Component\Yaml\Yaml;
 
+it('reports the existing required PHPForge checks on pull requests', function (): void {
+    $workflow = Yaml::parseFile(dirname(__DIR__, 2) . '/.github/workflows/security-standards.yml');
+    $phpforge = $workflow['jobs']['phpforge'];
+
+    expect($workflow['name'])->toBe('Security & Standards')
+        ->and($workflow['on']['pull_request']['branches'] ?? [])->toContain('main', 'master', 'develop', 'development')
+        ->and($phpforge)->not->toHaveKey('name')
+        ->not->toHaveKey('if')
+        ->not->toHaveKey('needs')
+        ->and($phpforge['uses'])->toBe('infocyph/phpforge/.github/workflows/security-standards.yml@main')
+        ->and(json_decode($phpforge['with']['php_versions'], true, flags: JSON_THROW_ON_ERROR))->toBe(['8.4', '8.5'])
+        ->and(json_decode($phpforge['with']['dependency_versions'], true, flags: JSON_THROW_ON_ERROR))->toBe(['prefer-lowest', 'prefer-stable'])
+        ->and($phpforge['with']['fail_on_skipped_tests'])->toBeTrue();
+});
+
 it('requires tagged Infbyte releases to pass stable Foundation and published consumer gates', function (): void {
     $workflow = Yaml::parseFile(dirname(__DIR__, 2) . '/.github/workflows/security-standards.yml');
     $jobs = $workflow['jobs'];
@@ -11,11 +26,11 @@ it('requires tagged Infbyte releases to pass stable Foundation and published con
     expect($jobs['release']['needs'] ?? [])->toContain('published-core', 'published-database')
         ->and($jobs['release']['if'])->toContain("startsWith(github.ref, 'refs/tags/')")
         ->not->toContain('always(', 'failure(', 'cancelled(')
-        ->and($jobs['phpforge']['needs'])->toBe('stable-constraint')
-        ->and($jobs['published-core']['needs'])->toBe('phpforge')
+        ->and($jobs['stable-constraint']['if'])->toBe("github.event_name != 'pull_request'")
+        ->and($jobs['published-core']['needs'])->toContain('stable-constraint', 'phpforge')
         ->and($jobs['published-database']['needs'])->toBe('published-core');
 
-    foreach (['stable-constraint', 'phpforge', 'published-core', 'published-database'] as $job) {
+    foreach (['phpforge', 'published-core', 'published-database'] as $job) {
         expect($jobs[$job]['if'] ?? null)->toBeNull();
     }
 });

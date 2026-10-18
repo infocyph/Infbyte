@@ -1,9 +1,10 @@
 name: "Security & Standards"
 
-# This is the release boundary, not the PR candidate lane. Candidate checks
-# live in foundation4-candidate.yml and run on every PR. This workflow must
-# reject development branches or VCS overrides before any release qualification.
+# Keep the existing required PHPForge checks on PRs. Published-package consumers
+# additionally require the stable constraint guard on release events.
 on:
+  pull_request:
+    branches: [ "main", "master", "develop", "development" ]
   push:
     branches: [ "main", "master" ]
     tags: [ "v*", "[0-9]*" ]
@@ -28,6 +29,7 @@ jobs:
       COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
   stable-constraint:
     name: "Reject non-stable Foundation or VCS overrides"
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -46,7 +48,6 @@ jobs:
           '
 
   phpforge:
-    needs: stable-constraint
     uses: infocyph/phpforge/.github/workflows/security-standards.yml@main
     with:
       php_versions: '["8.4","8.5"]'
@@ -63,7 +64,7 @@ jobs:
 
   published-core:
     name: "Published Core-only archive and immutable release / PHP ${{ matrix.php }}"
-    needs: phpforge
+    needs: [stable-constraint, phpforge]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
