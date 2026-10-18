@@ -3,12 +3,30 @@
 > **Status:** **Infbyte 4 candidate implementation and application-owned QA completed** (13/13 checks). Only **published Foundation 4 resolution and Foundation-owned release certification** remain; no merge/tag/publish. Framework-private host internals and optional unselected services are not Infbyte application implementation work.  
 > **Working branch:** `feature/infbyte-4` (single active implementation branch).  
 > **Base:** Infbyte `main` at `1a968ad72a5ec785e7227459e722ea8982038700`.  
-> **Foundation target:** [Foundation PR #20](https://github.com/infocyph/Foundation/pull/20), branch `feature/foundation-3`; inspected branch head `596825a563f2c3274c4167bd24fbe86a4531fbba` (2026-10-17). Candidate application source cited in release evidence: `3f295de1a2a5a6287d016de8afe0903a0907e675`.  
-> **Date:** 2026-10-17. **Release status:** Foundation 4.0 is not yet tagged/release-ready; its sustained paired-performance and final acceptance gates remain open.  
+> **Foundation target:** [Foundation PR #20](https://github.com/infocyph/Foundation/pull/20), branch `feature/foundation-3`; validated executable source `d2954021adf346aa84ffcff1c95d41678deb2a8d` (2026-10-18). Earlier source identities in the journal are historical checkpoints.
+> **Date:** 2026-10-18. **Release status:** Foundation 4.0 is not yet tagged/release-ready; its sustained paired-performance and final acceptance gates remain open.
 > **Implementation cadence:** one complete batch → focused tests → full applicable QA → record source/CI evidence → update this tracker → next batch.  
 > **Owner boundary:** modify **Infbyte only**; Foundation `feature/foundation-3` is read-only reference. No merges, tags, publication, or deletion of historical branches.
 
 ## 1. Objective and source of truth
+
+**Current verification (2026-10-18):** [candidate acceptance attempt 2](https://github.com/infocyph/Infbyte/actions/runs/39048507633/attempts/2)
+passes all 13 jobs at Infbyte `fcc28244846c158ff7c6d3e9f7d0f7f4fe165882`.
+Composer logs verify exact Foundation `d295402`; local installation is refreshed
+to that same source and the focused lifecycle/entrypoint/module suite passes
+13 tests / 86 assertions. The full local suite also passes 51 tests / 395
+assertions with socket capability access. Foundation's renewed full performance comparison
+[39055428140](https://github.com/infocyph/Foundation/actions/runs/39055428140)
+has seven passes, zero stable regressions and five inconclusive cases; its
+independent FPM confirmation is also inconclusive. These remain Foundation-owned
+release blockers. Infbyte's stable `^4.0` manifest without VCS repositories is
+prepared separately and must resolve a genuinely published Foundation 4 before
+stable/lowest release qualification. No publication gate is closed by candidate CI.
+
+The [release handoff](infbyte-4.0-release-handoff.md) includes a concrete,
+unapplied [manifest/README cutover patch](infbyte-4.0-stable-cutover.patch).
+Application of the patch and strict prospective manifest validation pass;
+published dependency resolution remains an operator-publication prerequisite.
 
 Build **one** clean, Foundation-4-native Infbyte application skeleton rather than merge three obsolete Foundation-3 branch histories. Infbyte owns the application/distribution interface (bootstrap, app config, sample routes/controllers, root CLI forwarding, deployment, docs and application-level validation); Foundation 4 owns application composition, compiled releases, native integrations and policy; Webrick owns HTTP/routing, InterMix owns DI, Runwire owns host runtime and worker lifecycle, ArrayKit owns config primitives and CacheLayer owns cache/locks.
 

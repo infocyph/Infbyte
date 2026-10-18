@@ -1,0 +1,84 @@
+diff --git a/composer.json b/composer.json
+index 7c2defc..4c1d299 100644
+--- a/composer.json
++++ b/composer.json
+@@ -5,17 +5,11 @@
+     "type": "project",
+     "require": {
+         "php": "^8.4",
+-        "infocyph/foundation": "dev-feature/foundation-3"
++        "infocyph/foundation": "^4.0"
+     },
+     "require-dev": {
+         "infocyph/phpforge": "dev-main@dev"
+     },
+-    "repositories": [
+-        {
+-            "type": "vcs",
+-            "url": "https://github.com/infocyph/Foundation"
+-        }
+-    ],
+     "autoload": {
+         "psr-4": {
+             "App\\": "app/"
+diff --git a/README.md b/README.md
+index 837e72e..82fe915 100644
+--- a/README.md
++++ b/README.md
+@@ -2,16 +2,13 @@
+ 
+ Infbyte is the minimal application skeleton for [Infocyph Foundation](https://github.com/infocyph/Foundation). It owns application routes, controllers, configuration, project structure and deployment decisions. Foundation and its native dependencies own the framework and runtime mechanisms.
+ 
+-## Foundation 4 development integration
++## Foundation 4
+ 
+-**This development branch follows Foundation `feature/foundation-3`, the Foundation 4.0 candidate.** Its `composer.json` temporarily requires `dev-feature/foundation-3` using the Foundation GitHub VCS source. That is an integration dependency, **not** a stable Foundation 4 publication or a production release instruction.
++Infbyte 4 requires published Foundation `^4.0` through ordinary Composer resolution, without development VCS overrides. Foundation provides the framework composition and policy; its native libraries retain their mechanisms.
+ 
+ - PHP 8.4+ (64-bit) and Composer 2.
+-- [Foundation candidate source](https://github.com/infocyph/Foundation/tree/feature/foundation-3)
+-- [Current Foundation 4 contract](https://github.com/infocyph/Foundation/blob/feature/foundation-3/docs/foundation-4-api-map.md)
+-- [Infbyte integration tracker](https://github.com/infocyph/Infbyte/blob/feature/infbyte-4/docs/plans/infbyte-4.0-foundation-integration-plan.md)
+-
+-After Foundation 4.0 is published and verified, the release-ready Infbyte manifest must use `"infocyph/foundation": "^4.0"`, remove the development VCS override, and pass clean normal Composer resolution.
++- [Foundation source and releases](https://github.com/infocyph/Foundation)
++- [Current Foundation 4 contract](https://github.com/infocyph/Foundation/blob/main/docs/foundation-4-api-map.md)
+ 
+ ## Development
+ 
+@@ -87,7 +84,7 @@ Module machine output is schema version 2. `module:install` reconciles the reque
+ 
+ OTP-backed MFA requires an explicitly selected `security.crypto` when the OTP MFA driver is used; selecting passkeys does not enable MFA. Durable Omnibus messaging requires `data.database`. Native packages, migration schemas, and extension requirements are enforced by Foundation's planner.
+ 
+-See the [Foundation module reference](https://github.com/infocyph/Foundation/blob/feature/foundation-3/docs/modules.md) and [configuration ownership reference](https://github.com/infocyph/Foundation/blob/feature/foundation-3/docs/configuration.md) for their current contracts.
++See the [Foundation module reference](https://github.com/infocyph/Foundation/blob/main/docs/modules.md) and [configuration ownership reference](https://github.com/infocyph/Foundation/blob/main/docs/configuration.md) for their current contracts.
+ 
+ ## Configuration and application safety
+ 
+@@ -122,7 +119,7 @@ INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256
+ 
+ A trusted release comprises the compiled native Webrick 6 routing artifact, InterMix 11 ABI-3 application graphs, normalized configuration and generation identity for web/CLI/worker/scheduler. It must fail closed when metadata or artifacts are missing/mismatched; the production request path must not fall back to mutable source configuration.
+ 
+-Do not use this Foundation 4 candidate branch for a final production release until Foundation itself is published and the Infbyte acceptance plan is complete. The [development plan](https://github.com/infocyph/Infbyte/blob/feature/infbyte-4/docs/plans/infbyte-4.0-foundation-integration-plan.md) tracks the remaining host, runtime, release and Composer QA gates.
++Production deployments require a published Foundation 4 version and a verified immutable release built from the installed dependency graph. Keep development VCS overrides out of production manifests.
+ 
+ ## Operating releases and restoring retained state
+ 
+@@ -134,14 +131,14 @@ For rollback, keep the previous compiled generation and its manifest SHA-256 in
+ 
+ Back up and restore application-owned `storage/app`, `storage/uploads`, `storage/sessions`, database volumes, and any selected feature's durable queues with the appropriate native service tooling. Installing, disabling or removing a module must not delete application-owned database tables, uploaded files or retained messages. Validate restores on a separate environment before pointing live workers at the recovered state. When using a persistent host, keep request-specific data in Runwire/Webrick native request scopes, not mutable application singletons.
+ 
+-The candidate CI verifies native Runwire, Swoole and nginx/PHP-FPM HTTP correctness, sustained short-burst request probes, a generation trust mismatch, an explicit rollback, and retained SQLite application records through feature removal/restore. **Shared GitHub runners are not a controlled performance laboratory:** their timings and RSS samples are diagnostics, not certified before/after throughput or memory-regression evidence.
++Application acceptance verifies native Runwire, Swoole and nginx/PHP-FPM HTTP correctness, sustained short-burst request probes, a generation trust mismatch, an explicit rollback, and retained SQLite application records through feature removal/restore. **Shared GitHub runners are not a controlled performance laboratory:** their timings and RSS samples are diagnostics, not certified before/after throughput or memory-regression evidence.
+ 
+ ## QA
+ 
+-Repository verification uses PHPForge's configured commands and the GitHub Security & Standards workflow. In a clean checkout with the Foundation candidate installed:
++Repository verification uses PHPForge's configured commands and the GitHub Security & Standards workflow. In a clean checkout with the published Foundation dependency installed:
+ 
+ ```bash
+ composer ic:ci
+ ```
+ 
+-Qualification of a final published Foundation 4 integration additionally requires PHP 8.4/8.5, lowest/stable dependency consumers, create-project archive, supported direct FPM and Runwire hosts, isolated/parallel requests, immutable releases and reproducible end-to-end performance. Historical Foundation 3 CI does not certify this branch.
++Release qualification requires PHP 8.4/8.5, lowest/stable dependency consumers, create-project archive, supported direct FPM and Runwire hosts, isolated/parallel requests, immutable releases and reproducible end-to-end performance. Historical Foundation 3 CI does not certify this branch.
