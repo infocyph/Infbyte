@@ -66,7 +66,7 @@ it('plans selected packages and configurations without implicitly activating the
 
     expect($plan['schema_version'])->toBe(2)
         ->and($plan['requested'])->toBe(['data.database'])
-        ->and($plan['effects']['require'])->toBe(['infocyph/dblayer' => '^6.1.1'])
+        ->and($plan['effects']['require'])->toBe((new ModuleArchitectureCatalog())->feature('data', 'database')['packages'])
         ->and($plan['effects']['publish'])->toBe(['database.php'])
         ->and($plan['effects']['activate'])->toBe([])
         ->and($plan['effects']['schemas'])->toBe([]);

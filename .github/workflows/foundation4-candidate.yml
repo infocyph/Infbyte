@@ -48,6 +48,37 @@ jobs:
                 exit(1);
             }
           '
+      - name: Record exact Composer-resolved Foundation source
+        shell: bash
+        run: |
+          set -euo pipefail
+          resolved="$(php -r '
+            $lock = json_decode(file_get_contents("composer.lock"), true, flags: JSON_THROW_ON_ERROR);
+            foreach ($lock["packages"] ?? [] as $package) {
+                if (($package["name"] ?? null) !== "infocyph/foundation") {
+                    continue;
+                }
+                $sha = $package["source"]["reference"] ?? $package["dist"]["reference"] ?? "";
+                if (!is_string($sha) || preg_match("/^[a-f0-9]{40}$/D", $sha) !== 1) {
+                    fwrite(STDERR, "Cannot establish an immutable Foundation source SHA.\n");
+                    exit(1);
+                }
+                echo $sha;
+                exit(0);
+            }
+            fwrite(STDERR, "No resolved Foundation package found.\n");
+            exit(1);
+          ')"
+          echo "Foundation source SHA: $resolved"
+          printf 'Foundation source SHA: %s\n' "$resolved" >> "$GITHUB_STEP_SUMMARY"
+          constraint="$(php -r '$c=json_decode(file_get_contents("composer.json"),true, flags:JSON_THROW_ON_ERROR);echo $c["require"]["infocyph/foundation"] ?? "";')"
+          if [[ "$constraint" == "dev-feature/foundation-3" ]]; then
+            upstream="$(git ls-remote https://github.com/infocyph/Foundation.git refs/heads/feature/foundation-3 | awk '{print $1}')"
+            if [[ ! "$upstream" =~ ^[a-f0-9]{40}$ || "$upstream" != "$resolved" ]]; then
+              printf 'Candidate dependency source drift: installed=%s upstream=%s\n' "$resolved" "$upstream" >&2
+              exit 1
+            fi
+          fi
       - name: Verify Foundation 4 schema-v2 Core module inventory
         run: |
           set -euo pipefail

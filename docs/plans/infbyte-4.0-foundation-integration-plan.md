@@ -235,3 +235,25 @@ Source of truth: [Foundation modules](https://github.com/infocyph/Foundation/blo
 - **Source reference:** Foundation `feature/foundation-3` HEAD `596825a563f2c3274c4167bd24fbe86a4531fbba` as inspected; current Foundation 4 source remains externally owned and unmodified. Development branch dependency **floats** with upstream changes until dependency source is frozen in a tested Composer lock/evidence. Final release cannot ship the VCS repository entry or a `dev-` constraint.
 
 - **2026-10-17 — Initial consolidation:** inspected all three Infbyte branches against current `main`, reviewed Foundation 4 Core/three-module/eight-feature direction and pending upstream release gates, selected one `main`-based branch and authored the plan. No runtime source edits; no QA claims.
+
+
+## V1 — Current-source compatibility verification (2026-11-13)
+
+- [x] Replaced the historical DBLayer ^6.1.1 planner-test expectation with
+  the native ModuleArchitectureCatalog package mapping, so the test checks the
+  selected Foundation contract rather than an old package floor.
+- [x] Added a real application HTTP TestKit test of Infbyte's existing
+  /api/health route (Webrick + Foundation, no framework-owned fake route).
+- [x] Added explicit immutable Composer-resolved Foundation source SHA
+  provenance in PHP 8.4/8.5 candidate workflows. Reject source drift against
+  the live Foundation branch for the development candidate.
+- [ ] Exact-head 13-job candidate QA to be verified after this commit.
+- [ ] PHPForge's stable runtime guard must remain **unchanged** until
+  a real published Foundation 4 release and stable Infbyte cutover.
+- [ ] Publisher-hosted Read the Docs checks and published consumer examples
+  remain external to this development batch.
+
+Infbyte docs **live in the Foundation repository** but all application examples
+must use paths in this Infbyte skeleton (for example config/database.php),
+not Foundation's internal resources/config/ template location. The Foundation
+manual is the human-facing source of truth for developer usage.
