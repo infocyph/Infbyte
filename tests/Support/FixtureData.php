@@ -9,8 +9,7 @@ use PHPUnit\Framework\Assert;
 
 /**
  * Validates untyped fixture input before it reaches a typed test boundary.
- *
- * @internal
+ * Shared by the repository's Pest tests, including global-namespace tests.
  */
 final class FixtureData
 {

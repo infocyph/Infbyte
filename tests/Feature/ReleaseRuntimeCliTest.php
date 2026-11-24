@@ -47,7 +47,7 @@ it('builds reports and clears one immutable Foundation release generation', func
                 'active_pointer',
             ])
             ->and($build['release_root'])->toBe($fixture . '/storage/releases')
-            ->and($manifest)->toBeString()->toBeFile()
+            ->and($manifest)->toBeFile()
             ->and(hash_file('sha256', $manifest))->toBe($build['manifest_sha256']);
 
         [$reportExitCode, $reportOutput] = runInfbyteCommand([
@@ -201,8 +201,7 @@ it('reports readiness and Foundation 4 qualified feature groups through the infb
         expect($readinessExitCode)->toBe(0, $readinessOutput)
             ->and($readiness['ready'])->toBeTrue()
             ->and($readiness)->toHaveKey('checks')
-            ->and($modulesExitCode)->toBe(0)
-            ->and($moduleRows)->toBeArray();
+            ->and($modulesExitCode)->toBe(0);
 
         $modules = array_column(FixtureData::rows($moduleRows['modules'] ?? null), null, 'name');
 
@@ -374,8 +373,8 @@ it('fails closed if a previously trusted Foundation generation manifest changes'
         $digest = FixtureData::text($release['manifest_sha256'] ?? null);
 
         expect($code)->toBe(0, $output)
-            ->and($manifest)->toBeString()->toBeFile()
-            ->and($digest)->toBeString()->toMatch('/^[a-f0-9]{64}$/');
+            ->and($manifest)->toBeFile()
+            ->and($digest)->toMatch('/^[a-f0-9]{64}$/');
 
         $bootstrap = new \Infocyph\Foundation\Release\FoundationReleaseBootstrap(
             $fixture . '/storage/releases',

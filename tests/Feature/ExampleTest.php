@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+use Infocyph\Foundation\Application\Application;
 use Infocyph\Webrick\Request\Request;
+use PHPUnit\Framework\Assert;
 
 it('serves the application health endpoint', function (): void {
     $app = require dirname(__DIR__, 2) . '/bootstrap/app.php';
+    Assert::assertInstanceOf(Application::class, $app);
 
     $response = $app->handle(Request::fake(method: 'GET', uri: 'http://localhost/api/health'));
     $payload = json_decode((string) $response->getBody(), true, flags: JSON_THROW_ON_ERROR);

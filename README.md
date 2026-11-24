@@ -20,4 +20,4 @@ See the [Infbyte framework manual](https://github.com/infocyph/Foundation/blob/m
 
 ## License
 
-Infbyte is open-source software licensed under the [MIT license](LICENSE).
+Infbyte is open-source software licensed under the MIT license.

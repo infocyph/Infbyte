@@ -120,8 +120,6 @@ it('keeps Foundation system commands out of application Composer script keys', f
     $composer = FixtureData::json((string) file_get_contents(dirname(__DIR__, 2) . '/composer.json'));
     $scripts = FixtureData::map($composer['scripts'] ?? null);
 
-    expect($scripts)->toBeArray();
-
     foreach ([
         'app:ready',
         'config:cache',
@@ -275,7 +273,10 @@ PHP);
     }
 });
 
-/** @throws \RuntimeException */
+/**
+ * @throws \InvalidArgumentException
+ * @throws \RuntimeException
+ */
 function infbyteSessionCookieId(Response $response): string
 {
     preg_match('/(?:^|;\\s*)infbyte_session=([a-f0-9]{64})/', $response->getHeaderLine('Set-Cookie'), $matches);

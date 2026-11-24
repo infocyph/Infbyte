@@ -193,7 +193,7 @@ it('builds a clean create-project archive and provisions a Foundation 4 release 
 
         expect($reportExitCode)->toBe(0)
             ->and($report['ready'] ?? null)->toBeTrue()
-            ->and($generation)->toBeString()->not->toBe('')
+            ->and($generation)->not->toBe('')
             ->and($report['manifest_sha256'] ?? null)->toMatch('/^[a-f0-9]{64}$/')
             ->and($project . '/storage/releases/generations/' . $generation . '/foundation.php')->toBeFile()
             ->and($project . '/storage/releases/generations/' . $generation . '/config.php')->toBeFile();
@@ -203,7 +203,6 @@ it('builds a clean create-project archive and provisions a Foundation 4 release 
             FixtureData::text($report['manifest_sha256'] ?? null),
         );
         expect($activeGeneration)->toBe($generation)
-            ->and($manifest)->toBeArray()
             ->and($manifest)->toHaveKeys(['web', 'cli', 'worker', 'scheduler']);
 
         $clearOutput = [];
