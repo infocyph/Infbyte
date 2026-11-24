@@ -17,6 +17,10 @@ aliases and obsolete compiled-artifact loading. Core is always installed;
 optional groups are data, security and execution, with eight qualified features.
 No Infbyte router, container, worker manager or event loop is introduced.
 
+## Current development candidate — 2026-11-24
+
+The active dependency is Foundation PR #22 (`plan/foundation-risk-engine-handoff`), not the historical PR #20 branch. Candidate QA must run against the current source on PHP 8.4/8.5/8.6. The risk engine is optional Foundation-owned functionality, not a new Infbyte module or default middleware. Infbyte retains Core-only defaults; developers opt in at their own authentication routes. Foundation owns the Infbyte developer manual.
+
 ## Prepared stable cutover
 
 The [unapplied cutover patch](infbyte-4.0-stable-cutover.patch) changes only
@@ -33,7 +37,7 @@ application archive by the existing `/docs/plans export-ignore` rule.
 
 ## Operator-controlled release sequence
 
-1. Complete Foundation's current-source performance acceptance and release
+1. Complete Foundation PR #22's current-source risk/host qualification and release
    review. Merging, tagging and publication require the operator's decision.
 2. Publish Foundation 4 and verify its source identity and normal Composer
    availability. Only then apply the prepared Infbyte manifest/README patch.
@@ -42,7 +46,7 @@ application archive by the existing `/docs/plans export-ignore` rule.
    from development-only abandoned packages.
 4. Commit the stable cutover and run both application candidate acceptance and
    the published-release workflow on that exact branch revision. Require PHP
-   8.4/8.5, lowest/stable PHPForge checks, published Core and DBLayer no-dev
+   8.4/8.5/8.6, lowest/stable PHPForge checks, published Core and DBLayer no-dev
    consumers, native host acceptance and actual exported project installation.
 5. Review the final source, artifacts and release notes before any Infbyte
    merge, tag or publication. A candidate run cannot close published resolution.

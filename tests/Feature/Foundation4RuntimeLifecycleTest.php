@@ -34,7 +34,7 @@ it('resolves the declared Foundation 4 dependency without activating optional mo
     $foundationPath = InstalledVersions::getInstallPath('infocyph/foundation');
     $constraint = $composer['require']['infocyph/foundation'] ?? '';
 
-    expect($constraint)->toBeIn(['dev-feature/foundation-3', '^4.0'])
+    expect($constraint)->toBeIn(['dev-plan/foundation-risk-engine-handoff', '^4.0'])
         ->and($version)->toBeString()
         ->and($foundationPath)->toBeString()
         ->and($root . '/config/modules.php')->toBeFile();

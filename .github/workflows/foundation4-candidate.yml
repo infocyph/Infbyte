@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        php: ["8.4", "8.5"]
+        php: ["8.4", "8.5", "8.6"]
     steps:
       - uses: actions/checkout@v7
       - name: Set up PHP and Composer
@@ -39,7 +39,7 @@ jobs:
             $constraint = $manifest["require"]["infocyph/foundation"] ?? "";
             $version = Composer\InstalledVersions::getPrettyVersion("infocyph/foundation") ?? "";
             $normalized = Composer\InstalledVersions::getVersion("infocyph/foundation") ?? "";
-            $candidate = $constraint === "dev-feature/foundation-3" && $version === $constraint;
+            $candidate = $constraint === "dev-plan/foundation-risk-engine-handoff" && $version === $constraint;
             $stable = $constraint === "^4.0"
                 && !isset($manifest["repositories"])
                 && preg_match("/^4\\.[0-9]+\\.[0-9]+\\.[0-9]+$/D", $normalized) === 1;
@@ -72,8 +72,8 @@ jobs:
           echo "Foundation source SHA: $resolved"
           printf 'Foundation source SHA: %s\n' "$resolved" >> "$GITHUB_STEP_SUMMARY"
           constraint="$(php -r '$c=json_decode(file_get_contents("composer.json"),true, flags:JSON_THROW_ON_ERROR);echo $c["require"]["infocyph/foundation"] ?? "";')"
-          if [[ "$constraint" == "dev-feature/foundation-3" ]]; then
-            upstream="$(git ls-remote https://github.com/infocyph/Foundation.git refs/heads/feature/foundation-3 | awk '{print $1}')"
+          if [[ "$constraint" == "dev-plan/foundation-risk-engine-handoff" ]]; then
+            upstream="$(git ls-remote https://github.com/infocyph/Foundation.git refs/heads/plan/foundation-risk-engine-handoff | awk '{print $1}')"
             if [[ ! "$upstream" =~ ^[a-f0-9]{40}$ || "$upstream" != "$resolved" ]]; then
               printf 'Candidate dependency source drift: installed=%s upstream=%s\n' "$resolved" "$upstream" >&2
               exit 1
@@ -265,7 +265,7 @@ jobs:
       - name: Set up PHP and Composer
         uses: shivammathur/setup-php@v2
         with:
-          php-version: "8.4"
+          php-version: "8.6"
           extensions: pdo_sqlite, pcntl
           tools: composer:v2
           coverage: none
@@ -362,7 +362,7 @@ jobs:
       - name: Set up PHP and Composer
         uses: shivammathur/setup-php@v2
         with:
-          php-version: "8.4"
+          php-version: "8.6"
           extensions: pcntl, pdo_sqlite, fileinfo, mbstring, ctype, sodium
           tools: composer:v2
           coverage: none
@@ -407,7 +407,7 @@ jobs:
       - name: Set up PHP and Composer
         uses: shivammathur/setup-php@v2
         with:
-          php-version: "8.4"
+          php-version: "8.6"
           extensions: pcntl, pdo_sqlite
           tools: composer:v2
           coverage: none
@@ -419,10 +419,17 @@ jobs:
           set -euo pipefail
           work="$(mktemp -d)"
           trap 'rm -rf "$work"' EXIT
+          upstream="$(git ls-remote https://github.com/infocyph/Infbyte.git refs/heads/feature/infbyte-4 | awk '{print $1}')"
+          [[ "$upstream" == "$HEAD_SHA" ]]
           composer create-project \
             --repository='{"type":"vcs","url":"https://github.com/infocyph/Infbyte.git"}' \
             --no-dev --prefer-dist --no-interaction --no-progress \
-            infocyph/infbyte "$work/project" "dev-feature/infbyte-4#$HEAD_SHA"
+            infocyph/infbyte "$work/project" "dev-feature/infbyte-4"
+          upstream="$(git ls-remote https://github.com/infocyph/Infbyte.git refs/heads/feature/infbyte-4 | awk '{print $1}')"
+          [[ "$upstream" == "$HEAD_SHA" ]]
+          for file in composer.json README.md public/index.php bootstrap/app.php bootstrap/providers.php infbyte; do
+            cmp "$file" "$work/project/$file"
+          done
           cd "$work/project"
           test -f config/modules.php
           test -f .env

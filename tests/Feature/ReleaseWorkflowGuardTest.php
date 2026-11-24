@@ -14,7 +14,7 @@ it('reports the existing required PHPForge checks on pull requests', function ()
         ->not->toHaveKey('if')
         ->not->toHaveKey('needs')
         ->and($phpforge['uses'])->toBe('infocyph/phpforge/.github/workflows/security-standards.yml@main')
-        ->and(json_decode($phpforge['with']['php_versions'], true, flags: JSON_THROW_ON_ERROR))->toBe(['8.4', '8.5'])
+        ->and(json_decode($phpforge['with']['php_versions'], true, flags: JSON_THROW_ON_ERROR))->toBe(['8.4', '8.5', '8.6'])
         ->and(json_decode($phpforge['with']['dependency_versions'], true, flags: JSON_THROW_ON_ERROR))->toBe(['prefer-lowest', 'prefer-stable'])
         ->and($phpforge['with']['fail_on_skipped_tests'])->toBeTrue();
 });
@@ -79,14 +79,14 @@ it('validates the actual CI dependency gate across candidate and stable release 
         rmdir($fixture);
     }
 })->with([
-    'declared candidate' => ['dev-feature/foundation-3', 'dev-feature/foundation-3', 'dev-feature/foundation-3', true, [], 0],
+    'declared candidate' => ['dev-plan/foundation-risk-engine-handoff', 'dev-plan/foundation-risk-engine-handoff', 'dev-plan/foundation-risk-engine-handoff', true, [], 0],
     'published 4.0' => ['^4.0', '4.0.0', '4.0.0.0', false, [], 0],
     'published 4.1' => ['^4.0', 'v4.1.0', '4.1.0.0', false, [], 0],
     'old major' => ['^4.0', '3.0.1', '3.0.1.0', false, [], 1],
     'next major' => ['^4.0', '5.0.0', '5.0.0.0', false, [], 1],
     'prerelease' => ['^4.0', '4.0.0-RC1', '4.0.0.0-RC1', false, [], 1],
-    'development alias' => ['^4.0', 'dev-feature/foundation-3', 'dev-feature/foundation-3', false, ['4.0.0'], 1],
+    'development alias' => ['^4.0', 'dev-plan/foundation-risk-engine-handoff', 'dev-plan/foundation-risk-engine-handoff', false, ['4.0.0'], 1],
     'stable with VCS override' => ['^4.0', '4.0.0', '4.0.0.0', true, [], 1],
-    'wrong candidate branch' => ['dev-feature/foundation-3', 'dev-main', 'dev-main', true, [], 1],
+    'wrong candidate branch' => ['dev-plan/foundation-risk-engine-handoff', 'dev-main', 'dev-main', true, [], 1],
     'unbounded requirement' => ['*', '4.0.0', '4.0.0.0', false, [], 1],
 ]);

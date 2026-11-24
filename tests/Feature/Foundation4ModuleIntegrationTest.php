@@ -13,7 +13,7 @@ function infbyteFeatureSnapshot(array $config = []): array
 {
     return [
         'root_known' => true,
-        'root_requirements' => ['infocyph/foundation' => 'dev-feature/foundation-3'],
+        'root_requirements' => ['infocyph/foundation' => 'dev-plan/foundation-risk-engine-handoff'],
         'installed' => [],
         'enabled' => [],
         'selected_features' => [],

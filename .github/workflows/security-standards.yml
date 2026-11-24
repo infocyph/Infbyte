@@ -50,7 +50,7 @@ jobs:
   phpforge:
     uses: infocyph/phpforge/.github/workflows/security-standards.yml@main
     with:
-      php_versions: '["8.4","8.5"]'
+      php_versions: '["8.4","8.5","8.6"]'
       dependency_versions: '["prefer-lowest","prefer-stable"]'
       php_extensions: "pcntl,pdo_sqlite"
       fail_on_skipped_tests: true
@@ -69,7 +69,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        php: ["8.4","8.5"]
+        php: ["8.4","8.5","8.6"]
     steps:
       - uses: actions/checkout@v7
       - name: Set up PHP and Composer
@@ -129,7 +129,7 @@ jobs:
       - name: Set up PHP and Composer
         uses: shivammathur/setup-php@v2
         with:
-          php-version: "8.4"
+          php-version: "8.6"
           extensions: pcntl, pdo_sqlite
           tools: composer:v2
           coverage: none

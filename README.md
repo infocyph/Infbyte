@@ -4,11 +4,11 @@ Infbyte is the minimal application skeleton for [Infocyph Foundation](https://gi
 
 ## Foundation 4 development integration
 
-**This development branch follows Foundation `feature/foundation-3`, the Foundation 4.0 candidate.** Its `composer.json` temporarily requires `dev-feature/foundation-3` using the Foundation GitHub VCS source. That is an integration dependency, **not** a stable Foundation 4 publication or a production release instruction.
+**This development branch follows Foundation `plan/foundation-risk-engine-handoff`, the Foundation 4.0 candidate.** Its `composer.json` temporarily requires `dev-plan/foundation-risk-engine-handoff` using the Foundation GitHub VCS source. That is an integration dependency, **not** a stable Foundation 4 publication or a production release instruction.
 
 - PHP 8.4+ (64-bit) and Composer 2.
-- [Foundation candidate source](https://github.com/infocyph/Foundation/tree/feature/foundation-3)
-- [Current Foundation 4 contract](https://github.com/infocyph/Foundation/blob/feature/foundation-3/docs/foundation-4-api-map.md)
+- [Foundation candidate source](https://github.com/infocyph/Foundation/tree/plan/foundation-risk-engine-handoff)
+- [Current Foundation 4 contract](https://github.com/infocyph/Foundation/blob/plan/foundation-risk-engine-handoff/docs/foundation-4-api-map.md)
 - [Infbyte integration tracker](https://github.com/infocyph/Infbyte/blob/feature/infbyte-4/docs/plans/infbyte-4.0-foundation-integration-plan.md)
 
 After Foundation 4.0 is published and verified, the release-ready Infbyte manifest must use `"infocyph/foundation": "^4.0"`, remove the development VCS override, and pass clean normal Composer resolution.
@@ -87,7 +87,7 @@ Module machine output is schema version 2. `module:install` reconciles the reque
 
 OTP-backed MFA requires an explicitly selected `security.crypto` when the OTP MFA driver is used; selecting passkeys does not enable MFA. Durable Omnibus messaging requires `data.database`. Native packages, migration schemas, and extension requirements are enforced by Foundation's planner.
 
-See the [Foundation module reference](https://github.com/infocyph/Foundation/blob/feature/foundation-3/docs/modules.md) and [configuration ownership reference](https://github.com/infocyph/Foundation/blob/feature/foundation-3/docs/configuration.md) for their current contracts.
+See the [Foundation module reference](https://github.com/infocyph/Foundation/blob/plan/foundation-risk-engine-handoff/docs/modules.md) and [configuration ownership reference](https://github.com/infocyph/Foundation/blob/plan/foundation-risk-engine-handoff/docs/configuration.md) for their current contracts.
 
 ## Configuration and application safety
 
@@ -144,4 +144,4 @@ Repository verification uses PHPForge's configured commands and the GitHub Secur
 composer ic:ci
 ```
 
-Qualification of a final published Foundation 4 integration additionally requires PHP 8.4/8.5, lowest/stable dependency consumers, create-project archive, supported direct FPM and Runwire hosts, isolated/parallel requests, immutable releases and reproducible end-to-end performance. Historical Foundation 3 CI does not certify this branch.
+Qualification of a final published Foundation 4 integration additionally requires PHP 8.4/8.5/8.6, lowest/stable dependency consumers, create-project archive, supported direct FPM and Runwire hosts, isolated/parallel requests, immutable releases and reproducible end-to-end performance. Historical Foundation 3 CI does not certify this branch.

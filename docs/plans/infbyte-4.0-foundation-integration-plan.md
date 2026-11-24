@@ -1,12 +1,12 @@
 # Infbyte 4.0 — Foundation 4 Integration and Consolidation Plan
 
-> **Status:** **Infbyte 4 candidate implementation and application-owned QA completed** (13/13 checks). Only **published Foundation 4 resolution and Foundation-owned release certification** remain; no merge/tag/publish. Framework-private host internals and optional unselected services are not Infbyte application implementation work.  
+> **Status:** Historical candidate implementation completed; current Foundation PR #22 integration and PHP 8.6 requalification pending. Stable publication remains blocked.
 > **Working branch:** `feature/infbyte-4` (single active implementation branch).  
 > **Base:** Infbyte `main` at `1a968ad72a5ec785e7227459e722ea8982038700`.  
-> **Foundation target:** [Foundation PR #20](https://github.com/infocyph/Foundation/pull/20), branch `feature/foundation-3`; validated executable source `f64cc61e9f89b8f8663b4c21220c344a04354eef` (2026-10-18). Earlier source identities in the journal are historical checkpoints.
-> **Date:** 2026-10-18. **Release status:** Foundation 4.0 is not yet tagged/release-ready; its sustained paired-performance and final acceptance gates remain open.
+> **Foundation target:** [Foundation PR #22](https://github.com/infocyph/Foundation/pull/22), branch `plan/foundation-risk-engine-handoff`. PR #20 and its October source identities below are historical.
+> **Updated:** 2026-11-24. **Release status:** Foundation 4 publication and current-source CI remain pending.
 > **Implementation cadence:** one complete batch → focused tests → full applicable QA → record source/CI evidence → update this tracker → next batch.  
-> **Owner boundary:** modify **Infbyte only**; Foundation `feature/foundation-3` is read-only reference. No merges, tags, publication, or deletion of historical branches.
+> **Owner boundary:** modify **Infbyte only**; Foundation PR #22 is the independently owned framework candidate. No merges, tags, publication, or deletion of historical branches.
 
 ## 1. Objective and source of truth
 
@@ -207,7 +207,7 @@ Source of truth: [Foundation modules](https://github.com/infocyph/Foundation/blo
 
 ## 7. Open external blockers and owner control
 
-- Foundation 4.0 PR #20 is **draft**: current full matched-host sustained performance has inconclusive cases and final upstream release approval remains open. Infbyte can plan and test a candidate but cannot claim final stable 4.0 readiness.
+- Foundation PR #22 is the active draft: current risk-specific host qualification and exact-head QA remain open. Earlier PR #20 performance evidence is historical. Infbyte can test the candidate but cannot claim stable 4.0 readiness.
 - Final public Composer `^4.0` resolution requires a published Foundation 4.0 tag. Do not ship with a development branch alias/VCS override; any isolated candidate check must be explicitly labeled non-release.
 - Confirm exact current production bootstrap/deploy/CLI schema and manifest outputs from source when Batch 1/4 begins rather than guessing based on 3.x field names.
 - Earlier main-based candidate QA was executed and acted on. The new Foundation 4 candidate matrix validates real Docker nginx/FPM, native Runwire, optional no-dev consumers and full PHPForge; the strictly stable release workflow is separately guarded until Foundation 4.0 publication.
@@ -257,3 +257,16 @@ Infbyte docs **live in the Foundation repository** but all application examples
 must use paths in this Infbyte skeleton (for example config/database.php),
 not Foundation's internal resources/config/ template location. The Foundation
 manual is the human-facing source of truth for developer usage.
+
+
+## V2 — Active Foundation 4 integration and PHP 8.6 (2026-11-24)
+
+Foundation supplies framework mechanisms; Infbyte is the application distribution (the same ownership relationship as Illuminate and Laravel). Preserve the lean Core-only application, optional feature topology, public bootstrap/CLI/HTTP contracts and deployment trust. Do not copy Foundation's risk engine into the skeleton or activate it globally. Foundation owns its public application manual; examples use Infbyte application paths.
+
+| Batch | Scope | State |
+| --- | --- | --- |
+| V2 | Switch temporary Composer branch, runtime/gate assertions, README, candidate and published matrices to PHP 8.4–8.6; single-version portable consumer jobs use 8.6; retain real 8.4 FPM/Swoole lanes | Implemented; exact-source hosted CI pending |
+| V3 | Resolve observed current-source application/QA failures and verify all eight selected features, native hosting, distribution and immutable release behavior | Pending CI |
+| V4 | Published Foundation ^4.0 stable cutover, remove VCS override, verify published package and exact-head application/release QA | Blocked until Foundation publication |
+
+No hardcoded revision dependencies. Create-project selects the named candidate branch and checks head identity before/after plus compares critical exported files; stable cutover patch refreshed but not applied. CORE-01, FLOW-02, COMPAT, STRUCT, CONFIG, REQUEST, OPS: preserve current contracts and gates; EXEC-03 hosted verification pending. Historical evidence above does not certify this new source. No merge/tag/publication.
