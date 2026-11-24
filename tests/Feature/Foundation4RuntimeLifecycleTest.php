@@ -32,21 +32,20 @@ it('resolves the declared Foundation 4 dependency without activating optional mo
 
     $version = InstalledVersions::getPrettyVersion('infocyph/foundation');
     $foundationPath = InstalledVersions::getInstallPath('infocyph/foundation');
-    $constraint = $composer['require']['infocyph/foundation'] ?? '';
+    \PHPUnit\Framework\Assert::assertIsArray($composer);
+    $requirements = $composer['require'] ?? null;
+    \PHPUnit\Framework\Assert::assertIsArray($requirements);
+    $constraint = $requirements['infocyph/foundation'] ?? '';
 
-    expect($constraint)->toBeIn(['dev-plan/foundation-risk-engine-handoff', '^4.0'])
+    expect($constraint)->toBe('^4.0')
         ->and($version)->toBeString()
         ->and($foundationPath)->toBeString()
         ->and($root . '/config/modules.php')->toBeFile();
 
-    if ($constraint === '^4.0') {
-        expect($composer)->not->toHaveKey('repositories')
-            ->and(InstalledVersions::getVersion('infocyph/foundation'))->toMatch('/^4\.[0-9]+\.[0-9]+\.[0-9]+$/D');
-    } else {
-        expect($version)->toBe($constraint)
-            ->and($composer['repositories'][0]['url'] ?? null)->toBe('https://github.com/infocyph/Foundation');
-    }
+    expect($composer)->not->toHaveKey('repositories')
+        ->and(InstalledVersions::getVersion('infocyph/foundation'))->toMatch('/^4\\.[0-9]+\\.[0-9]+\\.[0-9]+$/D');
 
+    \PHPUnit\Framework\Assert::assertIsString($foundationPath);
     $modules = require $root . '/config/modules.php';
     expect($modules)->toBe(['features' => []]);
 
@@ -78,14 +77,13 @@ it('keeps production auth secrets indirect and hardened cache resources opt in',
         ->and($cache)->toContain("'valkey' => [");
 });
 
-it('documents the Foundation 4 feature and Core cache lifecycle', function (): void {
+it('keeps the application README minimal and documents the Foundation ownership boundary', function (): void {
     $readme = file_get_contents(dirname(__DIR__, 2) . '/README.md');
     $auth = file_get_contents(dirname(__DIR__, 2) . '/config/auth.php');
 
     expect($readme)->toBeString()
         ->and($readme)->toContain('^4.0')
-        ->and($readme)->toContain('cache:schema:status')
-        ->and($readme)->toContain('cache:schema:install')
+        ->and($readme)->toContain('composer create-project infocyph/infbyte', 'Foundation/blob/main/docs/index.rst')
         ->and($readme)->not->toContain('php infbyte module:install cache')
         ->and($readme)->not->toContain('foundation-3/close-26.6')
         ->and($auth)->toBeString()

@@ -8,12 +8,15 @@ use Infocyph\Foundation\Module\ModuleFeatureCapabilityPolicy;
 use Infocyph\Foundation\Module\ModuleFeatureCommandCatalog;
 use Infocyph\Foundation\Module\ModuleFeaturePlanner;
 
-/** @return array<string, mixed> */
+/**
+ * @param array<string, mixed> $config
+ * @return array{root_known: bool, root_requirements: array<string, string>, installed: array<string, string>, enabled: list<string>, selected_features: list<string>, config: array<string, mixed>, extensions: list<string>, published_configs: list<string>}
+ */
 function infbyteFeatureSnapshot(array $config = []): array
 {
     return [
         'root_known' => true,
-        'root_requirements' => ['infocyph/foundation' => 'dev-plan/foundation-risk-engine-handoff'],
+        'root_requirements' => ['infocyph/foundation' => '^4.0'],
         'installed' => [],
         'enabled' => [],
         'selected_features' => [],

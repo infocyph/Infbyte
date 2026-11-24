@@ -1,7 +1,7 @@
 name: "Security & Standards"
 
-# Keep the existing required PHPForge checks on PRs. Published-package consumers
-# additionally require the stable constraint guard on release events.
+# Qualify normal published Foundation resolution on PRs and release events.
+# Preserve the existing required PHPForge check contexts.
 on:
   pull_request:
     branches: [ "main", "master", "develop", "development" ]
@@ -29,10 +29,13 @@ jobs:
       COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
   stable-constraint:
     name: "Reject non-stable Foundation or VCS overrides"
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.6"
+          coverage: none
       - name: Verify the published Foundation 4 release constraint
         shell: bash
         run: |

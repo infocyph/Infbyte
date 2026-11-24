@@ -273,7 +273,7 @@ it('plans explicit Foundation 4 database feature installation', function (): voi
             ->and($plan['schema_version'] ?? null)->toBe(2)
             ->and($plan['requested'] ?? null)->toContain('data.database')
             ->and($output)->toContain('infocyph/dblayer')
-            ->and($output)->toContain('^6.1.1');
+            ->and($output)->toContain((new \Infocyph\Foundation\Module\ModuleArchitectureCatalog())->feature('data', 'database')['packages']['infocyph/dblayer']);
     } finally {
         removeInfbyteTestDirectory($fixture);
     }
@@ -386,7 +386,7 @@ it('fails closed if a previously trusted Foundation generation manifest changes'
 
         file_put_contents($manifest, "\n/* trust-digest tamper */\n", FILE_APPEND);
         expect(fn() => $bootstrap->web(['base_path' => $fixture]))
-            ->toThrow(RuntimeException::class, 'Foundation generation manifest trust identity mismatch.');
+            ->toThrow(RuntimeException::class, 'Foundation release artifact trust identity mismatch.');
     } finally {
         removeInfbyteTestDirectory($fixture);
     }
@@ -477,7 +477,7 @@ it('supports an explicitly trusted release rollback while preserving retained ap
         );
         expect(fn() => $trusted->trustedActiveManifest(
             $stale->releaseRoot, $stale->trustedFoundationManifestSha256,
-        ))->toThrow(RuntimeException::class, 'Foundation generation manifest trust identity mismatch.');
+        ))->toThrow(RuntimeException::class, 'Foundation release artifact trust identity mismatch.');
 
         [$reportExit, $reportJson] = runInfbyteCommand([
             PHP_BINARY, $fixture . '/infbyte', 'optimize:report', '--json=1',
@@ -523,7 +523,7 @@ it('checks trusted CLI, worker and scheduler release sections using the same dep
             \Infocyph\Foundation\Application\RuntimeMode::Scheduler,
         ] as $runtime) {
             expect(fn() => $invalid->nonWeb(['base_path' => $fixture], $runtime))
-                ->toThrow(RuntimeException::class, 'Foundation generation manifest trust identity mismatch.');
+                ->toThrow(RuntimeException::class, 'Foundation release artifact trust identity mismatch.');
         }
     } finally {
         removeInfbyteTestDirectory($fixture);

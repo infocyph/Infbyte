@@ -26,7 +26,7 @@ it('requires tagged Infbyte releases to pass stable Foundation and published con
     expect($jobs['release']['needs'] ?? [])->toContain('published-core', 'published-database')
         ->and($jobs['release']['if'])->toContain("startsWith(github.ref, 'refs/tags/')")
         ->not->toContain('always(', 'failure(', 'cancelled(')
-        ->and($jobs['stable-constraint']['if'])->toBe("github.event_name != 'pull_request'")
+        ->and($jobs['stable-constraint'])->not->toHaveKey('if')
         ->and($jobs['published-core']['needs'])->toContain('stable-constraint', 'phpforge')
         ->and($jobs['published-database']['needs'])->toBe('published-core');
 
@@ -35,7 +35,7 @@ it('requires tagged Infbyte releases to pass stable Foundation and published con
     }
 });
 
-it('validates the actual CI dependency gate across candidate and stable release identities', function (
+it('validates the actual CI dependency gate against stable and rejected release identities', function (
     string $constraint,
     string $version,
     string $normalized,
@@ -79,14 +79,14 @@ it('validates the actual CI dependency gate across candidate and stable release 
         rmdir($fixture);
     }
 })->with([
-    'declared candidate' => ['dev-plan/foundation-risk-engine-handoff', 'dev-plan/foundation-risk-engine-handoff', 'dev-plan/foundation-risk-engine-handoff', true, [], 0],
+    'development branch' => ['dev-feature/example', 'dev-feature/example', 'dev-feature/example', true, [], 1],
     'published 4.0' => ['^4.0', '4.0.0', '4.0.0.0', false, [], 0],
     'published 4.1' => ['^4.0', 'v4.1.0', '4.1.0.0', false, [], 0],
     'old major' => ['^4.0', '3.0.1', '3.0.1.0', false, [], 1],
     'next major' => ['^4.0', '5.0.0', '5.0.0.0', false, [], 1],
     'prerelease' => ['^4.0', '4.0.0-RC1', '4.0.0.0-RC1', false, [], 1],
-    'development alias' => ['^4.0', 'dev-plan/foundation-risk-engine-handoff', 'dev-plan/foundation-risk-engine-handoff', false, ['4.0.0'], 1],
+    'development alias' => ['^4.0', 'dev-feature/example', 'dev-feature/example', false, ['4.0.0'], 1],
     'stable with VCS override' => ['^4.0', '4.0.0', '4.0.0.0', true, [], 1],
-    'wrong candidate branch' => ['dev-plan/foundation-risk-engine-handoff', 'dev-main', 'dev-main', true, [], 1],
+    'wrong development branch' => ['dev-feature/example', 'dev-main', 'dev-main', true, [], 1],
     'unbounded requirement' => ['*', '4.0.0', '4.0.0.0', false, [], 1],
 ]);

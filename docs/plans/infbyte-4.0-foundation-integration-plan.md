@@ -1,12 +1,12 @@
 # Infbyte 4.0 — Foundation 4 Integration and Consolidation Plan
 
-> **Status:** Historical candidate implementation completed; current Foundation PR #22 integration and PHP 8.6 requalification pending. Stable publication remains blocked.
+> **Status:** Foundation 4.0 is published; stable Infbyte cutover implemented, hosted qualification and static-analysis remediation pending.
 > **Working branch:** `feature/infbyte-4` (single active implementation branch).  
 > **Base:** Infbyte `main` at `1a968ad72a5ec785e7227459e722ea8982038700`.  
-> **Foundation target:** [Foundation PR #22](https://github.com/infocyph/Foundation/pull/22), branch `plan/foundation-risk-engine-handoff`. PR #20 and its October source identities below are historical.
-> **Updated:** 2026-11-24. **Release status:** Foundation 4 publication and current-source CI remain pending.
+> **Foundation target:** published [Foundation 4.0](https://github.com/infocyph/Foundation/releases/tag/4.0), normal Composer `^4.0`; PR #20/#22 and branch identities in earlier checkpoints are historical.
+> **Updated:** 2026-11-24. **Release status:** Foundation published; Infbyte remains unpublished and under qualification.
 > **Implementation cadence:** one complete batch → focused tests → full applicable QA → record source/CI evidence → update this tracker → next batch.  
-> **Owner boundary:** modify **Infbyte only**; Foundation PR #22 is the independently owned framework candidate. No merges, tags, publication, or deletion of historical branches.
+> **Owner boundary:** modify **Infbyte only**; Foundation is the independently published framework library. No merges, tags, publication, or deletion of historical branches.
 
 ## 1. Objective and source of truth
 
@@ -270,3 +270,10 @@ Foundation supplies framework mechanisms; Infbyte is the application distributio
 | V4 | Published Foundation ^4.0 stable cutover, remove VCS override, verify published package and exact-head application/release QA | Blocked until Foundation publication |
 
 No hardcoded revision dependencies. Create-project selects the named candidate branch and checks head identity before/after plus compares critical exported files; stable cutover patch refreshed but not applied. CORE-01, FLOW-02, COMPAT, STRUCT, CONFIG, REQUEST, OPS: preserve current contracts and gates; EXEC-03 hosted verification pending. Historical evidence above does not certify this new source. No merge/tag/publication.
+
+
+## V3/V4 — published dependency cutover and measured compatibility fixes (2026-11-24)
+
+Foundation 4.0 was published at 14:19 UTC. Replace the temporary development constraint with `^4.0`, remove VCS overrides, retire the prepared patch, and require stable normal Composer resolution on PRs as well as release events. Preserve the original PHPForge required contexts, all eight no-dev feature lanes, real FPM/Swoole/native Runwire, archive, independent create-project and trust/migration guards. The Infbyte branch itself remains a development project until maintainer publication. README is minimal and links the maintained Foundation-hosted Infbyte manual; keep Core-only defaults and optional risk admission ownership. No dependency SHA pins.
+
+V2 evidence: [candidate #45387509761](https://github.com/infocyph/Infbyte/actions/runs/45387509761) 11/14 passed; all eight selected features, DB lifecycle, Swoole and independent create-project passed; three Core lanes failed only at configured CI. Four Pest failures: stale DBLayer ^6.1.1 assertion and three outdated generation trust exception strings. [Security #45387510233](https://github.com/infocyph/Infbyte/actions/runs/45387510233) six QA lanes rejected dev runtime dependency and three analysis lanes failed; PHP 8.6 log reported 155 PHPStan and 19 Psalm errors (mostly test types, not production code). Correct stable policy, current catalog package assertion, exact released trust exception and typed planner fixture boundary. Remaining analysis findings require focused remediation against stable source; no skipped tests or weaker gate. CORE-01, TYPE, COMPAT, CONFIG, OPS: cutover implemented; EXEC-03 exact-head hosted resolution and full qualification pending. No merge/tag/publication.

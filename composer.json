@@ -5,17 +5,11 @@
     "type": "project",
     "require": {
         "php": "^8.4",
-        "infocyph/foundation": "dev-plan/foundation-risk-engine-handoff"
+        "infocyph/foundation": "^4.0"
     },
     "require-dev": {
         "infocyph/phpforge": "dev-main@dev"
     },
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://github.com/infocyph/Foundation"
-        }
-    ],
     "autoload": {
         "psr-4": {
             "App\\": "app/"
