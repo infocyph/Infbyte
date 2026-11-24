@@ -33,18 +33,16 @@ it('exports example tests while excluding repository verification tests', functi
     expect($attributes)->toBeString()
         ->and($attributes)->toContain('/.gitattributes export-ignore')
         ->and($attributes)->not->toContain("/tests export-ignore\n")
-        ->and($attributes)->toContain('/tests/Feature/FrameworkRuntimeTest.php export-ignore')
-        ->and($attributes)->toContain('/docs/plans export-ignore')
+        ->and($attributes)->toContain('/tests/Feature/* export-ignore')
+        ->and($attributes)->toContain('/tests/Feature/ExampleTest.php -export-ignore')
+        ->and($attributes)->toContain('/tests/Unit/* export-ignore')
+        ->and($attributes)->toContain('/tests/Unit/ExampleTest.php -export-ignore')
+        ->and($attributes)->toContain('/docs export-ignore')
         ->and($attributes)->toContain('/tests/ci export-ignore')
         ->and($attributes)->toContain('/tests/Support export-ignore')
-        ->and($attributes)->toContain('/tests/Feature/InfbyteManualCompatibilityTest.php export-ignore')
-        ->and($attributes)->toContain('/tests/Feature/ReleaseRuntimeCliTest.php export-ignore')
-        ->and($attributes)->toContain('/tests/Feature/SkeletonDistributionTest.php export-ignore')
-        ->and($attributes)->toContain('/bootstrap/cache/*.php export-ignore')
-        ->and($attributes)->toContain('/bootstrap/cache/config export-ignore')
-        ->and($attributes)->not->toContain('/bootstrap/cache/config/.gitignore -export-ignore')
-        ->and($attributes)->not->toContain('/bootstrap/cache/container/')
-        ->and($attributes)->not->toContain('/bootstrap/cache/routes/')
+        ->and($attributes)->toContain('/graphify-out export-ignore')
+        ->and($attributes)->toContain('/bootstrap/cache/* export-ignore')
+        ->and($attributes)->toContain('/bootstrap/cache/.gitignore -export-ignore')
         ->and($attributes)->toContain('/storage/releases/* export-ignore')
         ->and($attributes)->toContain('/storage/releases/.gitignore -export-ignore');
 });
@@ -86,35 +84,34 @@ it('builds a clean create-project archive and provisions a Foundation 4 release 
         $sourceComposer = FixtureData::json((string) file_get_contents($root . '/composer.json'));
         $exportedComposer = FixtureData::json((string) file_get_contents($project . '/composer.json'));
 
-        $cachedPhpFiles = [];
-        $cacheFiles = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator(
-                $project . '/bootstrap/cache',
-                FilesystemIterator::SKIP_DOTS,
-            ),
-        );
-        foreach ($cacheFiles as $cacheFile) {
-            \PHPUnit\Framework\Assert::assertInstanceOf(\SplFileInfo::class, $cacheFile);
-            if ($cacheFile->isFile() && $cacheFile->getExtension() === 'php') {
-                $cachedPhpFiles[] = $cacheFile->getPathname();
-            }
-        }
-
         expect($project . '/composer.json')->toBeFile()
             ->and($project . '/bootstrap/install.php')->not->toBeFile()
             ->and($project . '/bootstrap/cache/.gitignore')->toBeFile()
+            ->and(scandir($project . '/bootstrap/cache'))->toBe(['.', '..', '.gitignore'])
             ->and($project . '/bootstrap/cache/config')->not->toBeDirectory()
             ->and($project . '/bootstrap/cache/container')->not->toBeDirectory()
             ->and($project . '/bootstrap/cache/routes')->not->toBeDirectory()
             ->and($project . '/storage/cache/.gitignore')->toBeFile()
+            ->and(scandir($project . '/storage/cache'))->toBe(['.', '..', '.gitignore'])
             ->and($project . '/storage/logs/.gitignore')->toBeFile()
+            ->and(scandir($project . '/storage/logs'))->toBe(['.', '..', '.gitignore'])
             ->and($project . '/storage/releases/.gitignore')->toBeFile()
+            ->and(scandir($project . '/storage/releases'))->toBe(['.', '..', '.gitignore'])
             ->and($project . '/storage/sessions/.gitignore')->toBeFile()
+            ->and(scandir($project . '/storage/sessions'))->toBe(['.', '..', '.gitignore'])
             ->and($project . '/storage/uploads/.gitignore')->toBeFile()
+            ->and(scandir($project . '/storage/uploads'))->toBe(['.', '..', '.gitignore'])
             ->and($project . '/.env.example')->toBeFile()
+            ->and($project . '/.env')->not->toBeFile()
+            ->and($project . '/.gitignore')->toBeFile()
+            ->and($project . '/infbyte')->toBeFile()
+            ->and($project . '/deploy.sh')->toBeFile()
+            ->and($project . '/public/.htaccess')->toBeFile()
+            ->and($project . '/app/Http/Controllers/SystemController.php')->toBeFile()
             ->and($project . '/.gitattributes')->not->toBeFile()
             ->and($project . '/.github')->not->toBeDirectory()
-            ->and($project . '/docs/plans')->not->toBeDirectory()
+            ->and($project . '/docs')->not->toBeDirectory()
+            ->and($project . '/graphify-out')->not->toBeDirectory()
             ->and($project . '/tests/ci')->not->toBeDirectory()
             ->and($project . '/tests/Support')->not->toBeDirectory()
             ->and($project . '/tests/Feature/InfbyteManualCompatibilityTest.php')->not->toBeFile()
@@ -129,13 +126,15 @@ it('builds a clean create-project archive and provisions a Foundation 4 release 
             ->and($project . '/tests/Pest.php')->toBeFile()
             ->and($project . '/tests/Feature/ExampleTest.php')->toBeFile()
             ->and($project . '/tests/Unit/ExampleTest.php')->toBeFile()
+            ->and(scandir($project . '/tests'))->toBe(['.', '..', 'Feature', 'Pest.php', 'Unit'])
+            ->and(scandir($project . '/tests/Feature'))->toBe(['.', '..', 'ExampleTest.php'])
+            ->and(scandir($project . '/tests/Unit'))->toBe(['.', '..', 'ExampleTest.php'])
             ->and($project . '/tests/Feature/FrameworkRuntimeTest.php')->not->toBeFile()
             ->and($project . '/tests/Feature/ReleaseRuntimeCliTest.php')->not->toBeFile()
             ->and($project . '/tests/Feature/ReleaseWorkflowGuardTest.php')->not->toBeFile()
             ->and($project . '/tests/Feature/SkeletonDistributionTest.php')->not->toBeFile()
             ->and($project . '/vendor')->not->toBeDirectory()
             ->and($project . '/database')->not->toBeDirectory()
-            ->and($cachedPhpFiles)->toBe([])
             ->and(FixtureData::map($exportedComposer['require'] ?? null)['infocyph/foundation'] ?? null)
             ->toBe(FixtureData::map($sourceComposer['require'] ?? null)['infocyph/foundation'] ?? null)
             ->and(FixtureData::map($exportedComposer['scripts'] ?? null)['post-create-project-cmd'] ?? null)
