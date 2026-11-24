@@ -2,11 +2,9 @@
 
 declare(strict_types=1);
 
-use Infocyph\Foundation\Application\Application;
 use Infocyph\Webrick\Request\Request;
 
 it('serves the application health endpoint', function (): void {
-    /** @var Application $app */
     $app = require dirname(__DIR__, 2) . '/bootstrap/app.php';
 
     $response = $app->handle(Request::fake(method: 'GET', uri: 'http://localhost/api/health'));

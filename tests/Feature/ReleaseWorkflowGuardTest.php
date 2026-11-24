@@ -3,36 +3,57 @@
 declare(strict_types=1);
 
 use Symfony\Component\Yaml\Yaml;
+use Tests\Support\FixtureData;
 
 it('reports the existing required PHPForge checks on pull requests', function (): void {
-    $workflow = Yaml::parseFile(dirname(__DIR__, 2) . '/.github/workflows/security-standards.yml');
-    $phpforge = $workflow['jobs']['phpforge'];
+    $workflow = FixtureData::map(Yaml::parseFile(dirname(__DIR__, 2) . '/.github/workflows/security-standards.yml'));
+    $jobs = FixtureData::map($workflow['jobs'] ?? null);
+    $phpforge = FixtureData::map($jobs['phpforge'] ?? null);
+    $triggers = FixtureData::map($workflow['on'] ?? null);
+    $pullRequest = FixtureData::map($triggers['pull_request'] ?? null);
+    $inputs = FixtureData::map($phpforge['with'] ?? null);
 
     expect($workflow['name'])->toBe('Security & Standards')
-        ->and($workflow['on']['pull_request']['branches'] ?? [])->toContain('main', 'master', 'develop', 'development')
+        ->and($pullRequest['branches'] ?? [])->toContain('main', 'master', 'develop', 'development')
         ->and($phpforge)->not->toHaveKey('name')
         ->not->toHaveKey('if')
         ->not->toHaveKey('needs')
         ->and($phpforge['uses'])->toBe('infocyph/phpforge/.github/workflows/security-standards.yml@main')
-        ->and(json_decode($phpforge['with']['php_versions'], true, flags: JSON_THROW_ON_ERROR))->toBe(['8.4', '8.5', '8.6'])
-        ->and(json_decode($phpforge['with']['dependency_versions'], true, flags: JSON_THROW_ON_ERROR))->toBe(['prefer-lowest', 'prefer-stable'])
-        ->and($phpforge['with']['fail_on_skipped_tests'])->toBeTrue();
+        ->and(json_decode(FixtureData::text($inputs['php_versions'] ?? null), true, flags: JSON_THROW_ON_ERROR))->toBe(['8.4', '8.5', '8.6'])
+        ->and(json_decode(FixtureData::text($inputs['dependency_versions'] ?? null), true, flags: JSON_THROW_ON_ERROR))->toBe(['prefer-lowest', 'prefer-stable'])
+        ->and($inputs['fail_on_skipped_tests'] ?? null)->toBeTrue();
 });
 
 it('requires tagged Infbyte releases to pass stable Foundation and published consumer gates', function (): void {
-    $workflow = Yaml::parseFile(dirname(__DIR__, 2) . '/.github/workflows/security-standards.yml');
-    $jobs = $workflow['jobs'];
+    $workflow = FixtureData::map(Yaml::parseFile(dirname(__DIR__, 2) . '/.github/workflows/security-standards.yml'));
+    $jobs = FixtureData::map($workflow['jobs'] ?? null);
+    $release = FixtureData::map($jobs['release'] ?? null);
+    $stable = FixtureData::map($jobs['stable-constraint'] ?? null);
+    $core = FixtureData::map($jobs['published-core'] ?? null);
+    $database = FixtureData::map($jobs['published-database'] ?? null);
 
-    expect($jobs['release']['needs'] ?? [])->toContain('published-core', 'published-database')
-        ->and($jobs['release']['if'])->toContain("startsWith(github.ref, 'refs/tags/')")
+    expect($release['needs'] ?? [])->toContain('published-core', 'published-database')
+        ->and($release['if'])->toContain("startsWith(github.ref, 'refs/tags/')")
         ->not->toContain('always(', 'failure(', 'cancelled(')
-        ->and($jobs['stable-constraint'])->not->toHaveKey('if')
-        ->and($jobs['published-core']['needs'])->toContain('stable-constraint', 'phpforge')
-        ->and($jobs['published-database']['needs'])->toBe('published-core');
+        ->and($stable)->not->toHaveKey('if')
+        ->and($core['needs'])->toContain('stable-constraint', 'phpforge')
+        ->and($database['needs'])->toBe('published-core');
 
     foreach (['phpforge', 'published-core', 'published-database'] as $job) {
-        expect($jobs[$job]['if'] ?? null)->toBeNull();
+        expect(FixtureData::map($jobs[$job] ?? null)['if'] ?? null)->toBeNull();
     }
+});
+
+it('runs source QA before creating any compiled release generation', function (): void {
+    $workflow = FixtureData::map(Yaml::parseFile(dirname(__DIR__, 2) . '/.github/workflows/foundation4-candidate.yml'));
+    $jobs = FixtureData::map($workflow['jobs'] ?? null);
+    $core = FixtureData::map($jobs['candidate-core'] ?? null);
+    $names = array_column(FixtureData::rows($core['steps'] ?? null), 'name');
+    $qa = array_search('Run configured PHPForge CI (no suppressed failures)', $names, true);
+    $build = array_search('Prepare application and compile one trusted Core release', $names, true);
+    \PHPUnit\Framework\Assert::assertIsInt($qa);
+    \PHPUnit\Framework\Assert::assertIsInt($build);
+    expect($qa)->toBeLessThan($build);
 });
 
 it('validates the actual CI dependency gate against stable and rejected release identities', function (
@@ -44,9 +65,11 @@ it('validates the actual CI dependency gate against stable and rejected release 
     int $expected,
 ): void {
     $root = dirname(__DIR__, 2);
-    $workflow = Yaml::parseFile($root . '/.github/workflows/foundation4-candidate.yml');
-    $steps = array_column($workflow['jobs']['candidate-core']['steps'], 'run', 'name');
-    $step = $steps['Verify Composer metadata and resolve the declared Foundation 4 dependency'];
+    $workflow = FixtureData::map(Yaml::parseFile($root . '/.github/workflows/foundation4-candidate.yml'));
+    $jobs = FixtureData::map($workflow['jobs'] ?? null);
+    $core = FixtureData::map($jobs['candidate-core'] ?? null);
+    $steps = array_column(FixtureData::rows($core['steps'] ?? null), 'run', 'name');
+    $step = FixtureData::text($steps['Verify Composer metadata and resolve the declared Foundation 4 dependency'] ?? null);
     expect(preg_match('/php -r \'(.*?)\'/s', $step, $matches))->toBe(1);
 
     $fixture = sys_get_temp_dir() . '/infbyte-version-gate-' . bin2hex(random_bytes(6));
@@ -69,7 +92,7 @@ it('validates the actual CI dependency gate against stable and rejected release 
                 . '; Composer\\InstalledVersions::reload(' . var_export($installed, true) . ');',
         );
         exec('cd ' . escapeshellarg($fixture) . ' && ' . escapeshellarg(PHP_BINARY)
-            . ' -r ' . escapeshellarg($matches[1]) . ' 2>&1', $output, $status);
+            . ' -r ' . escapeshellarg(FixtureData::text($matches[1] ?? null)) . ' 2>&1', $output, $status);
 
         expect($status)->toBe($expected, implode("\n", $output));
     } finally {

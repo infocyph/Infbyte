@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
+use Tests\Support\FixtureData;
+
 it('ships only core application configuration before module installation', function (): void {
-    $config = array_map(
-        basename(...),
-        glob(dirname(__DIR__, 2) . '/config/*.php') ?: [],
-    );
+    $files = glob(dirname(__DIR__, 2) . '/config/*.php');
+    \PHPUnit\Framework\Assert::assertIsArray($files);
+    $config = array_map(basename(...), $files);
 
     sort($config);
 
@@ -29,6 +30,8 @@ it('exports example tests while excluding repository verification tests', functi
         ->and($attributes)->toContain('/tests/Feature/FrameworkRuntimeTest.php export-ignore')
         ->and($attributes)->toContain('/docs/plans export-ignore')
         ->and($attributes)->toContain('/tests/ci export-ignore')
+        ->and($attributes)->toContain('/tests/Support export-ignore')
+        ->and($attributes)->toContain('/tests/Feature/InfbyteManualCompatibilityTest.php export-ignore')
         ->and($attributes)->toContain('/tests/Feature/ReleaseRuntimeCliTest.php export-ignore')
         ->and($attributes)->toContain('/tests/Feature/SkeletonDistributionTest.php export-ignore')
         ->and($attributes)->toContain('/bootstrap/cache/*.php export-ignore')
@@ -74,16 +77,8 @@ it('builds a clean create-project archive and provisions a Foundation 4 release 
 
         new PharData($archive)->extractTo($project);
 
-        $sourceComposer = json_decode(
-            (string) file_get_contents($root . '/composer.json'),
-            true,
-            flags: JSON_THROW_ON_ERROR,
-        );
-        $exportedComposer = json_decode(
-            (string) file_get_contents($project . '/composer.json'),
-            true,
-            flags: JSON_THROW_ON_ERROR,
-        );
+        $sourceComposer = FixtureData::json((string) file_get_contents($root . '/composer.json'));
+        $exportedComposer = FixtureData::json((string) file_get_contents($project . '/composer.json'));
 
         $cachedPhpFiles = [];
         $cacheFiles = new RecursiveIteratorIterator(
@@ -93,6 +88,7 @@ it('builds a clean create-project archive and provisions a Foundation 4 release 
             ),
         );
         foreach ($cacheFiles as $cacheFile) {
+            \PHPUnit\Framework\Assert::assertInstanceOf(\SplFileInfo::class, $cacheFile);
             if ($cacheFile->isFile() && $cacheFile->getExtension() === 'php') {
                 $cachedPhpFiles[] = $cacheFile->getPathname();
             }
@@ -114,6 +110,8 @@ it('builds a clean create-project archive and provisions a Foundation 4 release 
             ->and($project . '/.github')->not->toBeDirectory()
             ->and($project . '/docs/plans')->not->toBeDirectory()
             ->and($project . '/tests/ci')->not->toBeDirectory()
+            ->and($project . '/tests/Support')->not->toBeDirectory()
+            ->and($project . '/tests/Feature/InfbyteManualCompatibilityTest.php')->not->toBeFile()
             ->and($project . '/config/modules.php')->toBeFile()
             ->and($project . '/.phpforge-report')->not->toBeDirectory()
             ->and($project . '/captainhook.json')->not->toBeFile()
@@ -132,9 +130,9 @@ it('builds a clean create-project archive and provisions a Foundation 4 release 
             ->and($project . '/vendor')->not->toBeDirectory()
             ->and($project . '/database')->not->toBeDirectory()
             ->and($cachedPhpFiles)->toBe([])
-            ->and($exportedComposer['require']['infocyph/foundation'] ?? null)
-            ->toBe($sourceComposer['require']['infocyph/foundation'] ?? null)
-            ->and($exportedComposer['scripts']['post-create-project-cmd'] ?? null)
+            ->and(FixtureData::map($exportedComposer['require'] ?? null)['infocyph/foundation'] ?? null)
+            ->toBe(FixtureData::map($sourceComposer['require'] ?? null)['infocyph/foundation'] ?? null)
+            ->and(FixtureData::map($exportedComposer['scripts'] ?? null)['post-create-project-cmd'] ?? null)
             ->toBe('@php infbyte app:install');
 
         mkdir($project . '/vendor', 0775, true);
@@ -151,8 +149,10 @@ it('builds a clean create-project archive and provisions a Foundation 4 release 
         ), $installOutput, $installExitCode);
 
         expect($installExitCode)->toBe(0, implode("\n", $installOutput))
-            ->and($project . '/.env')->toBeFile()
-            ->and(fileperms($project . '/.env') & 0777)->toBe(0600);
+            ->and($project . '/.env')->toBeFile();
+        $permissions = fileperms($project . '/.env');
+        \PHPUnit\Framework\Assert::assertIsInt($permissions);
+        expect($permissions & 0777)->toBe(0600);
 
         $environment = file_get_contents($project . '/.env');
         expect($environment)->toBeString()
@@ -188,8 +188,8 @@ it('builds a clean create-project archive and provisions a Foundation 4 release 
             escapeshellarg($project),
             escapeshellarg(PHP_BINARY),
         ), $reportOutput, $reportExitCode);
-        $report = json_decode(implode("\n", $reportOutput), true, flags: JSON_THROW_ON_ERROR);
-        $generation = $report['generation'] ?? null;
+        $report = FixtureData::json(implode("\n", $reportOutput));
+        $generation = FixtureData::text($report['generation'] ?? null);
 
         expect($reportExitCode)->toBe(0)
             ->and($report['ready'] ?? null)->toBeTrue()
@@ -198,8 +198,12 @@ it('builds a clean create-project archive and provisions a Foundation 4 release 
             ->and($project . '/storage/releases/generations/' . $generation . '/foundation.php')->toBeFile()
             ->and($project . '/storage/releases/generations/' . $generation . '/config.php')->toBeFile();
 
-        $manifest = require $project . '/storage/releases/generations/' . $generation . '/foundation.php';
-        expect($manifest)->toBeArray()
+        [$activeGeneration, $manifest] = new \Infocyph\Foundation\Release\FoundationReleaseRuntime()->trustedActiveManifest(
+            $project . '/storage/releases',
+            FixtureData::text($report['manifest_sha256'] ?? null),
+        );
+        expect($activeGeneration)->toBe($generation)
+            ->and($manifest)->toBeArray()
             ->and($manifest)->toHaveKeys(['web', 'cli', 'worker', 'scheduler']);
 
         $clearOutput = [];
@@ -229,6 +233,7 @@ function removeInfbyteDistributionFixture(string $directory): void
     );
 
     foreach ($files as $file) {
+        \PHPUnit\Framework\Assert::assertInstanceOf(\SplFileInfo::class, $file);
         if ($file->isDir() && !$file->isLink()) {
             rmdir($file->getPathname());
         } else {

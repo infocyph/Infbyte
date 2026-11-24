@@ -70,6 +70,8 @@ jobs:
           ')"
           echo "Foundation source SHA: $resolved"
           printf 'Foundation source SHA: %s\n' "$resolved" >> "$GITHUB_STEP_SUMMARY"
+      - name: Run configured PHPForge CI (no suppressed failures)
+        run: composer ic:ci
       - name: Verify Foundation 4 schema-v2 Core module inventory
         run: |
           set -euo pipefail
@@ -245,8 +247,6 @@ jobs:
           grep -q 'Foundation 4 release generation is ready' /tmp/infbyte-deploy-build.log
           grep -q '^export INFOCYPH_FOUNDATION_RELEASE_ROOT=' /tmp/infbyte-deploy-build.log
           grep -q '^export INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256=' /tmp/infbyte-deploy-build.log
-      - name: Run configured PHPForge CI (no suppressed failures)
-        run: composer ic:ci
 
   database-consumer:
     name: "No-dev optional database feature lifecycle"

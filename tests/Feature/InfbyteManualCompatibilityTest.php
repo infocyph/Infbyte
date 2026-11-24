@@ -16,8 +16,6 @@ it('runs the documented Infbyte health endpoint through the native HTTP TestKit'
     ])->boot();
 
     $testing = $app->make(TestKit::class);
-    expect($testing)->toBeInstanceOf(TestKit::class);
-
     $testing->http()->get('/api/health')
         ->assertStatus(200)
         ->assertJson(['status' => 'ok']);

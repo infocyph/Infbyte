@@ -12,14 +12,20 @@ use Infocyph\Foundation\Runtime\ExecutionScope;
 use Infocyph\Foundation\Session\BrowserSession;
 use Infocyph\Webrick\Request\Request;
 use Infocyph\Webrick\Response\Response;
+use Tests\Support\FixtureData;
 
-/** @return array<string, mixed> */
+/**
+ * @return array<string, mixed>
+ * @throws \RuntimeException
+ */
 function infbyteTestOptions(): array
 {
     $root = dirname(__DIR__, 2);
+    $pid = getmypid();
+    \PHPUnit\Framework\Assert::assertIsInt($pid);
     $runtime = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
         . '/infbyte-runtime-'
-        . getmypid();
+        . $pid;
 
     foreach (['cache', 'logs', 'sessions', 'uploads'] as $directory) {
         $path = $runtime . DIRECTORY_SEPARATOR . $directory;
@@ -56,10 +62,9 @@ it('constructs exactly the four explicit Foundation runtimes', function (): void
     ];
 
     foreach ($cases as [$factory, $mode, $predicate]) {
-        /** @var callable(array<string, mixed>):Application $factory */
         $app = $factory($options);
 
-        expect($app)->toBeInstanceOf(Application::class)
+        expect($app::class)->toBe(Application::class)
             ->and($app->runtimeMode())->toBe($mode)
             ->and($app->{$predicate}())->toBeTrue()
             ->and($app->booted())->toBeFalse()
@@ -67,7 +72,7 @@ it('constructs exactly the four explicit Foundation runtimes', function (): void
             ->and($app->basePath())->toBe(dirname(__DIR__, 2));
     }
 
-    expect(method_exists(Foundation::class, 'console'))->toBeFalse();
+    expect(get_class_methods(Foundation::class))->not->toContain('console');
 });
 
 it('keeps HTTP unavailable outside the web runtime', function (): void {
@@ -83,10 +88,10 @@ it('resolves only the narrow Foundation application core directly', function ():
     $app = Foundation::web(infbyteTestOptions())->boot();
 
     expect($app->make(Application::class))->toBe($app)
-        ->and($app->config())->toBeInstanceOf(ConfigRepository::class)
-        ->and($app->paths())->toBeInstanceOf(PathManager::class)
-        ->and($app->execution())->toBeInstanceOf(ExecutionScope::class)
-        ->and($app->http())->toBeInstanceOf(HttpKernel::class)
+        ->and($app->config()::class)->toBe(ConfigRepository::class)
+        ->and($app->paths()::class)->toBe(PathManager::class)
+        ->and($app->execution()::class)->toBe(ExecutionScope::class)
+        ->and($app->http()::class)->toBe(HttpKernel::class)
         ->and($app->booted())->toBeTrue();
 
     foreach ([
@@ -112,12 +117,8 @@ it('defines application commands through the explicit command route file', funct
 });
 
 it('keeps Foundation system commands out of application Composer script keys', function (): void {
-    $composer = json_decode(
-        (string) file_get_contents(dirname(__DIR__, 2) . '/composer.json'),
-        true,
-        flags: JSON_THROW_ON_ERROR,
-    );
-    $scripts = $composer['scripts'] ?? [];
+    $composer = FixtureData::json((string) file_get_contents(dirname(__DIR__, 2) . '/composer.json'));
+    $scripts = FixtureData::map($composer['scripts'] ?? null);
 
     expect($scripts)->toBeArray();
 
@@ -139,8 +140,8 @@ it('serves the skeleton routes through canonical embedded Foundation handling', 
 
     $health = $app->handle(Request::fake(method: 'GET', uri: 'http://localhost/api/health'));
     $json = $app->handle(Request::fake(method: 'GET', uri: 'http://localhost/json'));
-    $healthPayload = json_decode((string) $health->getBody(), true, flags: JSON_THROW_ON_ERROR);
-    $jsonPayload = json_decode((string) $json->getBody(), true, flags: JSON_THROW_ON_ERROR);
+    $healthPayload = FixtureData::json((string) $health->getBody());
+    $jsonPayload = FixtureData::json((string) $json->getBody());
 
     expect($app->booted())->toBeTrue()
         ->and($health->getStatusCode())->toBe(200)
@@ -274,6 +275,7 @@ PHP);
     }
 });
 
+/** @throws \RuntimeException */
 function infbyteSessionCookieId(Response $response): string
 {
     preg_match('/(?:^|;\\s*)infbyte_session=([a-f0-9]{64})/', $response->getHeaderLine('Set-Cookie'), $matches);
@@ -281,12 +283,13 @@ function infbyteSessionCookieId(Response $response): string
     return $matches[1] ?? throw new RuntimeException('The response did not contain an Infbyte session cookie.');
 }
 
-/** @return array<string,mixed> */
+/**
+ * @return array<string, mixed>
+ * @throws \JsonException
+ */
 function infbyteSessionJson(Response $response): array
 {
-    $decoded = json_decode((string) $response->getBody(), true, flags: JSON_THROW_ON_ERROR);
-
-    return is_array($decoded) ? $decoded : [];
+    return FixtureData::json((string) $response->getBody());
 }
 
 function infbyteRemoveTestDirectory(string $directory): void
@@ -300,6 +303,7 @@ function infbyteRemoveTestDirectory(string $directory): void
         RecursiveIteratorIterator::CHILD_FIRST,
     );
     foreach ($files as $file) {
+        \PHPUnit\Framework\Assert::assertInstanceOf(\SplFileInfo::class, $file);
         $file->isDir() ? rmdir($file->getPathname()) : unlink($file->getPathname());
     }
 

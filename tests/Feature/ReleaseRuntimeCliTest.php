@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Composer\InstalledVersions;
+use Tests\Support\FixtureData;
 
 it('keeps the Infbyte CLI identity independent of the application display name', function (): void {
     $fixture = createInfbyteCliFixture();
@@ -34,8 +35,8 @@ it('builds reports and clears one immutable Foundation release generation', func
             '--json=1',
         ], ['APP_ENV' => 'production']);
 
-        $build = json_decode($buildOutput, true, flags: JSON_THROW_ON_ERROR);
-        $manifest = $build['manifest'] ?? null;
+        $build = FixtureData::json($buildOutput);
+        $manifest = FixtureData::text($build['manifest'] ?? null);
 
         expect($buildExitCode)->toBe(0, $buildOutput)
             ->and($build)->toHaveKeys([
@@ -55,7 +56,7 @@ it('builds reports and clears one immutable Foundation release generation', func
             'optimize:report',
             '--json=1',
         ], ['APP_ENV' => 'production']);
-        $report = json_decode($reportOutput, true, flags: JSON_THROW_ON_ERROR);
+        $report = FixtureData::json($reportOutput);
 
         expect($reportExitCode)->toBe(0, $reportOutput)
             ->and($report['ready'] ?? null)->toBeTrue()
@@ -77,7 +78,7 @@ it('builds reports and clears one immutable Foundation release generation', func
             'optimize:report',
             '--json=1',
         ], ['APP_ENV' => 'production']);
-        $empty = json_decode($emptyOutput, true, flags: JSON_THROW_ON_ERROR);
+        $empty = FixtureData::json($emptyOutput);
 
         expect($emptyExitCode)->toBe(0, $emptyOutput)
             ->and($empty['ready'] ?? null)->toBeFalse();
@@ -161,7 +162,7 @@ it('builds and clears compiled command metadata through the infbyte cli wrapper'
         expect($buildExitCode)->toBe(0)
             ->and($buildOutput)->toContain('Command manifest cached: ')
             ->and($manifest)->toBeFile()
-            ->and(glob($fixture . '/bootstrap/cache/.commands-*') ?: [])->toBeEmpty();
+            ->and(glob($fixture . '/bootstrap/cache/.commands-*'))->toBe([]);
 
         [$clearExitCode, $clearOutput] = runInfbyteCommand([
             PHP_BINARY,
@@ -194,8 +195,8 @@ it('reports readiness and Foundation 4 qualified feature groups through the infb
             '--json=true',
         ]);
 
-        $readiness = json_decode($readinessOutput, true, flags: JSON_THROW_ON_ERROR);
-        $moduleRows = json_decode($modulesOutput, true, flags: JSON_THROW_ON_ERROR);
+        $readiness = FixtureData::json($readinessOutput);
+        $moduleRows = FixtureData::json($modulesOutput);
 
         expect($readinessExitCode)->toBe(0, $readinessOutput)
             ->and($readiness['ready'])->toBeTrue()
@@ -203,18 +204,18 @@ it('reports readiness and Foundation 4 qualified feature groups through the infb
             ->and($modulesExitCode)->toBe(0)
             ->and($moduleRows)->toBeArray();
 
-        $modules = array_column($moduleRows['modules'] ?? [], null, 'name');
+        $modules = array_column(FixtureData::rows($moduleRows['modules'] ?? null), null, 'name');
 
         expect($moduleRows['schema_version'] ?? null)->toBe(2)
             ->and(array_keys($modules))->toBe(['data', 'security', 'execution'])
-            ->and($modules['data']['features'])->toBe(['data.database', 'data.filesystem'])
-            ->and($modules['security']['features'])->toBe([
+            ->and(FixtureData::map($modules['data'] ?? null)['features'] ?? null)->toBe(['data.database', 'data.filesystem'])
+            ->and(FixtureData::map($modules['security'] ?? null)['features'] ?? null)->toBe([
                 'security.crypto',
                 'security.validation',
                 'security.mfa',
                 'security.passkey',
             ])
-            ->and($modules['execution']['features'])->toBe([
+            ->and(FixtureData::map($modules['execution'] ?? null)['features'] ?? null)->toBe([
                 'execution.messaging',
                 'execution.communication',
             ]);
@@ -243,7 +244,7 @@ it('keeps core cache outside module lifecycle and exposes its schema commands', 
             '--json=1',
         ], ['APP_CAPABILITIES' => 'cache']);
 
-        $schema = json_decode($schemaOutput, true, flags: JSON_THROW_ON_ERROR);
+        $schema = FixtureData::json($schemaOutput);
 
         expect($moduleExitCode)->not->toBe(0)
             ->and($moduleOutput)->toContain('cache')
@@ -267,7 +268,7 @@ it('plans explicit Foundation 4 database feature installation', function (): voi
             '--json=1',
         ]);
 
-        $plan = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+        $plan = FixtureData::json($output);
 
         expect($exitCode)->toBe(0, $output)
             ->and($plan['schema_version'] ?? null)->toBe(2)
@@ -312,7 +313,7 @@ it('delegates native HTTP host selection and protocol policy to Runwire', functi
             '--dry-run',
             '--json=1',
         ]);
-        $result = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+        $result = FixtureData::json($output);
 
         expect($exitCode)->toBe(0, $output)
             ->and($result['requested_runtime'] ?? null)->toBe('native')
@@ -327,7 +328,7 @@ it('delegates native HTTP host selection and protocol policy to Runwire', functi
             '--dry-run',
             '--json=1',
         ]);
-        $auto = json_decode($autoOutput, true, flags: JSON_THROW_ON_ERROR);
+        $auto = FixtureData::json($autoOutput);
 
         expect($autoExit)->toBe(0, $autoOutput)
             ->and($auto['requested_runtime'] ?? null)->toBe('auto')
@@ -368,9 +369,9 @@ it('fails closed if a previously trusted Foundation generation manifest changes'
             'optimize',
             '--json=1',
         ], ['APP_ENV' => 'production']);
-        $release = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
-        $manifest = $release['manifest'] ?? null;
-        $digest = $release['manifest_sha256'] ?? null;
+        $release = FixtureData::json($output);
+        $manifest = FixtureData::text($release['manifest'] ?? null);
+        $digest = FixtureData::text($release['manifest_sha256'] ?? null);
 
         expect($code)->toBe(0, $output)
             ->and($manifest)->toBeString()->toBeFile()
@@ -380,7 +381,7 @@ it('fails closed if a previously trusted Foundation generation manifest changes'
             $fixture . '/storage/releases',
             $digest,
         );
-        expect($bootstrap->web(['base_path' => $fixture]))->toBeInstanceOf(
+        expect($bootstrap->web(['base_path' => $fixture])::class)->toBe(
             \Infocyph\Foundation\Routing\WebReleaseRuntime::class,
         );
 
@@ -405,7 +406,7 @@ it('rotates trusted release generations without deleting application-owned state
             'optimize',
             '--json=1',
         ], ['APP_ENV' => 'production']);
-        $first = json_decode($firstOutput, true, flags: JSON_THROW_ON_ERROR);
+        $first = FixtureData::json($firstOutput);
 
         [$nextExit, $nextOutput] = runInfbyteCommand([
             PHP_BINARY,
@@ -413,13 +414,13 @@ it('rotates trusted release generations without deleting application-owned state
             'optimize',
             '--json=1',
         ], ['APP_ENV' => 'production']);
-        $next = json_decode($nextOutput, true, flags: JSON_THROW_ON_ERROR);
+        $next = FixtureData::json($nextOutput);
 
         expect($firstExit)->toBe(0, $firstOutput)
             ->and($nextExit)->toBe(0, $nextOutput)
             ->and($first['generation'])->not->toBe($next['generation'])
             ->and($next['manifest'])->toBeFile()
-            ->and($next['manifest_sha256'])->toBe(hash_file('sha256', $next['manifest']))
+            ->and($next['manifest_sha256'])->toBe(hash_file('sha256', FixtureData::text($next['manifest'] ?? null)))
             ->and($retained)->toBeFile()
             ->and(file_get_contents($retained))->toBe('application-owned-file');
 
@@ -429,7 +430,7 @@ it('rotates trusted release generations without deleting application-owned state
             'optimize:report',
             '--json=1',
         ], ['APP_ENV' => 'production']);
-        $report = json_decode($reportOutput, true, flags: JSON_THROW_ON_ERROR);
+        $report = FixtureData::json($reportOutput);
 
         expect($reportExit)->toBe(0, $reportOutput)
             ->and($report['ready'] ?? null)->toBeTrue()
@@ -451,21 +452,21 @@ it('supports an explicitly trusted release rollback while preserving retained ap
         [$firstExit, $firstJson] = runInfbyteCommand([
             PHP_BINARY, $fixture . '/infbyte', 'optimize', '--json=1',
         ], ['APP_ENV' => 'production']);
-        $first = json_decode($firstJson, true, flags: JSON_THROW_ON_ERROR);
+        $first = FixtureData::json($firstJson);
 
         [$secondExit, $secondJson] = runInfbyteCommand([
             PHP_BINARY, $fixture . '/infbyte', 'optimize', '--json=1',
         ], ['APP_ENV' => 'production']);
-        $second = json_decode($secondJson, true, flags: JSON_THROW_ON_ERROR);
+        $second = FixtureData::json($secondJson);
 
         expect($firstExit)->toBe(0, $firstJson)
             ->and($secondExit)->toBe(0, $secondJson)
             ->and($first['generation'])->not->toBe($second['generation']);
 
         $active = new \Infocyph\Foundation\Release\ActiveGeneration();
-        $pointer = $active->activate($releaseRoot, $first['generation']);
+        $pointer = $active->activate($releaseRoot, FixtureData::text($first['generation'] ?? null));
         $trusted = new \Infocyph\Foundation\Release\FoundationReleaseRuntime();
-        $current = $trusted->trustedActiveManifest($releaseRoot, $first['manifest_sha256']);
+        $current = $trusted->trustedActiveManifest($releaseRoot, FixtureData::text($first['manifest_sha256'] ?? null));
 
         expect($pointer)->toBeFile()
             ->and($current[0])->toBe($first['generation'])
@@ -473,7 +474,7 @@ it('supports an explicitly trusted release rollback while preserving retained ap
             ->and(file_get_contents($retained))->toBe('retained-session-state');
 
         $stale = new \Infocyph\Foundation\Release\FoundationReleaseBootstrap(
-            $releaseRoot, $second['manifest_sha256'],
+            $releaseRoot, FixtureData::text($second['manifest_sha256'] ?? null),
         );
         expect(fn() => $trusted->trustedActiveManifest(
             $stale->releaseRoot, $stale->trustedFoundationManifestSha256,
@@ -482,7 +483,7 @@ it('supports an explicitly trusted release rollback while preserving retained ap
         [$reportExit, $reportJson] = runInfbyteCommand([
             PHP_BINARY, $fixture . '/infbyte', 'optimize:report', '--json=1',
         ], ['APP_ENV' => 'production']);
-        $report = json_decode($reportJson, true, flags: JSON_THROW_ON_ERROR);
+        $report = FixtureData::json($reportJson);
         expect($reportExit)->toBe(0, $reportJson)
             ->and($report['generation'] ?? null)->toBe($first['generation'])
             ->and($report['manifest_sha256'] ?? null)->toBe($first['manifest_sha256'])
@@ -499,23 +500,22 @@ it('checks trusted CLI, worker and scheduler release sections using the same dep
         [$code, $output] = runInfbyteCommand([
             PHP_BINARY, $fixture . '/infbyte', 'optimize', '--json=1',
         ], ['APP_ENV' => 'production']);
-        $release = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+        $release = FixtureData::json($output);
 
         expect($code)->toBe(0, $output);
         $bootstrap = new \Infocyph\Foundation\Release\FoundationReleaseBootstrap(
-            $release['release_root'], $release['manifest_sha256'],
+            FixtureData::text($release['release_root'] ?? null), FixtureData::text($release['manifest_sha256'] ?? null),
         );
         foreach ([
             \Infocyph\Foundation\Application\RuntimeMode::Cli,
             \Infocyph\Foundation\Application\RuntimeMode::Worker,
             \Infocyph\Foundation\Application\RuntimeMode::Scheduler,
         ] as $runtime) {
-            expect($bootstrap->nonWeb(['base_path' => $fixture], $runtime))
-                ->toBeInstanceOf(\Infocyph\Foundation\Application\Application::class);
+            expect($bootstrap->nonWeb(['base_path' => $fixture], $runtime)->runtimeMode())->toBe($runtime);
         }
 
         $invalid = new \Infocyph\Foundation\Release\FoundationReleaseBootstrap(
-            $release['release_root'], str_repeat('0', 64),
+            FixtureData::text($release['release_root'] ?? null), str_repeat('0', 64),
         );
         foreach ([
             \Infocyph\Foundation\Application\RuntimeMode::Cli,
@@ -534,6 +534,7 @@ it('checks trusted CLI, worker and scheduler release sections using the same dep
  * @param list<string> $arguments
  * @param array<string, string> $environment
  * @return array{0:int,1:string}
+ * @throws \InvalidArgumentException
  */
 function runInfbyteCommand(array $arguments, array $environment = []): array
 {
@@ -559,6 +560,10 @@ function runInfbyteCommand(array $arguments, array $environment = []): array
     return [$exitCode, implode("\n", $output)];
 }
 
+/**
+ * @throws \RuntimeException
+ * @throws \Random\RandomException
+ */
 function createInfbyteCliFixture(): string
 {
     $root = dirname(__DIR__, 2);
@@ -595,6 +600,7 @@ function createInfbyteCliFixture(): string
     return $fixture;
 }
 
+/** @throws \RuntimeException */
 function copyInfbyteTestDirectory(string $source, string $destination): void
 {
     if (!mkdir($destination, 0775, true) && !is_dir($destination)) {
@@ -628,6 +634,7 @@ function removeInfbyteTestDirectory(string $directory): void
     );
 
     foreach ($entries as $entry) {
+        \PHPUnit\Framework\Assert::assertInstanceOf(\SplFileInfo::class, $entry);
         $path = $entry->getPathname();
 
         if ($entry->isLink() || $entry->isFile()) {

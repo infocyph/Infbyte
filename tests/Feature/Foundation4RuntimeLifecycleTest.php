@@ -45,7 +45,6 @@ it('resolves the declared Foundation 4 dependency without activating optional mo
     expect($composer)->not->toHaveKey('repositories')
         ->and(InstalledVersions::getVersion('infocyph/foundation'))->toMatch('/^4\\.[0-9]+\\.[0-9]+\\.[0-9]+$/D');
 
-    \PHPUnit\Framework\Assert::assertIsString($foundationPath);
     $modules = require $root . '/config/modules.php';
     expect($modules)->toBe(['features' => []]);
 
