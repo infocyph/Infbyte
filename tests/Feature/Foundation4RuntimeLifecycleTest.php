@@ -35,9 +35,7 @@ it('resolves the declared Foundation 4 dependency without activating optional mo
     \PHPUnit\Framework\Assert::assertIsArray($composer);
     $requirements = $composer['require'] ?? null;
     \PHPUnit\Framework\Assert::assertIsArray($requirements);
-    $constraint = $requirements['infocyph/foundation'] ?? '';
-
-    expect($constraint)->toBe('^4.0')
+    expect($requirements['infocyph/foundation'] ?? null)->toBe('^4.0')
         ->and($version)->toBeString()
         ->and($foundationPath)->toBeString()
         ->and($root . '/config/modules.php')->toBeFile();

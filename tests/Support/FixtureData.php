@@ -17,13 +17,9 @@ final class FixtureData
     public static function map(mixed $value): array
     {
         Assert::assertIsArray($value);
-        $map = [];
-        foreach ($value as $key => $entry) {
-            Assert::assertIsString($key);
-            $map[$key] = $entry;
-        }
+        $keys = array_map(self::text(...), array_keys($value));
 
-        return $map;
+        return array_combine($keys, array_values($value));
     }
 
     /** @return list<array<string, mixed>> */
