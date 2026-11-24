@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace Tests\Feature;
+
 use Symfony\Component\Yaml\Yaml;
 use Tests\Support\FixtureData;
 

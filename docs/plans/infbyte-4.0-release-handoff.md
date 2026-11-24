@@ -20,7 +20,8 @@ integration log records published Foundation 4.0 and source
 - [x] All eight selected no-dev features and retained database state (V5 integration; final-head confirmation pending).
 - [ ] Native/direct HTTP hosts, release trust and rollback.
 - [ ] Independent create-project and published Core/DBLayer archive consumers.
-- [ ] Close review findings and verify final release evidence.
+- [x] Prior review findings resolved (V6; recheck final head).
+- [ ] Verify final release evidence.
 - [ ] Maintainer approval, merge, tag and publication.
 
 The detailed [integration tracker](infbyte-4.0-foundation-integration-plan.md)

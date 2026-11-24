@@ -2,6 +2,12 @@
 
 declare(strict_types=1);
 
+namespace Tests\Feature;
+
+use FilesystemIterator;
+use PharData;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use Tests\Support\FixtureData;
 
 it('ships only core application configuration before module installation', function (): void {

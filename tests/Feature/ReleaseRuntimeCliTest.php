@@ -2,7 +2,15 @@
 
 declare(strict_types=1);
 
+namespace Tests\Feature;
+
 use Composer\InstalledVersions;
+use DirectoryIterator;
+use FilesystemIterator;
+use InvalidArgumentException;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use RuntimeException;
 use Tests\Support\FixtureData;
 
 it('keeps the Infbyte CLI identity independent of the application display name', function (): void {
