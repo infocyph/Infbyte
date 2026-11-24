@@ -2,11 +2,18 @@
 
 declare(strict_types=1);
 
+namespace Tests\Feature;
+
+use FilesystemIterator;
+use PharData;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use Tests\Support\FixtureData;
+
 it('ships only core application configuration before module installation', function (): void {
-    $config = array_map(
-        basename(...),
-        glob(dirname(__DIR__, 2) . '/config/*.php') ?: [],
-    );
+    $files = glob(dirname(__DIR__, 2) . '/config/*.php');
+    \PHPUnit\Framework\Assert::assertIsArray($files);
+    $config = array_map(basename(...), $files);
 
     sort($config);
 
@@ -14,6 +21,7 @@ it('ships only core application configuration before module installation', funct
         'app.php',
         'auth.php',
         'cache.php',
+        'modules.php',
         'notifications.php',
         'router.php',
     ]);
@@ -25,14 +33,16 @@ it('exports example tests while excluding repository verification tests', functi
     expect($attributes)->toBeString()
         ->and($attributes)->toContain('/.gitattributes export-ignore')
         ->and($attributes)->not->toContain("/tests export-ignore\n")
-        ->and($attributes)->toContain('/tests/Feature/FrameworkRuntimeTest.php export-ignore')
-        ->and($attributes)->toContain('/tests/Feature/ReleaseRuntimeCliTest.php export-ignore')
-        ->and($attributes)->toContain('/tests/Feature/SkeletonDistributionTest.php export-ignore')
-        ->and($attributes)->toContain('/bootstrap/cache/*.php export-ignore')
-        ->and($attributes)->toContain('/bootstrap/cache/config/* export-ignore')
-        ->and($attributes)->toContain('/bootstrap/cache/config/.gitignore -export-ignore')
-        ->and($attributes)->not->toContain('/bootstrap/cache/container/')
-        ->and($attributes)->not->toContain('/bootstrap/cache/routes/')
+        ->and($attributes)->toContain('/tests/Feature/* export-ignore')
+        ->and($attributes)->toContain('/tests/Feature/ExampleTest.php -export-ignore')
+        ->and($attributes)->toContain('/tests/Unit/* export-ignore')
+        ->and($attributes)->toContain('/tests/Unit/ExampleTest.php -export-ignore')
+        ->and($attributes)->toContain('/docs export-ignore')
+        ->and($attributes)->toContain('/tests/ci export-ignore')
+        ->and($attributes)->toContain('/tests/Support export-ignore')
+        ->and($attributes)->toContain('/graphify-out export-ignore')
+        ->and($attributes)->toContain('/bootstrap/cache/* export-ignore')
+        ->and($attributes)->toContain('/bootstrap/cache/.gitignore -export-ignore')
         ->and($attributes)->toContain('/storage/releases/* export-ignore')
         ->and($attributes)->toContain('/storage/releases/.gitignore -export-ignore');
 });
@@ -47,7 +57,7 @@ it('uses the trusted Foundation runtime as the production web entrypoint', funct
         ->and($entrypoint)->not->toContain('AutoEmitter');
 });
 
-it('builds a clean create-project archive and provisions a Foundation 3 release generation', function (): void {
+it('builds a clean create-project archive and provisions a Foundation 4 release generation', function (): void {
     $root = dirname(__DIR__, 2);
     $fixture = sys_get_temp_dir() . '/infbyte-distribution-' . bin2hex(random_bytes(6));
     $archiveBase = $fixture . '/infbyte';
@@ -71,44 +81,41 @@ it('builds a clean create-project archive and provisions a Foundation 3 release 
 
         new PharData($archive)->extractTo($project);
 
-        $sourceComposer = json_decode(
-            (string) file_get_contents($root . '/composer.json'),
-            true,
-            flags: JSON_THROW_ON_ERROR,
-        );
-        $exportedComposer = json_decode(
-            (string) file_get_contents($project . '/composer.json'),
-            true,
-            flags: JSON_THROW_ON_ERROR,
-        );
-
-        $cachedPhpFiles = [];
-        $cacheFiles = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator(
-                $project . '/bootstrap/cache',
-                FilesystemIterator::SKIP_DOTS,
-            ),
-        );
-        foreach ($cacheFiles as $cacheFile) {
-            if ($cacheFile->isFile() && $cacheFile->getExtension() === 'php') {
-                $cachedPhpFiles[] = $cacheFile->getPathname();
-            }
-        }
+        $sourceComposer = FixtureData::json((string) file_get_contents($root . '/composer.json'));
+        $exportedComposer = FixtureData::json((string) file_get_contents($project . '/composer.json'));
 
         expect($project . '/composer.json')->toBeFile()
             ->and($project . '/bootstrap/install.php')->not->toBeFile()
             ->and($project . '/bootstrap/cache/.gitignore')->toBeFile()
-            ->and($project . '/bootstrap/cache/config/.gitignore')->toBeFile()
+            ->and(scandir($project . '/bootstrap/cache'))->toBe(['.', '..', '.gitignore'])
+            ->and($project . '/bootstrap/cache/config')->not->toBeDirectory()
             ->and($project . '/bootstrap/cache/container')->not->toBeDirectory()
             ->and($project . '/bootstrap/cache/routes')->not->toBeDirectory()
             ->and($project . '/storage/cache/.gitignore')->toBeFile()
+            ->and(scandir($project . '/storage/cache'))->toBe(['.', '..', '.gitignore'])
             ->and($project . '/storage/logs/.gitignore')->toBeFile()
+            ->and(scandir($project . '/storage/logs'))->toBe(['.', '..', '.gitignore'])
             ->and($project . '/storage/releases/.gitignore')->toBeFile()
+            ->and(scandir($project . '/storage/releases'))->toBe(['.', '..', '.gitignore'])
             ->and($project . '/storage/sessions/.gitignore')->toBeFile()
+            ->and(scandir($project . '/storage/sessions'))->toBe(['.', '..', '.gitignore'])
             ->and($project . '/storage/uploads/.gitignore')->toBeFile()
+            ->and(scandir($project . '/storage/uploads'))->toBe(['.', '..', '.gitignore'])
             ->and($project . '/.env.example')->toBeFile()
+            ->and($project . '/.env')->not->toBeFile()
+            ->and($project . '/.gitignore')->toBeFile()
+            ->and($project . '/infbyte')->toBeFile()
+            ->and($project . '/deploy.sh')->toBeFile()
+            ->and($project . '/public/.htaccess')->toBeFile()
+            ->and($project . '/app/Http/Controllers/SystemController.php')->toBeFile()
             ->and($project . '/.gitattributes')->not->toBeFile()
             ->and($project . '/.github')->not->toBeDirectory()
+            ->and($project . '/docs')->not->toBeDirectory()
+            ->and($project . '/graphify-out')->not->toBeDirectory()
+            ->and($project . '/tests/ci')->not->toBeDirectory()
+            ->and($project . '/tests/Support')->not->toBeDirectory()
+            ->and($project . '/tests/Feature/InfbyteManualCompatibilityTest.php')->not->toBeFile()
+            ->and($project . '/config/modules.php')->toBeFile()
             ->and($project . '/.phpforge-report')->not->toBeDirectory()
             ->and($project . '/captainhook.json')->not->toBeFile()
             ->and($project . '/composer.lock')->not->toBeFile()
@@ -119,15 +126,18 @@ it('builds a clean create-project archive and provisions a Foundation 3 release 
             ->and($project . '/tests/Pest.php')->toBeFile()
             ->and($project . '/tests/Feature/ExampleTest.php')->toBeFile()
             ->and($project . '/tests/Unit/ExampleTest.php')->toBeFile()
+            ->and(scandir($project . '/tests'))->toBe(['.', '..', 'Feature', 'Pest.php', 'Unit'])
+            ->and(scandir($project . '/tests/Feature'))->toBe(['.', '..', 'ExampleTest.php'])
+            ->and(scandir($project . '/tests/Unit'))->toBe(['.', '..', 'ExampleTest.php'])
             ->and($project . '/tests/Feature/FrameworkRuntimeTest.php')->not->toBeFile()
             ->and($project . '/tests/Feature/ReleaseRuntimeCliTest.php')->not->toBeFile()
+            ->and($project . '/tests/Feature/ReleaseWorkflowGuardTest.php')->not->toBeFile()
             ->and($project . '/tests/Feature/SkeletonDistributionTest.php')->not->toBeFile()
             ->and($project . '/vendor')->not->toBeDirectory()
             ->and($project . '/database')->not->toBeDirectory()
-            ->and($cachedPhpFiles)->toBe([])
-            ->and($exportedComposer['require']['infocyph/foundation'] ?? null)
-            ->toBe($sourceComposer['require']['infocyph/foundation'] ?? null)
-            ->and($exportedComposer['scripts']['post-create-project-cmd'] ?? null)
+            ->and(FixtureData::map($exportedComposer['require'] ?? null)['infocyph/foundation'] ?? null)
+            ->toBe(FixtureData::map($sourceComposer['require'] ?? null)['infocyph/foundation'] ?? null)
+            ->and(FixtureData::map($exportedComposer['scripts'] ?? null)['post-create-project-cmd'] ?? null)
             ->toBe('@php infbyte app:install');
 
         mkdir($project . '/vendor', 0775, true);
@@ -144,8 +154,10 @@ it('builds a clean create-project archive and provisions a Foundation 3 release 
         ), $installOutput, $installExitCode);
 
         expect($installExitCode)->toBe(0, implode("\n", $installOutput))
-            ->and($project . '/.env')->toBeFile()
-            ->and(fileperms($project . '/.env') & 0777)->toBe(0600);
+            ->and($project . '/.env')->toBeFile();
+        $permissions = fileperms($project . '/.env');
+        \PHPUnit\Framework\Assert::assertIsInt($permissions);
+        expect($permissions & 0777)->toBe(0600);
 
         $environment = file_get_contents($project . '/.env');
         expect($environment)->toBeString()
@@ -181,18 +193,21 @@ it('builds a clean create-project archive and provisions a Foundation 3 release 
             escapeshellarg($project),
             escapeshellarg(PHP_BINARY),
         ), $reportOutput, $reportExitCode);
-        $report = json_decode(implode("\n", $reportOutput), true, flags: JSON_THROW_ON_ERROR);
-        $generation = $report['generation'] ?? null;
+        $report = FixtureData::json(implode("\n", $reportOutput));
+        $generation = FixtureData::text($report['generation'] ?? null);
 
         expect($reportExitCode)->toBe(0)
             ->and($report['ready'] ?? null)->toBeTrue()
-            ->and($generation)->toBeString()->not->toBe('')
+            ->and($generation)->not->toBe('')
             ->and($report['manifest_sha256'] ?? null)->toMatch('/^[a-f0-9]{64}$/')
             ->and($project . '/storage/releases/generations/' . $generation . '/foundation.php')->toBeFile()
             ->and($project . '/storage/releases/generations/' . $generation . '/config.php')->toBeFile();
 
-        $manifest = require $project . '/storage/releases/generations/' . $generation . '/foundation.php';
-        expect($manifest)->toBeArray()
+        [$activeGeneration, $manifest] = new \Infocyph\Foundation\Release\FoundationReleaseRuntime()->trustedActiveManifest(
+            $project . '/storage/releases',
+            FixtureData::text($report['manifest_sha256'] ?? null),
+        );
+        expect($activeGeneration)->toBe($generation)
             ->and($manifest)->toHaveKeys(['web', 'cli', 'worker', 'scheduler']);
 
         $clearOutput = [];
@@ -222,6 +237,7 @@ function removeInfbyteDistributionFixture(string $directory): void
     );
 
     foreach ($files as $file) {
+        \PHPUnit\Framework\Assert::assertInstanceOf(\SplFileInfo::class, $file);
         if ($file->isDir() && !$file->isLink()) {
             rmdir($file->getPathname());
         } else {

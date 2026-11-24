@@ -84,7 +84,7 @@ if [[ -z "$release_root" || ! "$manifest_sha256" =~ ^[a-f0-9]{64}$ ]]; then
     exit 70
 fi
 
-printf '\nFoundation 3 release generation is ready.\n'
+printf '\nFoundation 4 release generation is ready.\n'
 printf 'Configure the web/runtime supervisor with these immutable deployment inputs:\n'
 printf 'export INFOCYPH_FOUNDATION_RELEASE_ROOT=%q\n' "$release_root"
 printf 'export INFOCYPH_FOUNDATION_RELEASE_MANIFEST_SHA256=%q\n' "$manifest_sha256"
